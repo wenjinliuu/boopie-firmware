@@ -14,6 +14,7 @@ set(srcs
     "ime/boopie_pinyin.c"
     "ime/boopie_pinyin_dict.c"
     "store/boopie_assets.c"
+    "sound/boopie_sound.c"
     "boopie_text.c"
     "font/boopie_pixel_font.c"
     "font/boopie_pixel_glyphs.c")
@@ -28,7 +29,7 @@ endif()
 
 idf_component_register(
     SRCS ${srcs}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound"
     REQUIRES esp_driver_i2c
     PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs
 )

@@ -18,6 +18,7 @@
 #include "boopie_pages.h"   /* Boopie: the power menu */
 #include "boopie_games.h"   /* Boopie: the buttons in a game */
 #include "boopie_input.h"   /* Boopie: text entry */
+#include "boopie_sound.h"   /* Boopie: goodbye */
 #include "muse_input.h"
 
 #include <stdint.h>
@@ -99,6 +100,7 @@ static void power_off(void)
     muse_state_set_level(0);
     muse_state_set_mode(MUSE_MODE_OFF);
     muse_state_set_caption("GOODBYE!");
+    boopie_sound_play(BOOPIE_SOUND_OFF);
     vTaskDelay(pdMS_TO_TICKS(GOODBYE_MS));
     boopie_clock_save();   /* Boopie: the clock carries on from here next power-up */
     esp_err_t err = muse_board->power_off();

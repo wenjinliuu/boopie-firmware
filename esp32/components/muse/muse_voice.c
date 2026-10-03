@@ -15,6 +15,7 @@
  */
 
 #include "muse_voice.h"
+#include "boopie_sound.h"   /* Boopie: its sounds, played here as the speaker's owner */
 
 #include <math.h>
 #include <stdio.h>
@@ -811,7 +812,7 @@ static void voice_task(void *arg)
             muse_input_event_t ev;
             bool asleep = muse_state_asleep();
             bool battery = muse_state_on_battery();
-            bool rest = asleep && battery && !s_chirp && !s_mp3test && !s_loopback;
+            bool rest = asleep && battery && !s_chirp && !s_mp3test && !s_loopback && !boopie_sound_pending();
 #if HOLD_NOTES
             /* A press goes first: send_held() leaves it queued and returns
              * without backing off, so retrying before it's read would spin. */
@@ -841,6 +842,19 @@ static void voice_task(void *arg)
             if (s_chirp) {
                 s_chirp = false;
                 muse_audio_chirp(1);
+                pre_reset();
+            }
+            boopie_sound_t sound;   /* Boopie: a sound asked for, while nothing else is playing */
+            if (boopie_sound_take(&sound) && muse_settings_speaker_on()) {
+                static int16_t *pcm;
+                if (!pcm) {
+                    pcm = heap_caps_malloc(BOOPIE_SOUND_MAX_FRAMES * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+                }
+                size_t n = pcm ? boopie_sound_render(sound, pcm, BOOPIE_SOUND_MAX_FRAMES) : 0;
+                for (size_t i = 0; i < n; i += MUSE_AUDIO_CHUNK) {
+                    muse_audio_write(pcm + i, n - i < MUSE_AUDIO_CHUNK ? n - i : MUSE_AUDIO_CHUNK);
+                }
+                s_settle = SETTLE_CHUNKS;   /* the mic hears its tail: skip it */
                 pre_reset();
             }
             if (s_mp3test) {

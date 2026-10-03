@@ -11,6 +11,7 @@
 #include "boopie_avatar.h"
 #include "boopie_font.h"
 #include "boopie_pixel.h"
+#include "boopie_sound.h"
 #include "boopie_whack.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -172,6 +173,7 @@ static void set_paused(bool on)
 static void finish(void)
 {
     s_state = G_OVER;
+    boopie_sound_play(BOOPIE_SOUND_GAME_OVER);
     int xp, stars, best;
     bool record;
     boopie_pet_event_t ev;
@@ -227,7 +229,10 @@ static void on_press(lv_event_t *e)
     case G_PLAY: {
         lv_area_t a;
         lv_obj_get_coords(s_image, &a);
-        boopie_whack_tap(&s_game, (float)(p.x - a.x1) / CELL, (float)(p.y - a.y1) / CELL);
+        int points = boopie_whack_tap(&s_game, (float)(p.x - a.x1) / CELL, (float)(p.y - a.y1) / CELL);
+        if (points) {
+            boopie_sound_play(points < 0 ? BOOPIE_SOUND_CLOUD : points >= 3 ? BOOPIE_SOUND_GOLD : BOOPIE_SOUND_SCORE);
+        }
         break;
     }
     default:

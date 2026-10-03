@@ -14,6 +14,7 @@
 #endif
 
 #include "boopie_avatar.h"
+#include "boopie_sound.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -723,6 +724,11 @@ static void flash_overlay(boopie_overlay_t o, float secs)
 /* Show what a pet call earned: eating, a level-up. */
 static void show_event(const boopie_pet_event_t *ev)
 {
+    if (ev->levels > 0) {
+        boopie_sound_play(BOOPIE_SOUND_LEVEL_UP);
+    } else if (ev->fed) {
+        boopie_sound_play(BOOPIE_SOUND_EAT);
+    }
     if (ev->fed) {
         boopie_avatar_react(BOOPIE_EXPR_EATING, 3.0f);
         flash_overlay(BOOPIE_OVERLAY_HEARTS, 4.5f);
@@ -773,6 +779,8 @@ bool boopie_avatar_tap(int gx, int gy)
     bool fed = boopie_pet_tap(&s_pet_state, now, &ev);
     if (fed) {
         s_pet_mood = BOOPIE_EXPR_IDLE;
+    } else {
+        boopie_sound_play(BOOPIE_SOUND_POKE);
     }
     show_event(&ev);
     return fed;

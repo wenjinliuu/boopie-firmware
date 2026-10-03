@@ -22,6 +22,7 @@
 
 #include "boopie_assets.h"  /* Boopie */
 #include "boopie_clock.h"   /* Boopie */
+#include "boopie_sound.h"   /* Boopie */
 #include "boopie_store.h"   /* Boopie */
 #include "muse_audio.h"
 #include "muse_battery.h"
@@ -77,6 +78,7 @@ void muse_app_run(const muse_board_t *board)
     muse_battery_init();
     muse_state_set_caption("WAKING UP...");
     ESP_ERROR_CHECK(muse_ui_start());
+    boopie_sound_play(BOOPIE_SOUND_BOOT);   /* Boopie: hello, once the voice task is up */
     ESP_LOGI(TAG, "UI built: free internal %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
     QueueHandle_t q = xQueueCreate(16, sizeof(muse_input_event_t));
