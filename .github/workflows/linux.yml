@@ -14,10 +14,9 @@
 
 name: Linux client
 
+# Boopie: upstream CI only runs by hand; boopie.yml builds our board.
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read

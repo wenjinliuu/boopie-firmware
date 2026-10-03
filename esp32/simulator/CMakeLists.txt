@@ -36,6 +36,9 @@ option(MUSE_SIM_FETCH_DEPS
        ON)
 option(MUSE_SIM_SANITIZERS "Build the simulator with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MUSE_SIM_WARNINGS_AS_ERRORS "Treat simulator warnings as errors" OFF)
+# Boopie: preview the Waveshare ESP32-S3-Touch-AMOLED-1.75C (466 x 466) instead
+# of the SenseCAP Watcher.
+option(MUSE_SIM_WAVESHARE_175C "Simulate the Waveshare 1.75C round screen" OFF)
 
 set(MUSE_SIM_LVGL_VERSION "9.5.0")
 set(MUSE_SIM_SDL_MIN_VERSION "2.0.18")
@@ -181,6 +184,9 @@ if(APPLE)
 endif()
 
 target_compile_options(muse_simulator PRIVATE -Wall -Wextra -Wpedantic)
+if(MUSE_SIM_WAVESHARE_175C)
+    target_compile_definitions(muse_simulator PRIVATE MUSE_SIM_WAVESHARE_175C=1)
+endif()
 if(MUSE_SIM_WARNINGS_AS_ERRORS)
     target_compile_options(muse_simulator PRIVATE -Werror)
 endif()

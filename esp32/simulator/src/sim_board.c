@@ -20,7 +20,12 @@
 #include "src/drivers/sdl/lv_sdl_mouse.h"
 #include "src/drivers/sdl/lv_sdl_window.h"
 
+#if MUSE_SIM_WAVESHARE_175C
+/* Boopie: Waveshare 1.75C, as in components/muse/boards/board_waveshare_s3_175c.c. */
+#define WATCHER_RESOLUTION 466
+#else
 #define WATCHER_RESOLUTION 412
+#endif
 
 static lv_display_t *s_display;
 
@@ -75,6 +80,18 @@ static esp_err_t sim_power_off(void)
 }
 
 static const muse_board_t s_sim_board = {
+#if MUSE_SIM_WAVESHARE_175C
+    .name = "Waveshare 1.75C Simulator",
+    .width = WATCHER_RESOLUTION,
+    .height = WATCHER_RESOLUTION,
+    .round = true,
+    .touch = true,
+    .diagonal_in = 1.75f,
+    .talk_button = "top",
+    .aux_button = "bottom",
+    .talk_hint = { LV_ALIGN_CENTER, 153, -129 },
+    .aux_hint = { LV_ALIGN_CENTER, 153, 129 },
+#else
     .name = "SenseCAP Watcher Simulator",
     .width = WATCHER_RESOLUTION,
     .height = WATCHER_RESOLUTION,
@@ -84,6 +101,7 @@ static const muse_board_t s_sim_board = {
     .talk_button = "wheel",
     .aux_button = "scroll",
     .talk_hint = { LV_ALIGN_CENTER, 100, -143 },
+#endif
     .frame_ms = 40,
     .init = sim_init,
     .display_start = sim_display_start,

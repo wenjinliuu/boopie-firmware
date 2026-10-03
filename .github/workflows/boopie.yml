@@ -1,0 +1,151 @@
+# Copyright (c) 2026 Boopie contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Boopie's cloud build: firmware for the Waveshare ESP32-S3-Touch-AMOLED-1.75C,
+# host tests, and screenshots from the UI simulator on the same 466 x 466
+# round screen. The SDK token comes from the MUSE_SDK_TOKEN secret and is never
+# printed or committed; without it the firmware still builds but can't pair.
+
+name: Boopie firmware
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    name: Firmware (Waveshare 1.75C)
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.0.1
+    defaults:
+      run:
+        shell: bash
+        working-directory: esp32
+    env:
+      BUILD_DIR: build-boopie-175c
+      DEFAULTS: sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # The token goes in an overlay loaded last, inside the gitignored build
+      # directory, so it never lands in the repository or the log.
+      - name: Inject SDK token
+        env:
+          MUSE_SDK_TOKEN: ${{ secrets.MUSE_SDK_TOKEN }}
+        run: |
+          mkdir -p "$BUILD_DIR"
+          if [ -n "$MUSE_SDK_TOKEN" ]; then
+            printf 'CONFIG_GADGET_SDK_TOKEN="%s"\n' "$MUSE_SDK_TOKEN" > "$BUILD_DIR/sdkconfig.token"
+            echo "DEFAULTS=$DEFAULTS;$BUILD_DIR/sdkconfig.token" >> "$GITHUB_ENV"
+            echo "SDK token: set from MUSE_SDK_TOKEN"
+          else
+            echo "::warning::MUSE_SDK_TOKEN is not set: this firmware builds but can't pair with Muse."
+          fi
+
+      # The build fails if the app no longer fits its 4 MB slot.
+      - name: Build
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          idf.py -B "$BUILD_DIR" -DIDF_TARGET=esp32s3 -DSDKCONFIG="$BUILD_DIR/sdkconfig" \
+            -DSDKCONFIG_DEFAULTS="$DEFAULTS" build
+          idf.py -B "$BUILD_DIR" -DIDF_TARGET=esp32s3 -DSDKCONFIG="$BUILD_DIR/sdkconfig" \
+            -DSDKCONFIG_DEFAULTS="$DEFAULTS" merge-bin -o boopie-waveshare-s3-175c-merged.bin
+          idf.py -B "$BUILD_DIR" -DIDF_TARGET=esp32s3 -DSDKCONFIG="$BUILD_DIR/sdkconfig" \
+            -DSDKCONFIG_DEFAULTS="$DEFAULTS" size
+
+      # Everything a flash needs, without the token overlay or sdkconfig.
+      - name: Collect firmware
+        run: |
+          out="$GITHUB_WORKSPACE/out"
+          mkdir -p "$out/flash"
+          cp "$BUILD_DIR/boopie-waveshare-s3-175c-merged.bin" "$out/"
+          (cd "$BUILD_DIR" && cp --parents muse-gadget.bin bootloader/bootloader.bin \
+            partition_table/partition-table.bin ota_data_initial.bin flash_args \
+            "$out/flash/")
+          {
+            echo "commit: $GITHUB_SHA"
+            echo "board: Waveshare ESP32-S3-Touch-AMOLED-1.75C"
+            echo "idf: $(cd "$IDF_PATH" && git describe --tags 2>/dev/null || echo v6.0.1)"
+            echo "token: $([ -f "$BUILD_DIR/sdkconfig.token" ] && echo yes || echo no)"
+            echo "merged image: flash at 0x0"
+          } > "$out/BUILD_INFO.txt"
+          cat "$out/BUILD_INFO.txt"
+          rm -f "$BUILD_DIR/sdkconfig.token"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boopie-waveshare-s3-175c-${{ github.sha }}
+          path: out/
+          if-no-files-found: error
+
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.0.1
+    defaults:
+      run:
+        shell: bash
+        working-directory: esp32
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # test_noise_core links against the host's PSA Crypto library.
+      - name: Install host crypto library
+        working-directory: .
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends libmbedtls-dev pkg-config
+
+      - name: Boopie tests
+        run: python3 -m unittest discover -s components/boopie/tests -p 'test_*.py' -v
+
+      # The discovery and pairing tests compile cJSON from managed_components/,
+      # which the component manager fetches on configure.
+      - name: Fetch managed components
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          idf.py -B build-host-tests -DSDKCONFIG=build-host-tests/sdkconfig reconfigure
+
+      - name: Upstream tests
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          python -m unittest discover -s tests -p 'test_*.py' -v
+
+  simulator:
+    name: UI simulator (Waveshare 1.75C)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: |
+          cmake -S esp32/simulator -B build/simulator -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUSE_SIM_WAVESHARE_175C=ON \
+            -DMUSE_SIM_WARNINGS_AS_ERRORS=ON
+          cmake --build build/simulator --parallel
+
+      - name: Screenshots
+        run: |
+          pip install -q pillow
+          python3 tools/boopie/sim_shots.py --binary build/simulator/muse_simulator --out shots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boopie-ui-shots-${{ github.sha }}
+          path: shots/
+          if-no-files-found: error

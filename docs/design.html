@@ -211,7 +211,7 @@ footer{margin-top:32px;font-size:12.5px;color:var(--muted)}
   </table></div>
   <h3>形象动画</h3>
   <p>默认形象是 64×64 的像素角色，由代码实时绘制（<code>muse_pixel.c</code>），共 8 种状态：开机、待机、聆听、思考、说话、出错、关机，以及被摸时的开心反应。官方脚本 <code>avatar.py</code> 能让你的 Muse 把自己的形象重画成新的绘制代码，还支持一句话修改，比如“耳朵大一点”。</p>
-  <p>64×64 放大到 466×466 的屏幕上，每个像素约成 7×7 的方块，所以看起来偏粗糙。这是刻意的复古像素风：不占存储，在 S3 上每帧绘制不到 10 毫秒。Muse 生成的用户形象也是同样规格。</p>
+  <p>64×64 在 466×466 的屏幕上放大到 320×320，每个像素成 5×5 的方块（读代码确认），所以看起来偏粗糙。这是刻意的复古像素风：不占存储，在 S3 上每帧绘制不到 10 毫秒。Muse 生成的用户形象也是同样规格。</p>
   <h3>设备命令</h3>
   <p>设备向 Muse 注册命令，Muse 在对话中调用它们。已有的例子包括 <code>display.draw_url</code>（显示网络图片）、<code>sensors.read</code>（读传感器）、<code>camera.capture</code>（拍照，Seeed Watcher 上）。<strong>Boopie 的大部分扩展都会通过新增命令接入 Muse。</strong></p>
 </section>
