@@ -12,6 +12,7 @@
 #include "boopie_avatar.h"
 #include "boopie_font.h"
 #include "boopie_games.h"
+#include "boopie_input.h"
 #include "muse_board.h"
 #include "muse_input.h"
 #include "muse_settings.h"
@@ -175,11 +176,36 @@ static void tick_cards(void)
 
 static lv_obj_t *s_name, *s_level, *s_bar, *s_xp, *s_stars, *s_mood;
 
+static void tick_pet(void);
+
+static void named(const char *text, bool done)
+{
+    const char *error = NULL;
+    if (done && !boopie_avatar_set_pet_name(text, &error)) {
+        set_text(s_mood, "这个名字用不了");
+        return;
+    }
+    tick_pet();
+}
+
+/* Tapping the name renames the pet; left empty, it goes back to its character's. */
+static void on_name(lv_event_t *e)
+{
+    (void)e;
+    boopie_input_open("给它起个名字", boopie_avatar_has_own_name() ? boopie_avatar_pet_name() : "",
+                      "留空就叫角色名", BOOPIE_PET_NAME_CHARS, named);
+}
+
 static void build_pet(lv_obj_t *page)
 {
     title(page, "PET");
     s_name = text(page, &lv_font_montserrat_28, COLOR_TEXT, "");
     lv_obj_align(s_name, LV_ALIGN_TOP_MID, 0, 92);
+    lv_obj_add_flag(s_name, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(s_name, 20);
+    lv_obj_add_event_cb(s_name, on_name, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *hint = text(page, &lv_font_montserrat_20, COLOR_DIM, LV_SYMBOL_EDIT);
+    lv_obj_align_to(hint, s_name, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
     s_level = text(page, &lv_font_montserrat_20, COLOR_ACCENT, "");
     lv_obj_align(s_level, LV_ALIGN_TOP_MID, 0, 146);
 

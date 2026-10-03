@@ -167,6 +167,9 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_avatar.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_games.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_input.c"
+    "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin.c"
+    "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin_dict.c"
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_pixel.c"
     "${BOOPIE_COMPONENT_DIR}/boopie_expr.c"
     "${BOOPIE_COMPONENT_DIR}/pet/boopie_pet.c"
@@ -187,6 +190,7 @@ target_include_directories(muse_simulator PRIVATE
     "${BOOPIE_COMPONENT_DIR}/pet"
     "${BOOPIE_COMPONENT_DIR}/ui"
     "${BOOPIE_COMPONENT_DIR}/game"
+    "${BOOPIE_COMPONENT_DIR}/ime"
     "${BOOPIE_COMPONENT_DIR}"
 )
 

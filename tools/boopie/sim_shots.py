@@ -154,7 +154,9 @@ def render_accessories(binary: Path, out: Path) -> list[Path]:
 PAGES = [("page-home", []), ("page-apps", ["swipe=right"]), ("page-settings", ["swipe=left"]),
          ("page-cards", ["swipe=down"]), ("page-pet", ["swipe=up"]), ("power-menu", ["menu=power"]),
          ("game-ready", ["game=whack"]), ("game-play", ["game=whack", "tap=233,233", "advance=20000"]),
-         ("game-over", ["game=whack", "tap=233,233", "advance=61000"])]
+         ("game-over", ["game=whack", "tap=233,233", "advance=61000"]),
+         ("input-pinyin", ["input=", "tap=233,284", "tap=335,234"]),   # keys 6 then 4: ni, mi ...
+         ("input-typed", ["input=", "tap=233,284", "tap=335,234", "tap=86,184"])]
 
 
 def render_pages(binary: Path, out: Path) -> list[Path]:

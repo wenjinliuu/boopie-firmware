@@ -35,6 +35,7 @@
 #include "muse_ui.h"
 #include "sim_board.h"
 #include "boopie_games.h"
+#include "boopie_input.h"
 #include "boopie_pages.h"
 #include "sim_platform.h"
 #include "sim_services.h"
@@ -71,7 +72,7 @@ static void usage(FILE *out, const char *argv0)
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
             "  tap=X,Y            swipe=left|right|up|down   menu=power\n"
-            "  game=whack\n"
+            "  game=whack         input=TEXT\n"
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
@@ -356,6 +357,11 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
     }
     if (!strcmp(key, "swipe")) {
         return swipe(value, real_time);
+    }
+    if (!strcmp(key, "input")) {   /* text entry, as renaming the pet */
+        boopie_input_open("给它起个名字", value, "留空就叫角色名", 8, NULL);
+        render_for(100, real_time);
+        return true;
     }
     if (!strcmp(key, "game")) {   /* a game opened, as from the apps page */
         bool ok = boopie_games_open_locked(value);

@@ -17,6 +17,7 @@
 #include "boopie_clock.h"   /* Boopie */
 #include "boopie_pages.h"   /* Boopie: the power menu */
 #include "boopie_games.h"   /* Boopie: the buttons in a game */
+#include "boopie_input.h"   /* Boopie: text entry */
 #include "muse_input.h"
 
 #include <stdint.h>
@@ -143,6 +144,10 @@ static void aux_single(void)
         boopie_pages_menu_close();
     } else if (boopie_games_active()) {
         boopie_games_key(false);   /* leave the game */
+    } else if (boopie_input_active()) {
+        muse_board->display_lock(-1);
+        boopie_input_cancel();     /* put away the keys */
+        muse_board->display_unlock();
     } else if (!muse_ui_go_home()) {
         set_asleep(true, muse_board->aux_button);
     }

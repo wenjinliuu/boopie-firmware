@@ -11,6 +11,8 @@ set(srcs
     "device/boopie_shake.c"
     "pet/boopie_pet.c"
     "game/boopie_whack.c"
+    "ime/boopie_pinyin.c"
+    "ime/boopie_pinyin_dict.c"
     "boopie_text.c"
     "font/boopie_pixel_font.c"
     "font/boopie_pixel_glyphs.c")
@@ -23,7 +25,7 @@ endif()
 
 idf_component_register(
     SRCS ${srcs}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime"
     REQUIRES esp_driver_i2c
     PRIV_REQUIRES nvs_flash esp_netif esp_timer
 )
