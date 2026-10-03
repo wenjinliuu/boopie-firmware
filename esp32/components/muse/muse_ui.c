@@ -48,6 +48,7 @@
 #endif
 #include "boopie_avatar.h"
 #include "boopie_font.h"   /* Boopie: Chinese and English reply text */
+#include "boopie_pages.h"  /* Boopie: the pages round the face */
 
 static const char *TAG = "muse_ui";
 
@@ -97,7 +98,9 @@ static lv_indev_t *s_indev;
 static lv_obj_t *s_tv;
 static lv_obj_t *s_face;
 static lv_obj_t *s_settings;
-static lv_obj_t *s_dots[2];
+/* Boopie: the pages round the face (boopie_pages.c): apps, cards, the pet. */
+static lv_obj_t *s_apps, *s_cards, *s_pet;
+static lv_obj_t *s_dots[3];
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_ble_icon;
 static lv_obj_t *s_cover;
@@ -791,16 +794,21 @@ static void build_screen(void)
 
     lv_obj_t *face = scr;
     if (muse_board->touch) {
-        /* Swipe left from Muse for settings. */
+        /* Swipe left from Muse for settings. Boopie: and right for apps, down
+         * for cards, up for the pet; the face in the middle of a cross. */
         s_tv = lv_tileview_create(scr);
         lv_obj_set_style_bg_color(s_tv, lv_color_black(), 0);
         lv_obj_set_style_bg_opa(s_tv, LV_OPA_COVER, 0);
         lv_obj_set_scrollbar_mode(s_tv, LV_SCROLLBAR_MODE_OFF);
-        s_face = lv_tileview_add_tile(s_tv, 0, 0, LV_DIR_RIGHT);
+        s_cards = lv_tileview_add_tile(s_tv, 1, 0, LV_DIR_BOTTOM);
+        s_apps = lv_tileview_add_tile(s_tv, 0, 1, LV_DIR_RIGHT);
+        s_face = lv_tileview_add_tile(s_tv, 1, 1, LV_DIR_ALL);
         /* It never scrolls, but LVGL would size its scrollbars from all its
          * children every time it draws any part of it. */
         lv_obj_set_scrollbar_mode(s_face, LV_SCROLLBAR_MODE_OFF);
-        s_settings = lv_tileview_add_tile(s_tv, 1, 0, LV_DIR_LEFT);
+        s_settings = lv_tileview_add_tile(s_tv, 2, 1, LV_DIR_LEFT);
+        s_pet = lv_tileview_add_tile(s_tv, 1, 2, LV_DIR_TOP);
+        lv_tileview_set_tile(s_tv, s_face, LV_ANIM_OFF);
         face = s_face;
     }
 
@@ -1008,7 +1016,7 @@ static void build_overlays(void)
     lv_obj_t *scr = lv_screen_active();
 
     /* Page dots. */
-    for (int i = 0; i < 2 && s_tv; i++) {
+    for (int i = 0; i < 3 && s_tv; i++) {
         lv_obj_t *d = lv_obj_create(scr);
         lv_obj_remove_style_all(d);
         lv_obj_set_size(d, 8, 8);
@@ -1016,7 +1024,7 @@ static void build_overlays(void)
         lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(d, lv_color_hex(COLOR_DOT_OFF), 0);
         lv_obj_remove_flag(d, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_align(d, LV_ALIGN_BOTTOM_MID, i ? 8 : -8, -14);
+        lv_obj_align(d, LV_ALIGN_BOTTOM_MID, (i - 1) * 16, -14);   /* Boopie: apps, face, settings */
         s_dots[i] = d;
     }
 
@@ -1140,9 +1148,11 @@ static const char *idle_name(muse_wifi_state_t wifi)
 {
     static bool joined;   /* since boot: from then on, a drop is reconnecting */
     switch (wifi) {
-    case MUSE_WIFI_CONNECTED:
+    case MUSE_WIFI_CONNECTED: {
         joined = true;
-        return MODE_NAMES[MUSE_MODE_IDLE];
+        const char *clock = boopie_pages_clock();   /* Boopie: the time, once it's known */
+        return clock ? clock : MODE_NAMES[MUSE_MODE_IDLE];
+    }
     case MUSE_WIFI_OFF:
         return "WI-FI OFF";
     case MUSE_WIFI_NO_NETWORK:
@@ -1162,21 +1172,26 @@ static void update_chrome(float now)
     s_next_settings_tick = now + SETTINGS_TICK_S;
 
     if (s_tv) {
-        int page = lv_tileview_get_tile_active(s_tv) == s_settings;
+        lv_obj_t *active = lv_tileview_get_tile_active(s_tv);
+        int page = active == s_settings;
         bool subpage = muse_settings_ui_in_subpage();
         bool swipe = !page || !subpage;
         if (swipe != lv_obj_has_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE)) {
             lv_obj_set_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE, swipe);
         }
-        int shown = page * 2 + subpage;
+        /* Boopie: three dots for the row (apps, face, settings), none above or below it. */
+        int dot = active == s_apps ? 0 : page ? 2 : 1;
+        bool off_row = active == s_cards || active == s_pet;
+        int shown = dot * 4 + subpage * 2 + off_row;
         if (shown != s_shown_page) {
-            for (int i = 0; i < 2; i++) {
-                lv_obj_set_style_bg_color(s_dots[i], lv_color_hex(i == page ? COLOR_ACCENT : COLOR_DOT_OFF), 0);
-                lv_obj_set_flag(s_dots[i], LV_OBJ_FLAG_HIDDEN, page && subpage);
+            for (int i = 0; i < 3; i++) {
+                lv_obj_set_style_bg_color(s_dots[i], lv_color_hex(i == dot ? COLOR_ACCENT : COLOR_DOT_OFF), 0);
+                lv_obj_set_flag(s_dots[i], LV_OBJ_FLAG_HIDDEN, (page && subpage) || off_row);
             }
             s_shown_page = shown;
         }
-        muse_settings_ui_tick(lv_obj_get_scroll_x(s_tv) > 0);
+        muse_settings_ui_tick(lv_obj_get_scroll_x(s_tv) > lv_obj_get_x(s_face));
+        boopie_pages_tick(active == s_apps || active == s_cards || active == s_pet ? active : NULL);
     }
 
     /* Joining, the icon blinks: the compact layout has no state label. */
@@ -1310,7 +1325,7 @@ static void update_status(muse_mode_t mode, float now)
     uint32_t accent = muse_pixel_accent(mode);
     const char *name = mode == MUSE_MODE_IDLE ? s_idle_name : MODE_NAMES[mode];
 
-    if (name != s_shown_name) {
+    if (name != s_shown_name || strcmp(name, lv_label_get_text(s_state_lbl)) != 0) {   /* Boopie: the clock */
         lv_label_set_text(s_state_lbl, name);
         s_shown_name = name;
     }
@@ -1475,7 +1490,8 @@ static void frame_tick(lv_timer_t *timer)
     if (s_image_dsc.data) {
         return;   /* the image covers the face */
     }
-    if (s_tv && lv_obj_get_scroll_x(s_tv) != 0) {
+    if (s_tv && (lv_obj_get_scroll_x(s_tv) != lv_obj_get_x(s_face)
+                 || lv_obj_get_scroll_y(s_tv) != lv_obj_get_y(s_face))) {
         /* Off screen, or sliding to or from settings: hold still so the
          * slide gets the whole frame time. */
         return;
@@ -1530,6 +1546,7 @@ esp_err_t muse_ui_start(void)
     build_screen();
     if (s_settings) {
         muse_settings_ui_build(s_settings);
+        boopie_pages_build(s_apps, s_cards, s_pet);
     } else {
         muse_menu_build(lv_screen_active(), s_w, s_h);
     }

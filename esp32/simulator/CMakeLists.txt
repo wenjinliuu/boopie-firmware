@@ -165,6 +165,7 @@ add_executable(muse_simulator
     src/sim_settings.c
     # Boopie: the avatars, and the switcher between them and Muse's.
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_avatar.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c"
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_pixel.c"
     "${BOOPIE_COMPONENT_DIR}/boopie_expr.c"
     "${BOOPIE_COMPONENT_DIR}/pet/boopie_pet.c"
@@ -182,6 +183,7 @@ target_include_directories(muse_simulator PRIVATE
     "${BOOPIE_COMPONENT_DIR}/font"
     "${BOOPIE_COMPONENT_DIR}/avatar"
     "${BOOPIE_COMPONENT_DIR}/pet"
+    "${BOOPIE_COMPONENT_DIR}/ui"
     "${BOOPIE_COMPONENT_DIR}"
 )
 
@@ -193,8 +195,8 @@ target_link_libraries(muse_simulator PRIVATE
 
 target_link_libraries(muse_simulator PRIVATE m)
 
-# Boopie: strdup for the settings pages.
-set_source_files_properties("${MUSE_COMPONENT_DIR}/muse_settings_ui.c" PROPERTIES COMPILE_DEFINITIONS
+# Boopie: strdup for the settings pages, localtime_r for the clock.
+set_source_files_properties("${MUSE_COMPONENT_DIR}/muse_settings_ui.c" "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c" PROPERTIES COMPILE_DEFINITIONS
     "_POSIX_C_SOURCE=200809L")
 
 # Boopie: Muse's renderer under the names the avatar switcher calls.

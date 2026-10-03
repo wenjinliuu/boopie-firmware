@@ -22,7 +22,7 @@ endif()
 
 idf_component_register(
     SRCS ${srcs}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui"
     REQUIRES esp_driver_i2c
     PRIV_REQUIRES nvs_flash esp_netif esp_timer
 )
