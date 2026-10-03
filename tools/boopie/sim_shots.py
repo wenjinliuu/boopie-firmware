@@ -112,7 +112,7 @@ def render_scenes(binary: Path, out: Path) -> list[Path]:
                 for avatar in ("muse", "boopie") for scene in SCENES]
 
 
-SKINS = [("boopie", "boopie_starry"), ("codex", "codex_terminal")]
+SKINS = [("boopie", "boopie_starry")]
 
 
 def render_skins(binary: Path, out: Path) -> list[Path]:

@@ -1903,8 +1903,6 @@ typedef struct {
 static const skin_t SKINS[] = {
     { "boopie_starry", "星空", BOOPIE_CHAR_BOOPIE, true, 300, BOOPIE_SCENE_STARS,
       0x2b3170, 0xececff, 0xbe6ec8, 0xffeca0, 0x7676d6, NO_COLOUR, NO_COLOUR, false, FX_BODY_STARRY, FX_FACE_NONE },
-    { "codex_terminal", "复古终端", BOOPIE_CHAR_CODEX, false, 150, BOOPIE_SCENE_MATRIX,
-      0xd6cca8, NO_COLOUR, 0xffaa96, 0x64ff96, NO_COLOUR, 0x0c160e, 0x64ff96, true, FX_BODY_NONE, FX_FACE_SCANLINES },
 };
 #define SKIN_COUNT (int)(sizeof(SKINS) / sizeof(SKINS[0]))
 

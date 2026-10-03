@@ -112,9 +112,12 @@ class BoopiePixelTest(unittest.TestCase):
                 self.compare(jobs, scene)
 
     def test_skins(self) -> None:
-        self.assertEqual(list(ap.SKINS), ["boopie_starry", "codex_terminal"])
+        # Drafts are designs still under review, not in the firmware yet.
+        done = [k for k, sk in ap.SKINS.items() if not sk.draft]
+        self.assertEqual(done, ["boopie_starry"])
         rigs = {R.key: R for R in ap.CHARACTERS}
-        for key, skin in ap.SKINS.items():
+        for key in done:
+            skin = ap.SKINS[key]
             jobs = [(rigs[skin.rig], name, i / ap.FPS, None)
                     for name, length, _ in ap.EXPRESSIONS for i in range(0, round(length * ap.FPS), 4)]
             with self.subTest(skin=key):

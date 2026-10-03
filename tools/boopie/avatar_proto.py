@@ -524,7 +524,7 @@ class GPT(Rig):
     def __init__(self, colour=None, skin=None):
         super().__init__(colour, skin)
         self.rp["out"] = self.ink
-        self.bands = ramp("f6f6f6")
+        self.bands = ramp(getattr(self, "bands_colour", "f6f6f6"))
         self.bands["out"] = self.ink
 
     def draw(self, c, p):
@@ -887,23 +887,137 @@ class Skin:
     glow: tuple | None = None
     outline: tuple | None = None
     extra: dict = field(default_factory=dict)   # rig attributes it sets
-    body_fx: str = ""   # drawn over the body: "starry"
+    body_fx: str = ""   # drawn over the body: "starry", "jelly", "ink", ...
     face_fx: str = ""   # drawn over the face: "scanlines"
+    draft: bool = False # still a design under review, not in the firmware
 
 
 SKINS = {
     "boopie_starry": Skin("boopie_starry", "boopie", "星空", "典藏", 300, "stars", "2b3170",
                           eye=(236, 236, 255), cheek=(190, 110, 200), glow=(255, 236, 160),
                           outline=(118, 118, 214), body_fx="starry"),
-    "codex_terminal": Skin("codex_terminal", "codex", "复古终端", "普通", 150, "matrix", "d6cca8",
-                           cheek=(255, 170, 150), glow=(100, 255, 150),
-                           extra={"screen": (12, 22, 14), "glyph": (100, 255, 150), "glyph_follows_light": False},
-                           face_fx="scanlines"),
+    # Drafts, two a character, for review.
+    "boopie_jelly": Skin("boopie_jelly", "boopie", "果冻", "普通", 150, "bubbles", "7fe6d4",
+                         cheek=(255, 140, 170), outline=(40, 140, 130), body_fx="jelly", draft=True),
+    "muse_astronaut": Skin("muse_astronaut", "muse", "宇航员", "典藏", 300, "stars", "e8ecf2",
+                           extra={"visor": "1d2b4a"}, draft=True),
+    "muse_matcha": Skin("muse_matcha", "muse", "抹茶", "普通", 150, "fireflies", "8fbf6a", draft=True),
+    "gpt_ink": Skin("gpt_ink", "gpt", "水墨", "典藏", 300, "default", "dadada",
+                    cheek=(200, 120, 120), extra={"bands_colour": "c83a3a"}, body_fx="ink", draft=True),
+    "gpt_porcelain": Skin("gpt_porcelain", "gpt", "青花瓷", "普通", 150, "petals", "f4f6fa",
+                          cheek=(150, 170, 230), extra={"bands_colour": "3a5bb8"}, body_fx="porcelain", draft=True),
+    "codex_neon": Skin("codex_neon", "codex", "霓虹", "典藏", 300, "neon_grid", "1c1830",
+                       cheek=(255, 60, 200), outline=(0, 240, 255),
+                       extra={"screen": (10, 0, 20), "glyph": (255, 70, 210), "glyph_follows_light": False},
+                       draft=True),
+    "codex_glitch": Skin("codex_glitch", "codex", "赛博故障", "普通", 150, "glitch", "5a3cf0",
+                         cheek=(0, 255, 200), outline=(20, 10, 60),
+                         extra={"screen": (6, 6, 20), "glyph": (0, 255, 200), "glyph_follows_light": False},
+                         body_fx="cyber", draft=True),
+    "klaude_clay": Skin("klaude_clay", "klaude", "黏土", "普通", 150, "default", "c9764a",
+                        body_fx="clay", draft=True),
+    "klaude_cookie": Skin("klaude_cookie", "klaude", "饼干", "典藏", 300, "default", "dba25e",
+                          outline=(110, 60, 25), body_fx="cookie", draft=True),
+    "whale_koi": Skin("whale_koi", "whale", "锦鲤", "典藏", 300, "bubbles", "f6f2ec",
+                      outline=(150, 70, 50), extra={"belly": ((236, 230, 222), (250, 248, 244))}, body_fx="koi",
+                      draft=True),
+    "whale_deepsea": Skin("whale_deepsea", "whale", "深海", "普通", 150, "fireflies", "16285e",
+                          eye=(220, 255, 255), outline=(60, 180, 220), glow=(80, 240, 255),
+                          extra={"belly": ((30, 52, 104), (40, 72, 134))}, body_fx="glow_spots", draft=True),
+    "doubao_sakura": Skin("doubao_sakura", "doubao", "樱花", "普通", 150, "petals", "f2c9b4",
+                          glow=(255, 160, 200), extra={"hair": "d9809e", "top": "f6c6d6"}, draft=True),
+    "doubao_winter": Skin("doubao_winter", "doubao", "冬装", "典藏", 300, "snow", "f2c9b4",
+                          extra={"top": "c8323c"}, body_fx="winter", draft=True),
 }
 
 
+def in_body(c: Canvas, x, y) -> bool:
+    return 0 <= x < N and 0 <= y < N and bool(c.body[y, x])
+
+
 def skin_body(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
-    if skin.body_fx == "starry":   # stars twinkling inside the body, a few with a cross
+    bx, by = anchors["body"]
+    t = pose.t
+    fx = skin.body_fx
+    if fx == "jelly":       # a glossy highlight and bubbles rising inside
+        for y in range(N):
+            for x in range(N):
+                if in_body(c, x, y) and ((x - bx + 8) / 6) ** 2 + ((y - by + 8) / 3.5) ** 2 <= 1 and BAYER[y % 4][x % 4] < 0.7:
+                    c.put(x, y, (225, 255, 250))
+        for i in range(6):
+            k = (t * (0.15 + h01(i, 3) * 0.2) + h01(i, 1)) % 1
+            x, y = round(bx + (h01(i, 2) - 0.5) * 22), round(by + 10 - k * 22)
+            if in_body(c, x, y):
+                c.put(x, y, (200, 255, 245))
+    elif fx == "ink":       # ink pooling in the lower body, a few drops
+        for y in range(N):
+            for x in range(N):
+                if not in_body(c, x, y):
+                    continue
+                d = (y - by) / 14 + (h01(x // 3, y // 3, 5) - 0.5) * 0.5
+                if d > 0.2 and BAYER[y % 4][x % 4] < d:
+                    c.put(x, y, mix((150, 150, 150), (40, 40, 44), min(1, d)))
+        for i in range(4):
+            x, y = round(bx + (h01(i, 6) - 0.5) * 24), round(by + (h01(i, 7) - 0.8) * 16)
+            if in_body(c, x, y):
+                c.put(x, y, (30, 30, 34))
+    elif fx == "porcelain":  # a blue band and little blue flowers
+        for y in range(N):
+            for x in range(N):
+                if in_body(c, x, y) and 7 <= y - by <= 9 + (x % 4 == 0):
+                    c.put(x, y, (50, 80, 180))
+        for i in range(5):
+            x, y = round(bx + (h01(i, 8) - 0.5) * 22), round(by + (h01(i, 9) - 0.9) * 12)
+            for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+                if in_body(c, x + dx, y + dy):
+                    c.put(x + dx, y + dy, (70, 100, 200) if (dx or dy) else (220, 230, 250))
+    elif fx == "cyber":     # cyan lines across the body, magenta specks
+        for y in range(N):
+            for x in range(N):
+                if in_body(c, x, y):
+                    if (y + int(t * 6)) % 4 == 0:
+                        c.put(x, y, (0, 230, 210))
+                    elif h01(x, y, int(t * 4)) > 0.97:
+                        c.put(x, y, (255, 40, 180))
+    elif fx == "clay":      # thumbprint ridges, lighter and darker
+        for y in range(N):
+            for x in range(N):
+                if in_body(c, x, y):
+                    r = math.hypot(x - bx - 6, y - by + 2)
+                    if int(r) % 3 == 0 and BAYER[y % 4][x % 4] < 0.4:
+                        c.put(x, y, (176, 98, 60))
+    elif fx == "cookie":    # chocolate chips
+        for i in range(10):
+            x, y = round(bx + (h01(i, 10) - 0.5) * 30), round(by + (h01(i, 11) - 0.5) * 20)
+            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                if in_body(c, x + dx, y + dy):
+                    c.put(x + dx, y + dy, (90, 50, 30) if (dx + dy) else (130, 80, 50))
+    elif fx == "koi":       # red-orange patches
+        for i in range(4):
+            px, py = bx + (h01(i, 12) - 0.5) * 24, by + (h01(i, 13) - 0.7) * 16
+            rx, ry = 4 + h01(i, 14) * 4, 3 + h01(i, 15) * 3
+            for y in range(N):
+                for x in range(N):
+                    if in_body(c, x, y) and ((x - px) / rx) ** 2 + ((y - py) / ry) ** 2 <= 1:
+                        c.put(x, y, (238, 92, 50) if BAYER[y % 4][x % 4] > 0.2 else (250, 140, 90))
+    elif fx == "glow_spots":  # glowing spots, pulsing
+        for i in range(9):
+            x, y = round(bx + (h01(i, 16) - 0.5) * 28), round(by + (h01(i, 17) - 0.7) * 18)
+            g = 0.5 + 0.5 * math.sin(t * 2 + i)
+            if in_body(c, x, y):
+                c.put(x, y, mix((40, 90, 140), (120, 255, 255), g))
+    elif fx == "winter":    # a knit beanie with a pompom, and a scarf
+        hx, hy = anchors["slots"]["hat"]
+        cx = round(hx + 3)
+        for y in range(round(hy) - 2, round(hy) + 7):
+            for x in range(cx - 13, cx + 14):
+                d = ((x - cx) / 13) ** 2 + ((y - hy - 7) / 9) ** 2
+                if d <= 1 and y <= hy + 6:
+                    c.put(x, y, (240, 240, 245) if y >= hy + 4 else ((200, 40, 50) if (x + y) % 3 else (230, 80, 90)))
+        for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, -1), (0, 1)):
+            c.put(cx + dx, round(hy) - 3 + dy, (250, 250, 255))
+        wear(c, "scarf", anchors["slots"])
+    if fx == "starry":   # stars twinkling inside the body, a few with a cross
         bx, by = anchors["body"]
         for i in range(18):
             x = round(bx + (h01(i, 7) - 0.5) * 28)
