@@ -147,6 +147,7 @@ class Pose:
     sparkle_speed: float = 0.6
     fx: list = field(default_factory=list)
     dim: float = 1.0
+    wear: tuple = ()           # accessories (ACCESSORIES)
 
 
 # ---------------------------------------------------------------- drawing
@@ -411,7 +412,7 @@ class Boopie(Rig):
         c.shaded(body, self.rp)
         c.outline(body, self.rp["out"])
         light = antenna(c, f, cx + 3, cy - ry + 1, p, self.rp["out"], 2.4, self.light_colour(p), self.rp["out"])
-        return {"face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": light, "show_face": p.scale > 0.6}
+        return {"slots": {"hat": f.pt(27, 27), "eyes": (*f.pt(cx, cy - 1), 7 * f.sx), "neck": (*f.pt(cx, 47), 26 * f.sx)}, "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": light, "show_face": p.scale > 0.6}
 
 
 class Codex(Rig):
@@ -444,7 +445,7 @@ class Codex(Rig):
         for i, (dx, dy) in enumerate(((-3, -1), (-2, 0), (-3, 1), (0, 0), (1, 0))):   # >- on the chest
             c.put(gx + dx, gy + dy, mix(self.glyph, self.rp["mid"], 0.4))
         face = f.pt(32, 27)
-        return {"face": face, "body": f.pt(32, 40), "light": f.pt(44, 14), "show_face": p.scale > 0.6}
+        return {"slots": {"hat": f.pt(31, 10), "eyes": (face[0] - 0.5, face[1], 4.5 * f.sx), "neck": (*f.pt(32, 38), 16 * f.sx)}, "face": face, "body": f.pt(32, 40), "light": f.pt(44, 14), "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
         col = p.light or self.glyph
@@ -530,7 +531,7 @@ class GPT(Rig):
         c.shaded(bands, self.bands)
         c.rim = rim
         c.outline(bands | holes, self.ink)
-        return {"face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": f.pt(42, 17), "show_face": True}
+        return {"slots": {"hat": f.pt(25, 29), "eyes": (*f.pt(cx, cy - 1), 7 * f.sx), "neck": (*f.pt(cx, 48), 24 * f.sx)}, "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": f.pt(42, 17), "show_face": True}
 
 
 GLYPHS = {
@@ -566,7 +567,7 @@ class Klaude(Rig):
                 body |= f.rect(x, 44, x + 3, 51)
         c.shaded(body, self.rp)
         c.outline(body, self.rp["out"])
-        return {"face": f.pt(32, 30), "body": f.pt(32, 35), "light": f.pt(44, 16), "show_face": p.scale > 0.6}
+        return {"slots": {"hat": f.pt(32, 23), "eyes": (*f.pt(32, 30), 7 * f.sx), "neck": (*f.pt(32, 42), 30 * f.sx)}, "face": f.pt(32, 30), "body": f.pt(32, 35), "light": f.pt(44, 16), "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
         eyec = mix(WHITE, p.light, 0.35) if p.light and p.light != WHITE else (255, 246, 236)
@@ -607,7 +608,7 @@ class Whale(Rig):
             c.put(hx, hy - 1 - i, col)
         for dx, dy in ((-2, -h), (2, -h), (-3, -h + 2), (3, -h + 2)):
             c.put(hx + dx, hy + dy, col)
-        return {"face": f.pt(cx, cy - 2), "body": f.pt(cx, cy), "light": (hx, hy - h - 1),
+        return {"slots": {"hat": f.pt(37, 27), "eyes": (*f.pt(cx, cy - 2), 7 * f.sx), "neck": (*f.pt(cx, 47), 24 * f.sx)}, "face": f.pt(cx, cy - 2), "body": f.pt(cx, cy), "light": (hx, hy - h - 1),
                 "show_face": p.scale > 0.6}
 
 
@@ -647,7 +648,7 @@ class Doubao(Rig):
         clip = f.ellipse(45, 16, 2.4, 1.6)
         c.flat(clip, self.light_colour(p))
         c.outline(clip, self.hp["out"])
-        return {"face": f.pt(32, 30), "body": f.pt(32, 44), "light": f.pt(45, 16), "show_face": p.scale > 0.6}
+        return {"slots": {"hat": f.pt(29, 11), "eyes": (*f.pt(32, 30), 6 * f.sx), "neck": (*f.pt(32, 43), 12 * f.sx)}, "face": f.pt(32, 30), "body": f.pt(32, 44), "light": f.pt(45, 16), "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
         c.eye = (58, 36, 30)
@@ -660,6 +661,77 @@ class Doubao(Rig):
 
     def hand_ramp(self):
         return self.rp
+
+
+# ---------------------------------------------------------------- accessories
+# Worn in three slots each character marks where its head, eyes and neck are
+# ("slots" in draw()'s anchors): hat (bottom centre), eyes (centre, half the
+# gap between them), neck (centre, width). One item a slot.
+HAT_SPRITES = {
+    "straw_hat": (["....######....", "...#yyyyyy#...", "...#yyyyyy#...", "..#rrrrrrrr#..",
+                   "##yyyyyyyyyy##", ".############."],
+                  {"#": (120, 82, 40), "y": (240, 200, 110), "r": (220, 70, 80)}),
+    "bow": (["##.....##", "#pp#.#pp#", "#ppp#ppp#", "#pp#.#pp#", "##.....##"],
+            {"#": (150, 40, 80), "p": (255, 120, 170)}),
+    "party_hat": (["...w...", "..www..", "...#...", "..#p#..", "..#y#..", ".#ppp#.", ".#yyy#.", "#ppppp#", "#######"],
+                  {"w": (255, 255, 255), "#": (60, 40, 110), "p": (120, 200, 255), "y": (255, 220, 90)}),
+    "crown": (["g...g...g", "gg.ggg.gg", "ggggggggg", "grgggggbg", "ddddddddd"],
+              {"g": (255, 210, 70), "d": (190, 130, 30), "r": (240, 60, 80), "b": (80, 170, 255)}),
+}
+NECK_SPRITES = {
+    "bow_tie": (["r.....r", "rr.k.rr", "rrrkrrr", "rr.k.rr", "r.....r"],
+                {"r": (220, 50, 70), "k": (120, 20, 40)}),
+}
+ACCESSORIES = {   # name: slot, Chinese name
+    "straw_hat": ("hat", "小草帽"), "bow": ("hat", "蝴蝶结"), "party_hat": ("hat", "生日帽"),
+    "crown": ("hat", "小皇冠"), "round_glasses": ("eyes", "圆眼镜"), "sunglasses": ("eyes", "墨镜"),
+    "scarf": ("neck", "红围巾"), "bow_tie": ("neck", "小领结"),
+}
+
+
+def sprite(c: Canvas, rows, colours, x, y):
+    for j, row in enumerate(rows):
+        for i, ch in enumerate(row):
+            if ch in colours:
+                c.put(x + i, y + j, colours[ch])
+
+
+def wear(c: Canvas, name: str, slots: dict):
+    slot = ACCESSORIES[name][0]
+    if slot == "hat":
+        rows, colours = HAT_SPRITES[name]
+        hx, hy = slots["hat"]
+        sprite(c, rows, colours, round(hx - len(rows[0]) / 2), round(hy) - len(rows) + 1)
+    elif slot == "eyes":
+        ex, ey, gap = slots["eyes"]
+        frame_c = (40, 30, 50) if name == "sunglasses" else (200, 150, 60)
+        for side in (-1, 1):
+            cx = round(ex + side * gap)
+            ring = [(-2, -2), (-1, -3), (0, -3), (1, -3), (2, -2), (3, -1), (3, 0), (3, 1), (2, 2), (1, 3), (0, 3),
+                    (-1, 3), (-2, 2), (-3, 1), (-3, 0), (-3, -1)]
+            if name == "sunglasses":
+                for dy in range(-2, 3):
+                    for dx in range(-2, 3):
+                        if abs(dx) + abs(dy) < 4:
+                            c.put(cx + dx, round(ey) + dy, (30, 30, 40))
+                c.put(cx - 1, round(ey) - 1, (150, 160, 190))
+            for dx, dy in ring:
+                c.put(cx + dx, round(ey) + dy, frame_c)
+        for x in range(round(ex - gap + 3), round(ex + gap - 2)):
+            c.put(x, round(ey) - 1, frame_c)
+    elif name == "scarf":
+        nx, ny, w = slots["neck"]
+        red, dark = (230, 60, 70), (160, 30, 45)
+        for dx in range(-round(w / 2), round(w / 2) + 1):
+            for dy in range(0, 3):
+                c.put(nx + dx, ny + dy, dark if (dx + dy) % 4 == 0 else red)
+        for dy in range(3, 8):   # the tail
+            for dx in range(2):
+                c.put(nx + w / 4 + dx + (dy > 5), ny + dy, dark if dy == 7 else red)
+    else:
+        rows, colours = NECK_SPRITES[name]
+        nx, ny, _ = slots["neck"]
+        sprite(c, rows, colours, round(nx - len(rows[0]) / 2), round(ny) - 1)
 
 
 CHARACTERS = [Boopie, GPT, Codex, Klaude, Whale, Doubao]
@@ -951,6 +1023,9 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
     fx, fy = anchors["face"]
     if anchors.get("show_face", True):
         rig.face(c, round(fx), round(fy), pose)
+    for item in pose.wear:
+        if "slots" in anchors:
+            wear(c, item, anchors["slots"])
     bx, by = anchors["body"]
     if pose.prop == "laptop":
         c.icon("laptop", round(bx) - 7, round(by) + 8)
