@@ -71,9 +71,27 @@ COMMON = [
 ]
 
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def assets_pack() -> Path:
+    """esp32/assets packed as the device has it, for the simulator (BOOPIE_ASSETS)."""
+    out = Path(tempfile.gettempdir()) / "boopie-sim-assets.bin"
+    subprocess.run([sys.executable, str(ROOT / "tools" / "boopie" / "pack_assets.py"), "--out", str(out)],
+                   check=True, stdout=subprocess.DEVNULL)
+    return out
+
+
+ASSETS = None
+
+
 def shoot(binary: Path, tmp: Path, png: Path, lines: list[str], env_extra: dict | None = None,
           advance: int = 600) -> Path:
-    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", **(env_extra or {}))
+    global ASSETS
+    if ASSETS is None:
+        ASSETS = assets_pack()
+    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", BOOPIE_ASSETS=str(ASSETS),
+               **(env_extra or {}))
     common = list(COMMON)
     if env.pop("CHARGING", None):
         common = [c for c in common if not c.startswith("usb=")] + ["usb=true", "charging=true"]

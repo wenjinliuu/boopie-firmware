@@ -14,6 +14,19 @@ Boopie 的最底层同时支持中文和英文，不管接 Muse 还是国内大�
 
 ## 二、字体
 
+### 界面文字：思源黑体（平滑）
+
+设置页、各个页面、输入法、引导、游戏卡片里的中文用**思源黑体**（Noto Sans SC，SIL OFL 1.1），和英文的 Montserrat 同样是平滑字体，风格统一：
+
+- 英文、数字照旧用 Montserrat；Montserrat 没有的中文字，自动回退到同字号的思源黑体（`boopie_font_with_cjk`）
+- 字体放在**资源区**（`esp32/assets/fonts/ui.otf`，见[存储设计](boopie-storage.md)），不占程序区；LVGL 的 TinyTTF 直接从 Flash 映射读取，任意字号、抗锯齿，用过的字形缓存 256 个
+- 裁剪到 GB2312 全部字符、拉丁字母、中文标点、全角符号和界面用到的 ★☆ 等，共 7812 个字符，**约 1.5 MB**。重新生成：`python3 tools/boopie/gen_ui_font.py --source NotoSansSC-Regular.otf`（下载地址见脚本说明）
+- 资源区没有字体或损坏时，自动退回下面的像素字体，板子照常能用
+
+### 字幕和像素画面：像素字体
+
+**回复字幕仍用像素字体**：字幕按“列”分页（见第一节），需要每个字宽度固定；像素字体也和像素风的角色统一。游戏里的分数等是直接画在像素网格上的。
+
 `components/boopie/font/`，两个尺寸共用同一份 12px 点阵：
 
 | 字体 | 大小 | 用途 |

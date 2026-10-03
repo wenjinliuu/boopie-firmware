@@ -205,8 +205,6 @@ static void build_pet(lv_obj_t *page)
     lv_obj_add_flag(s_name, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(s_name, 20);
     lv_obj_add_event_cb(s_name, on_name, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *hint = text(page, &lv_font_montserrat_20, COLOR_DIM, LV_SYMBOL_EDIT);
-    lv_obj_align_to(hint, s_name, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
     s_level = text(page, &lv_font_montserrat_20, COLOR_ACCENT, "");
     lv_obj_align(s_level, LV_ALIGN_TOP_MID, 0, 146);
 
@@ -249,7 +247,8 @@ static void tick_pet(void)
     boopie_pet_status_t st;
     boopie_avatar_pet_status(&st);
     char buf[64];
-    set_text(s_name, boopie_avatar_pet_name());
+    snprintf(buf, sizeof buf, "%s  " LV_SYMBOL_EDIT, boopie_avatar_pet_name());   /* tap to rename */
+    set_text(s_name, buf);
     snprintf(buf, sizeof buf, "Lv %d", st.level);
     set_text(s_level, buf);
     lv_bar_set_range(s_bar, 0, st.xp_need > 0 ? (int32_t)st.xp_need : 1);

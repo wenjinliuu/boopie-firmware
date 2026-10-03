@@ -55,6 +55,11 @@
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
+/* Boopie: the smooth Chinese font from the assets pack (BOOPIE_ASSETS). */
+#define LV_USE_TINY_TTF 1
+#define LV_TINY_TTF_FILE_SUPPORT 0
+#define LV_TINY_TTF_CACHE_GLYPH_CNT 256
+#define LV_TINY_TTF_CACHE_KERNING_CNT 256
 #define LV_FONT_UNSCII_8 1
 #define LV_FONT_UNSCII_16 1
 #define LV_FONT_DEFAULT &lv_font_montserrat_20

@@ -7,6 +7,8 @@
 
 #include "boopie_pixel_font.h"
 
+#include "boopie_assets.h"
+
 /* The one thing that differs between the two sizes. */
 typedef struct {
     uint8_t scale;
@@ -81,6 +83,49 @@ const lv_font_t boopie_font_pixel_12 = {
 };
 
 #define CJK_COPIES 8
+#define TTF_SIZES 6
+
+/*
+ * The smooth Chinese font (Noto Sans SC, from the assets partition) at the
+ * size a Latin font calls for, made once a size; NULL without the asset, and
+ * the pixel font stands in. Its own gaps fall back to the pixel font too.
+ */
+static const lv_font_t *smooth_cjk(const lv_font_t *base)
+{
+#if LV_USE_TINY_TTF
+    static struct {
+        int32_t size;
+        lv_font_t *font;
+    } s_made[TTF_SIZES];
+    /* Montserrat's line is about 1.1 of its size; CJK reads right a touch larger. */
+    int32_t size = (base->line_height * 100 + 55) / 110 + 1;
+    for (int i = 0; i < TTF_SIZES; i++) {
+        if (s_made[i].font && s_made[i].size == size) {
+            return s_made[i].font;
+        }
+    }
+    size_t n;
+    const void *data = boopie_assets_get("fonts/ui.otf", &n);
+    if (!data) {
+        return NULL;
+    }
+    for (int i = 0; i < TTF_SIZES; i++) {
+        if (!s_made[i].font) {
+            lv_font_t *f = lv_tiny_ttf_create_data_ex(data, n, size, LV_FONT_KERNING_NONE, 256);
+            if (!f) {
+                return NULL;
+            }
+            f->fallback = size >= 20 ? &boopie_font_pixel_24 : &boopie_font_pixel_12;
+            s_made[i].size = size;
+            s_made[i].font = f;
+            return f;
+        }
+    }
+#else
+    (void)base;
+#endif
+    return NULL;
+}
 
 const lv_font_t *boopie_font_with_cjk(const lv_font_t *base)
 {
@@ -95,7 +140,8 @@ const lv_font_t *boopie_font_with_cjk(const lv_font_t *base)
         }
         if (!s_base[i]) {
             s_copy[i] = *base;
-            s_copy[i].fallback = base->line_height >= 20 ? &boopie_font_pixel_24 : &boopie_font_pixel_12;
+            const lv_font_t *cjk = smooth_cjk(base);
+            s_copy[i].fallback = cjk ? cjk : base->line_height >= 20 ? &boopie_font_pixel_24 : &boopie_font_pixel_12;
             s_base[i] = base;
             return &s_copy[i];
         }
