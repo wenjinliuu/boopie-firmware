@@ -2,8 +2,10 @@
 # Copyright (c) 2026 Boopie contributors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Renders each avatar state in the UI simulator and saves PNGs plus a contact
-sheet, so UI changes can be checked from CI without a board.
+"""Renders each avatar state in the UI simulator and saves PNGs plus contact
+sheets, so UI changes can be checked from CI without a board: Muse's own
+character in every state (contact-sheet.png), every character in a few
+(avatars.png), and Boopie's pet expressions and overlays (pets.png).
 
   python3 tools/boopie/sim_shots.py --binary build/simulator/muse_simulator --out shots
 
@@ -22,7 +24,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-# (file name, face, extra scenario lines).
+# (file name, face, extra scenario lines[, environment]).
 SHOTS = [
     ("boot", "boot", []),
     ("idle", "idle", []),
@@ -38,6 +40,23 @@ SHOTS = [
     ("off", "off", []),
 ]
 
+AVATARS = ["muse", "boopie", "gpt", "codex", "klaude", "whale", "doubao"]
+
+# Every character in these: (name, face, extra lines, ms to run first).
+AVATAR_STATES = [
+    ("idle", "idle", [], 600),
+    ("listening", "listening", ["level=0.6", "progress=0.4"], 600),
+    ("thinking", "thinking", ["progress=0.5"], 600),
+    ("working", "thinking", ["progress=0.5"], 3000),
+    ("speaking", "speaking", ["level=0.5", "progress=0.6", "caption=你好，我是布比！"], 600),
+    ("happy", "happy", [], 300),
+]
+
+# Boopie's pet expressions and overlays: (name, environment).
+PETS = [(e, {"BOOPIE_PET": e}) for e in ("hungry", "eating", "sleepy", "sad", "dizzy")] + \
+       [(o, {"BOOPIE_OVERLAY": o}) for o in ("surprise", "blush", "confetti", "hearts")] + \
+       [("low_battery", {"BATTERY": "9"}), ("charging", {"CHARGING": "1"})]
+
 COMMON = [
     "battery=72",
     "usb=false",
@@ -48,22 +67,45 @@ COMMON = [
 ]
 
 
+def shoot(binary: Path, tmp: Path, png: Path, lines: list[str], env_extra: dict | None = None,
+          advance: int = 600) -> Path:
+    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", **(env_extra or {}))
+    common = list(COMMON)
+    if env.pop("CHARGING", None):
+        common = [c for c in common if not c.startswith("usb=")] + ["usb=true", "charging=true"]
+    if "BATTERY" in env:
+        common = [c for c in common if not c.startswith("battery=")] + [f"battery={env.pop('BATTERY')}"]
+    scenario = tmp / f"{png.stem}.txt"
+    scenario.write_text("\n".join([*lines, *common, f"advance={advance}"]) + "\n", encoding="utf-8")
+    ppm = tmp / f"{png.stem}.ppm"
+    subprocess.run([str(binary), "--headless", "--scenario", str(scenario),
+                    "--run-ms", "300", "--screenshot", str(ppm)],
+                   check=True, env=env, stdout=subprocess.DEVNULL)
+    Image.open(ppm).convert("RGB").save(png)
+    return png
+
+
 def render(binary: Path, out: Path) -> list[Path]:
-    env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"{name}.png", [f"face={face}", *extra])
+                for name, face, extra in SHOTS]
+
+
+def render_avatars(binary: Path, out: Path) -> list[Path]:
     pngs = []
     with tempfile.TemporaryDirectory() as tmp:
-        for name, face, extra in SHOTS:
-            scenario = Path(tmp) / f"{name}.txt"
-            scenario.write_text("\n".join([f"face={face}", *COMMON, *extra, "advance=600"]) + "\n",
-                                encoding="utf-8")
-            ppm = Path(tmp) / f"{name}.ppm"
-            subprocess.run([str(binary), "--headless", "--scenario", str(scenario),
-                            "--run-ms", "300", "--screenshot", str(ppm)],
-                           check=True, env=env, stdout=subprocess.DEVNULL)
-            png = out / f"{name}.png"
-            Image.open(ppm).convert("RGB").save(png)
-            pngs.append(png)
+        for avatar in AVATARS:
+            for name, face, extra, advance in AVATAR_STATES:
+                pngs.append(shoot(binary, Path(tmp), out / f"{avatar}-{name}.png", [f"face={face}", *extra],
+                                  {"BOOPIE_AVATAR": avatar}, advance))
     return pngs
+
+
+def render_pets(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"pet-{name}.png", ["face=idle"],
+                      {"BOOPIE_AVATAR": "boopie", **env}, 1000)
+                for name, env in PETS]
 
 
 def contact_sheet(pngs: list[Path], dest: Path, cols: int = 5) -> None:
@@ -89,7 +131,11 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     pngs = render(args.binary, args.out)
     contact_sheet(pngs, args.out / "contact-sheet.png")
-    print(f"{len(pngs)} screenshots in {args.out}", file=sys.stderr)
+    avatars = render_avatars(args.binary, args.out)
+    contact_sheet(avatars, args.out / "avatars.png", cols=len(AVATAR_STATES))
+    pets = render_pets(args.binary, args.out)
+    contact_sheet(pets, args.out / "pets.png", cols=6)
+    print(f"{len(pngs) + len(avatars) + len(pets)} screenshots in {args.out}", file=sys.stderr)
     return 0
 
 

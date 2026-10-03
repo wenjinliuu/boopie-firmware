@@ -159,6 +159,10 @@ add_executable(muse_simulator
     "${MUSE_COMPONENT_DIR}/muse_state.c"
     "${MUSE_COMPONENT_DIR}/muse_text.c"
     "${MUSE_COMPONENT_DIR}/../../avatar/muse_pixel.c"
+    # Boopie: the avatars, and the switcher between them and Muse's.
+    "${BOOPIE_COMPONENT_DIR}/avatar/boopie_avatar.c"
+    "${BOOPIE_COMPONENT_DIR}/avatar/boopie_pixel.c"
+    "${BOOPIE_COMPONENT_DIR}/boopie_expr.c"
     # Boopie: the Chinese and English text font.
     "${BOOPIE_COMPONENT_DIR}/font/boopie_font.c"
     "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_font.c"
@@ -171,6 +175,8 @@ target_include_directories(muse_simulator PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${MUSE_COMPONENT_DIR}"
     "${BOOPIE_COMPONENT_DIR}/font"
+    "${BOOPIE_COMPONENT_DIR}/avatar"
+    "${BOOPIE_COMPONENT_DIR}"
 )
 
 target_link_libraries(muse_simulator PRIVATE
@@ -180,6 +186,10 @@ target_link_libraries(muse_simulator PRIVATE
 )
 
 target_link_libraries(muse_simulator PRIVATE m)
+
+# Boopie: Muse's renderer under the names the avatar switcher calls.
+set_source_files_properties("${MUSE_COMPONENT_DIR}/../../avatar/muse_pixel.c" PROPERTIES COMPILE_DEFINITIONS
+    "muse_pixel_accent=jolly_pixel_accent;muse_pixel_render=jolly_pixel_render;muse_pixel_set_size=jolly_pixel_set_size;muse_pixel_scale=jolly_pixel_scale")
 
 if(APPLE)
     # SDL's Cocoa display and screensaver backends use IOKit even when its

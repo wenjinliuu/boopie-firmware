@@ -1327,6 +1327,27 @@ static char *build_register_json(void) {
                 nullptr, volume_optional);
 #endif
 
+#if CONFIG_MUSE_ENABLED
+    // Boopie: the on-screen character.
+    cJSON *avatar_optional = cJSON_CreateObject();
+    cJSON_AddItemToObject(avatar_optional, "avatar", string_param(
+        "Character: muse, boopie, gpt, codex, klaude, whale or doubao; kept across restarts."));
+    cJSON_AddItemToObject(avatar_optional, "colour", string_param(
+        "Body colour as RRGGBB, or \"default\"; not for muse. Kept per character."));
+    cJSON_AddItemToObject(avatar_optional, "expression", string_param(
+        "Pet expression shown while idle: hungry, eating, sleepy, sad or dizzy; idle clears it."));
+    cJSON_AddItemToObject(avatar_optional, "reaction", string_param(
+        "Effect over any expression: surprise, blush, confetti or hearts. Turned on, or off with on=false."));
+    cJSON *avatar_on = cJSON_CreateObject();
+    cJSON_AddStringToObject(avatar_on, "type", "boolean");
+    cJSON_AddStringToObject(avatar_on, "description", "With reaction: on (default) or off.");
+    cJSON_AddItemToObject(avatar_optional, "on", avatar_on);
+    add_command(commands, "display.avatar",
+                "Change the character on screen, its colour, its pet expression "
+                "or a reaction. Without parameters, reports the current ones.",
+                nullptr, avatar_optional);
+#endif
+
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS
     add_command(commands, "sensors.read",
                 "Read the air sensors: CO2 in ppm, the tVOC index (1-500, 100 "

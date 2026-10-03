@@ -55,10 +55,13 @@ if(CONFIG_MUSE_ENABLED)
     file(GLOB custom_avatar CONFIGURE_DEPENDS "${COMPONENT_DIR}/avatar/muse_pixel.c")
     if(custom_avatar)
         message(STATUS "Custom avatar: components/muse/avatar/muse_pixel.c")
-        list(APPEND srcs "avatar/muse_pixel.c")
+        set(muse_pixel_src "avatar/muse_pixel.c")
     else()
-        list(APPEND srcs "../../avatar/muse_pixel.c")
+        set(muse_pixel_src "../../avatar/muse_pixel.c")
     endif()
+    # Boopie: the avatar switcher stands in for muse_pixel_*; Muse's own
+    # renderer is built as jolly_pixel_* (below) and drawn when Muse is chosen.
+    list(APPEND srcs "${muse_pixel_src}" "../boopie/avatar/boopie_avatar.c")
     if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C)
         list(APPEND srcs "boards/board_waveshare_s3_175c.c" "boards/muse_lcd_bands.c")
     elseif(CONFIG_MUSE_BOARD_AIPI)
@@ -89,7 +92,7 @@ set(muse_priv_requires
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
     esp_driver_pcnt)
 list(APPEND muse_priv_requires camera)
-# Boopie: fonts and line breaking for Chinese text.
+# Boopie: fonts and line breaking for Chinese text, and the avatars.
 list(APPEND muse_priv_requires boopie)
 
 idf_component_register(
@@ -102,6 +105,10 @@ idf_component_register(
 )
 
 if(CONFIG_MUSE_ENABLED)
+    # Boopie: see the avatar switcher above.
+    set_source_files_properties("${muse_pixel_src}" PROPERTIES COMPILE_DEFINITIONS
+        "muse_pixel_accent=jolly_pixel_accent;muse_pixel_render=jolly_pixel_render;muse_pixel_set_size=jolly_pixel_set_size;muse_pixel_scale=jolly_pixel_scale")
+
     # LVGL spins forever on a failed assert unless LV_ASSERT_HANDLER is set,
     # which its Kconfig can't do. Abort, so the panic handler prints a backtrace
     # and reboots. PUBLIC reaches LVGL and every file that includes lvgl.h.

@@ -73,6 +73,7 @@
 #endif
 #if CONFIG_MUSE_ENABLED
 #include "muse_glue.h"
+#include "boopie_avatar.h"   /* Boopie: display.avatar */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -1862,6 +1863,29 @@ static cJSON *on_ws_command(
         led_status_show_animation();
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
+        return result;
+    }
+#endif
+#if CONFIG_MUSE_ENABLED
+    /* Boopie: which character is on screen, its colour, a pet expression or
+     * a reaction. */
+    if (strcmp(command, "display.avatar") == 0) {
+        cJSON *on = params ? cJSON_GetObjectItem(params, "on") : NULL;
+        char *avatar = json_strdup_string(params, "avatar");
+        char *colour = json_strdup_string(params, "colour");
+        char *pet = json_strdup_string(params, "expression");
+        char *reaction = json_strdup_string(params, "reaction");
+        const char *error = NULL;
+        bool ok = boopie_avatar_command(avatar, colour, pet, reaction, !cJSON_IsFalse(on), &error);
+        free(avatar);
+        free(colour);
+        free(pet);
+        free(reaction);
+        if (!ok) return command_error("bad_param", error);
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "avatar", boopie_avatar_key(boopie_avatar_current()));
+        cJSON_AddStringToObject(result, "expression", boopie_expr_name(boopie_avatar_pet()));
         return result;
     }
 #endif

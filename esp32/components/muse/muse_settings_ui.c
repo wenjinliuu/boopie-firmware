@@ -39,6 +39,7 @@
 #include "muse_voice.h"
 #include "muse_wifi.h"
 #include "boopie_font.h"
+#include "boopie_avatar.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -62,6 +63,7 @@ static int s_text_scale = 466;
 static lv_obj_t *s_tile;
 static lv_obj_t *s_current;
 static lv_obj_t *s_home, *s_wifi, *s_hatch, *s_ble, *s_sound, *s_sleep, *s_battery, *s_power, *s_text;
+static lv_obj_t *s_avatar, *s_home_avatar;   /* Boopie: the avatar page */
 
 /*
  * Only home is kept. A sub-page is built when it opens and deleted on the way
@@ -1227,6 +1229,103 @@ static void build_power_page(lv_obj_t *tile)
     note(list, text);
 }
 
+/* ---------- Avatar (Boopie) ---------- */
+
+/* Body colours to pick from; the first is the character's own. */
+static const struct {
+    const char *name;
+    uint32_t rgb;
+} AVATAR_COLOURS[] = {
+    { "默认 Default", BOOPIE_COLOUR_DEFAULT },
+    { "樱花粉", 0xff9ec8 },
+    { "薄荷绿", 0x7fe3c4 },
+    { "天空蓝", 0x7fb8ff },
+    { "柠檬黄", 0xffd96a },
+    { "薰衣草", 0xb9a2ff },
+    { "蜜桃橙", 0xffb08a },
+    { "珊瑚红", 0xff7a7a },
+    { "奶白", 0xf4efe6 },
+};
+#define AVATAR_COLOUR_COUNT (int)(sizeof(AVATAR_COLOURS) / sizeof(AVATAR_COLOURS[0]))
+
+static lv_obj_t *s_avatar_checks[BOOPIE_AVATAR_COUNT];
+static lv_obj_t *s_colour_checks[AVATAR_COLOUR_COUNT];
+static lv_obj_t *s_colour_box, *s_colour_default_swatch;
+static int s_avatar_shown = -1;
+
+static void on_avatar_choice(lv_event_t *e)
+{
+    boopie_avatar_select((int)(intptr_t)lv_event_get_user_data(e));
+}
+
+static void on_colour_choice(lv_event_t *e)
+{
+    boopie_avatar_set_colour(AVATAR_COLOURS[(int)(intptr_t)lv_event_get_user_data(e)].rgb);
+}
+
+static lv_obj_t *swatch(lv_obj_t *row_obj, uint32_t rgb)
+{
+    lv_obj_t *sw = lv_obj_create(row_obj);
+    lv_obj_remove_style_all(sw);
+    lv_obj_set_size(sw, 22, 22);
+    lv_obj_set_style_radius(sw, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(sw, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(sw, lv_color_hex(rgb), 0);
+    lv_obj_move_to_index(sw, 0);
+    return sw;
+}
+
+static void build_avatar_page(lv_obj_t *tile)
+{
+    lv_obj_t *list;
+    s_avatar = page(tile, "AVATAR", true, &list);
+    for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
+        row(list, NULL, boopie_avatar_name(i), &s_avatar_checks[i], on_avatar_choice, (void *)(intptr_t)i);
+        lv_obj_set_style_text_color(s_avatar_checks[i], lv_color_hex(COLOR_ACCENT), 0);
+    }
+    /* The colours, hidden for Muse's own character. */
+    s_colour_box = column(list);
+    note(s_colour_box, "Colour 颜色");
+    for (int i = 0; i < AVATAR_COLOUR_COUNT; i++) {
+        lv_obj_t *r = row(s_colour_box, NULL, AVATAR_COLOURS[i].name, &s_colour_checks[i], on_colour_choice,
+                          (void *)(intptr_t)i);
+        lv_obj_set_style_text_color(s_colour_checks[i], lv_color_hex(COLOR_ACCENT), 0);
+        lv_obj_t *sw = swatch(r, AVATAR_COLOURS[i].rgb == BOOPIE_COLOUR_DEFAULT ? 0 : AVATAR_COLOURS[i].rgb);
+        if (i == 0) {
+            s_colour_default_swatch = sw;
+        }
+    }
+    note(list, "Brand characters are for personal use. 品牌形象仅供自用。");
+}
+
+static void tick_avatar(void)
+{
+    int cur = boopie_avatar_current();
+    for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
+        set_text(s_avatar_checks[i], i == cur ? LV_SYMBOL_OK : "");
+    }
+    bool colours = boopie_avatar_recolourable(cur);
+    if (colours == lv_obj_has_flag(s_colour_box, LV_OBJ_FLAG_HIDDEN)) {
+        if (colours) {
+            lv_obj_remove_flag(s_colour_box, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(s_colour_box, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (!colours) {
+        return;
+    }
+    if (cur != s_avatar_shown) {
+        s_avatar_shown = cur;
+        lv_obj_set_style_bg_color(s_colour_default_swatch,
+                                  lv_color_hex(boopie_char_default_colour((boopie_char_t)(cur - 1))), 0);
+    }
+    uint32_t c = boopie_avatar_colour();
+    for (int i = 0; i < AVATAR_COLOUR_COUNT; i++) {
+        set_text(s_colour_checks[i], AVATAR_COLOURS[i].rgb == c ? LV_SYMBOL_OK : "");
+    }
+}
+
 /* ---------- Home ---------- */
 
 static const page_t WIFI = { &s_wifi, build_wifi_page };
@@ -1236,6 +1335,7 @@ static const page_t SOUND = { &s_sound, build_sound_page };
 static const page_t SLEEP = { &s_sleep, build_sleep_page };
 static const page_t BATTERY = { &s_battery, build_battery_page };
 static const page_t POWER = { &s_power, build_power_page };
+static const page_t AVATAR = { &s_avatar, build_avatar_page };   /* Boopie */
 
 static void build_home(lv_obj_t *tile)
 {
@@ -1243,6 +1343,7 @@ static void build_home(lv_obj_t *tile)
     s_home = page(tile, "SETTINGS", false, &list);
     row(list, LV_SYMBOL_WIFI, "Wi-Fi", &s_home_wifi, on_nav, (void *)&WIFI);
     row(list, LV_SYMBOL_HOME, "Muse", &s_home_hatch, on_nav, (void *)&HATCH);
+    row(list, LV_SYMBOL_IMAGE, "Avatar", &s_home_avatar, on_nav, (void *)&AVATAR);   /* Boopie */
     row(list, LV_SYMBOL_BLUETOOTH, "Bluetooth", &s_home_ble, on_nav, (void *)&BLE);
     row(list, LV_SYMBOL_VOLUME_MAX, "Sound", &s_home_sound, on_nav, (void *)&SOUND);
     row(list, LV_SYMBOL_EYE_CLOSE, "Sleep", &s_home_sleep, on_nav, (void *)&SLEEP);
@@ -1272,6 +1373,7 @@ static void tick_home(void)
         set_text(s_home_sound, "Muted");
     }
     set_text(s_home_sleep, sleep_name(muse_settings_sleep_s()));
+    set_text(s_home_avatar, boopie_avatar_name(boopie_avatar_current()));   /* Boopie */
 
     muse_power_t p = muse_state_power();
     char buf[96];
@@ -1324,6 +1426,8 @@ void muse_settings_ui_tick(bool visible)
         tick_sleep();
     } else if (s_current == s_battery) {
         tick_battery();
+    } else if (s_current == s_avatar) {
+        tick_avatar();   /* Boopie */
     }
 }
 

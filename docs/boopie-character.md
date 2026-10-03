@@ -1,6 +1,6 @@
 # 形象设定
 
-Boopie 的屏幕形象全部对齐 Muse 官方固件的**微像素风格**，和官方默认形象并存，在设置里切换。这一页记录已经敲定的设计；固件里的实现还没开工，下面“下一步”是开工顺序。
+Boopie 的屏幕形象全部对齐 Muse 官方固件的**微像素风格**，和官方默认形象并存，在设置里切换。这一页记录敲定的设计和固件里的实现。
 
 预览由 `tools/boopie/avatar_proto.py` 生成，规格和官方像素形象相同：64×64 网格，在 1.75C 上放大 5 倍到 320×320。固件里的绘制代码会照着这个原型移植成 C。
 
@@ -81,11 +81,27 @@ python3 tools/boopie/avatar_proto.py --out previews/ --character boopie --color 
 - 眼睛、腮红、眼泪、特效图标是固定颜色
 - 更多自定义走两条路：设置页里的选项（形象、颜色），以及让 Muse 生成代码后通过 OTA 更新
 
-## 五、下一步
+## 五、固件实现
 
-1. `boopie_expr` 从现在的 19 个整理成 13 个 + 叠加层，更新测试；原型同步
-2. 把各角色移植成 C 的 `muse_pixel` 绘制器，接入形象切换，在模拟器里和官方形象对比
-3. 官方 Muse 角色补上 5 个宠物表情和叠加层
-4. 设置页加“形象”和“颜色”两项
-5. 调整开心时高个子角色跳起来碰到下方状态文字的问题
-6. 到货后在真机上看实际观感，再细调
+| 部分 | 文件 |
+|---|---|
+| 表情与叠加层的编号、退回规则 | `components/boopie/boopie_expr.[ch]` |
+| 6 个角色的渲染器（原型的 C 移植） | `components/boopie/avatar/boopie_pixel.[ch]` |
+| 形象切换：接管 `muse_pixel_*`，选 Muse 时交给官方渲染器 | `components/boopie/avatar/boopie_avatar.[ch]` |
+| 设置页“Avatar”：选角色、选颜色（9 种预设） | `components/muse/muse_settings_ui.c` |
+| 远程命令 `display.avatar` | `main/app.c`、`main/noise_control.cpp` |
+
+- 官方 `avatar/muse_pixel.c` 一字未改，编译时把函数改名为 `jolly_pixel_*`
+- 选择和每个角色的颜色存在 NVS（命名空间 `boopie`），重启后保留
+- 充电、低电量（≤15%）叠加层由电量自动触发
+- 宠物表情只在待机时显示；Muse 官方角色暂时按退回规则显示核心表情
+- 测试：`test_boopie_pixel.py` 让 C 和 Python 原型画同一帧，逐像素比较；模拟器用 `BOOPIE_AVATAR`、`BOOPIE_COLOUR`、`BOOPIE_PET`、`BOOPIE_OVERLAY` 环境变量截图（`tools/boopie/sim_shots.py`）
+
+`display.avatar` 的参数都可选：`avatar`（角色 id）、`colour`（`RRGGBB` 或 `default`）、`expression`（宠物表情，`idle` 清除）、`reaction`（`surprise`/`blush`/`confetti`/`hearts`，配 `on=false` 关闭）。
+
+## 六、下一步
+
+1. 官方 Muse 角色补上 5 个宠物表情和叠加层
+2. 调整开心时高个子角色跳起来碰到上方状态文字的问题
+3. 宠物玩法：什么时候饿、困，喂食等逻辑（目前只能由命令触发）
+4. 到货后在真机上看实际观感和帧耗时，再细调
