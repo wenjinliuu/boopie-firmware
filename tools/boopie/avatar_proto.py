@@ -52,6 +52,18 @@ LIGHT = {
     "shy": (255, 140, 180), "low_battery": RED, "charging": (255, 230, 90), "working": (110, 235, 170),
 }
 
+# The state's accent, as Muse's official schemes: the aura, rim light,
+# sparkles and rings round the character take it.
+ACCENT = {
+    "boot": (169, 192, 255), "idle": (167, 125, 255), "listening": (92, 184, 255),
+    "thinking": (224, 123, 255), "speaking": (111, 240, 191), "error": (255, 92, 92),
+    "off": (124, 114, 208), "happy": (167, 125, 255), "hungry": (255, 170, 80),
+    "eating": (255, 190, 110), "sleepy": (124, 114, 208), "sad": (110, 140, 230),
+    "surprised": (167, 125, 255), "dizzy": (255, 200, 120), "celebrate": (167, 125, 255),
+    "shy": (255, 140, 180), "low_battery": (255, 92, 92), "charging": (255, 230, 90),
+    "working": (111, 240, 191),
+}
+
 # Name, seconds per loop, Chinese label. Order and names as boopie_expr.h.
 EXPRESSIONS = [
     ("boot", 2.0, "开机"), ("idle", 3.0, "待机"), ("listening", 1.6, "聆听"),
@@ -121,6 +133,11 @@ class Pose:
     blush: str = "normal"      # normal big none
     spin: int = 0              # spiral eye phase
     prop: str = ""             # laptop
+    accent: tuple = (167, 125, 255)
+    aura: float = 0.75         # strength of the glow round the character
+    rings: float = 0.0         # speed of the dotted rings (listening, speaking); 0 for none
+    level: float = 0.3         # voice level, 0..1: the aura and rings swell with it
+    sparkle_speed: float = 0.6
     fx: list = field(default_factory=list)
     dim: float = 1.0
 
@@ -131,6 +148,8 @@ class Canvas:
         self.img = np.zeros((N, N, 3), dtype=np.uint8)
         self.eye = EYE
         self.shine = WHITE
+        self.rim = None            # state-tinted rim light on the lower right edge, as Muse's
+        self.body = np.zeros((N, N), dtype=bool)
 
     def put(self, x, y, colour):
         x, y = int(round(x)), int(round(y))
@@ -151,6 +170,12 @@ class Canvas:
         for role, cond in (("dark", d <= -0.3), ("mid", (d > -0.3) & (d <= 0.2)),
                            ("light", (d > 0.2) & (d <= 0.55)), ("high", d > 0.55)):
             self.img[mask & cond] = rp[role]
+        if self.rim is not None:
+            bay = BAYER[np.arange(N)[:, None] % 4, np.arange(N)[None, :] % 4]
+            out = (-gx * 0.6 - gy * 0.8) / (np.hypot(gx, gy) + 1e-6)
+            rim = mask & (h < 0.8) & (out > 0.7) & (bay < 0.45)
+            self.img[rim] = mix(rp["light"], self.rim, 0.55)
+        self.body |= mask
 
     def flat(self, mask, colour):
         self.img[mask] = colour
@@ -366,9 +391,9 @@ class Boopie(Rig):
         return {"face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": light, "show_face": p.scale > 0.6}
 
 
-class Codex(Rig):
-    """Codex: a cloud-headed robot whose face is a terminal; its eyes are the prompt, >_ ."""
-    key, name, colour = "codex", "Codex", "5b86f5"
+class GPT(Rig):
+    """GPT: a cloud-headed robot whose face is a terminal; its eyes are the prompt, >_ ."""
+    key, name, colour = "gpt", "GPT", "5b86f5"
     screen = (30, 34, 84)
     glyph = (120, 236, 240)
 
@@ -439,7 +464,7 @@ def glyph(c, ch, x, y, colour):
 
 class Klaude(Rig):
     """小克: a blocky orange critter with square eyes, stubby side arms and four little legs."""
-    key, name, colour = "klaude", "小克", "d97757"
+    key, name, colour = "klaude", "小克", "f28c5e"
 
     def draw(self, c, p):
         cx, base = 32, 51
@@ -468,36 +493,35 @@ class Klaude(Rig):
 
 
 class Whale(Rig):
-    """DeepSeek 小鲸: a chubby whale with a white belly; its tail flicks up behind, its spout is the state light."""
-    key, name, colour = "whale", "DeepSeek 小鲸", "4d6bfe"
-    belly = ((214, 224, 255), (236, 241, 255))
+    """DeepSeek 小鲸鱼: a round little whale with a white tummy and a perky tail;
+    its spout is the state light."""
+    key, name, colour = "whale", "DeepSeek 小鲸鱼", "5a7dff"
+    belly = ((214, 224, 255), (240, 244, 255))
 
     def draw(self, c, p):
-        cx, cy, rx, ry = 30, 41, 19, 14
+        cx, cy, rx, ry = 31, 41, 16, 15
         f = Frame(p, cx, cy + ry)
         a = math.radians(p.antenna - 18)            # the tail swings like Boopie's antenna
-        tx, ty = 47 + 6 * math.sin(a), 21 - 2 * math.cos(a)
-        tail = f.ellipse(45 + 3 * math.sin(a) * 0.5, 30, 4, 7)
-        tail |= f.ellipse(tx - 4, ty, 4.5, 2.6) | f.ellipse(tx + 4, ty - 1, 4.5, 2.6)
+        tx, ty = 46 + 3 * math.sin(a), 21 - 1.5 * math.cos(a)
+        tail = f.ellipse(44 + 1.5 * math.sin(a), 29, 2.6, 5) | f.ellipse(tx - 3, ty, 3.5, 2) | f.ellipse(tx + 3, ty - 0.5, 3.5, 2)
         body = f.ellipse(cx, cy, rx, ry) | tail
         for h in p.hands:
             if h[0] != "front":
-                body |= f.ellipse(cx + h[0] * (rx - 1), cy + 5 + h[1] * 0.8, 4, 2.2)
+                body |= f.ellipse(cx + h[0] * (rx + 0.5), cy + 6 + h[1] * 0.8, 3.2, 2.0)
         c.shaded(body, self.rp)
-        belly = f.ellipse(cx - 2, cy + 8, 13, 7) & f.ellipse(cx, cy, rx - 1.5, ry - 1.5)
+        belly = f.ellipse(cx, cy + 8, 10.5, 6) & f.ellipse(cx, cy, rx - 1.2, ry - 1.2)
         c.flat(belly, self.belly[1])
-        c.flat(belly & (BAYER[np.arange(N)[:, None] % 4, np.arange(N)[None, :] % 4] > 0.5) & (YS > f.pt(0, cy + 11)[1]),
-               self.belly[0])
+        bay = BAYER[np.arange(N)[:, None] % 4, np.arange(N)[None, :] % 4]
+        c.flat(belly & (bay > 0.5) & (YS > f.pt(0, cy + 10)[1]), self.belly[0])
         c.outline(body, self.rp["out"])
-        # the spout: droplets rising from the blowhole, in the state colour
-        hx, hy = f.pt(cx - 4, cy - ry)
+        hx, hy = f.pt(cx - 2, cy - ry)
         col = self.light_colour(p)
-        h = 2 + round(4 * max(0.0, min(1.0, p.light_level)))
+        h = 2 + round(3 * max(0.0, min(1.0, p.light_level)))
         for i in range(h):
-            c.put(hx, hy - 2 - i, col)
-        for dx, dy in ((-2, -h - 1), (2, -h - 1), (-3, -h + 1), (3, -h + 1)):
+            c.put(hx, hy - 1 - i, col)
+        for dx, dy in ((-2, -h), (2, -h), (-3, -h + 2), (3, -h + 2)):
             c.put(hx + dx, hy + dy, col)
-        return {"face": f.pt(cx - 2, cy - 1), "body": f.pt(cx, cy), "light": (hx, hy - h - 2),
+        return {"face": f.pt(cx, cy - 2), "body": f.pt(cx, cy), "light": (hx, hy - h - 1),
                 "show_face": p.scale > 0.6}
 
 
@@ -551,7 +575,7 @@ class Doubao(Rig):
         return self.rp
 
 
-CHARACTERS = [Boopie, Codex, Klaude, Whale, Doubao]
+CHARACTERS = [Boopie, GPT, Klaude, Whale, Doubao]
 
 
 # ---------------------------------------------------------------- the expressions
@@ -562,7 +586,8 @@ def wave(t, period, lo=-1.0, hi=1.0):
 def pose_for(name: str, t: float, length: float) -> Pose:
     bob = round(wave(t, 1.5, 0, 1))
     blink = (t % 3.0) > 2.75
-    p = Pose(t=t, light=LIGHT[name])
+    p = Pose(t=t, light=LIGHT[name], accent=ACCENT[name])
+    p.sparkle_speed = {"thinking": 2.8, "listening": 1.2, "speaking": 1.5, "working": 2.0}.get(name, 0.6)
     if name == "idle":
         p.dy = bob
         p.eyes = "blink" if blink else "open"
@@ -592,6 +617,7 @@ def pose_for(name: str, t: float, length: float) -> Pose:
         p.hands = ((-1, 3), (1, -4))
         p.mouth = "smile"
         p.light_level = wave(t, 0.4, 0.6, 1)
+        p.rings, p.level = 0.9, wave(t, 0.4, 0.3, 0.8)
         r = (t / length * 3) % 1
         for k in range(2):
             rr = 3 + (r + k * 0.5) % 1 * 6
@@ -615,6 +641,7 @@ def pose_for(name: str, t: float, length: float) -> Pose:
         p.eyes = "blink" if (t % 1.2) > 1.1 else "open"
         p.hands = ((-1, 3 - round(level * 3)), (1, 3))
         p.light_level = 0.55 + 0.45 * level
+        p.rings, p.level = 0.6, level
         if (t % 1.2) < 0.6:
             p.fx = [("icon", "note", 52, 24 - int(t % 0.6 * 10))]
     elif name == "error":
@@ -639,6 +666,7 @@ def pose_for(name: str, t: float, length: float) -> Pose:
             p.squash = 1.0 + 0.12 * k
             p.antenna = 18 + 40 * k
             p.light_level = 1 - k
+            p.aura = 0.75 * (1 - k)
             p.dim = 1 - 0.55 * k
     elif name == "happy":
         k = t / length
@@ -783,9 +811,70 @@ def pose_for(name: str, t: float, length: float) -> Pose:
 
 
 # ---------------------------------------------------------------- rendering
+def aura(c: Canvas, cx, cy, radius, strength, acc):
+    """Muse's glow: a dithered disc fading out from the centre, in two tints of the accent."""
+    if strength <= 0:
+        return
+    bay = BAYER[np.arange(N)[:, None] % 4, np.arange(N)[None, :] % 4]
+    d = np.sqrt((XS - cx) ** 2 + ((YS - cy) * 1.1) ** 2) / radius
+    i = np.clip(1 - d, 0, 1) * strength
+    a1 = tuple(round(v * 0.16) for v in acc)
+    a2 = tuple(round(v * 0.34) for v in acc)
+    inside = d < 1
+    c.img[inside & (i > (bay * 0.9))] = a1
+    c.img[inside & (i > 0.55 + bay * 0.35)] = a2
+
+
+def rings(c: Canvas, cx, cy, t, level, speed, acc):
+    """Expanding dotted rings, as Muse's while listening and speaking."""
+    for k in range(2):
+        ph = (t * speed + k * 0.5) % 1
+        r = 20 + ph * 11
+        fade = (1 - ph) * (0.35 + level)
+        n = int(r * 2.2)
+        for j in range(n):
+            ang = j * 2 * math.pi / n
+            x, y = round(cx + math.cos(ang) * r), round(cy + math.sin(ang) * r * 0.92)
+            if 0 <= x < N and 0 <= y < N and BAYER[y % 4][x % 4] < fade and not c.body[y, x]:
+                c.put(x, y, acc if fade > 0.6 else tuple(round(v * 0.34) for v in acc))
+
+
+def sparkles(c: Canvas, cx, cy, t, speed, front, acc, count=6):
+    spk = mix(acc, WHITE, 0.45)
+    for i in range(count):
+        ang = t * speed + i * 2 * math.pi / count
+        s = math.sin(ang)
+        if (s > 0) != front:
+            continue
+        rr = 25 + 2 * math.sin(i * 1.9 + t * 0.7)
+        x, y = round(cx + math.cos(ang) * rr), round(cy - 3 + s * rr * 0.42)
+        tw = 0.5 + 0.5 * math.sin(t * 5 + i * 1.7)
+        arm = acc if front else tuple(round(v * 0.34) for v in acc)
+        if tw > 0.8:
+            c.spark(x, y, WHITE if front else spk, 0)
+            for k in (1, 2):
+                for dx, dy in ((k, 0), (-k, 0), (0, k), (0, -k)):
+                    c.put(x + dx, y + dy, spk if k == 1 and front else arm)
+        elif tw > 0.45:
+            c.spark(x, y, arm, 1)
+        elif tw > 0.15:
+            c.put(x, y, arm)
+
+
 def render(rig: Rig, pose: Pose) -> np.ndarray:
     c = Canvas()
+    acc = pose.accent
+    t = pose.t
+    # background layers, as Muse's: the glow, the ground shadow, sparkles behind
+    aura(c, 32, 37, 29 + pose.level * 4 + math.sin(t * 1.5), pose.aura + pose.level * 0.4, acc)
+    for dx in range(-12, 13):
+        if abs(dx) < 12 - (dx % 2):
+            c.put(32 + dx, 59, (22, 18, 34))
+    sparkles(c, 32, 40, t, pose.sparkle_speed, False, acc)
+    c.rim = mix(acc, WHITE, 0.2)
     anchors = rig.draw(c, pose)
+    if pose.rings:
+        rings(c, 32, anchors["face"][1] + 2, t, pose.level, pose.rings, acc)
     fx, fy = anchors["face"]
     if anchors.get("show_face", True):
         rig.face(c, round(fx), round(fy), pose)
@@ -801,6 +890,7 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
         hr = rig.hand_ramp()
         c.flat(front, hr["light"])
         c.outline(front, hr["out"])
+    sparkles(c, 32, 40, t, pose.sparkle_speed, True, acc)
     lx, ly = anchors["light"]
     for e in pose.fx:
         kind = e[0]
@@ -866,7 +956,7 @@ TELLING = {"boot": 0.8, "happy": 0.3, "off": 0.3, "surprised": 0.15, "celebrate"
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--character", default="all", help="boopie, codex, klaude, whale, doubao or all")
+    ap.add_argument("--character", default="all", help="boopie, gpt, klaude, whale, doubao or all")
     ap.add_argument("--color", help="body colour, RRGGBB (one character only)")
     ap.add_argument("--scale", type=int, default=4)
     args = ap.parse_args()
