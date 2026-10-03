@@ -711,7 +711,7 @@ def wear(c: Canvas, name: str, slots: dict):
 # it, or over the whole frame afterwards (glitch). "default" is Muse's own:
 # the glow and sparkles alone.
 SCENES = {
-    "default": "默认光晕", "stars": "星空", "fireflies": "萤火", "rain": "细雨", "snow": "飘雪",
+    "default": "默认光晕", "stars": "星空", "fireflies": "萤火", "snow": "飘雪",
     "petals": "花瓣", "bubbles": "气泡", "matrix": "代码雨", "neon_grid": "霓虹网格", "glitch": "像素故障",
 }
 
@@ -745,16 +745,6 @@ def scene_back(c: Canvas, scene: str, t: float, acc):
             if i % 3 == 0:
                 continue                           # those fly in front
             firefly(c, i, t)
-    elif scene == "rain":
-        for i in range(26):
-            x0, sp = h01(i, 1) * 80, 40 + h01(i, 2) * 20
-            y = (h01(i, 3) * 64 + t * sp) % 70 - 4
-            x = x0 - y * 0.35
-            for j in range(3):
-                c.put(x + j * 0.35, y - j, (70, 90, 150) if j else (120, 150, 210))
-            if y > 56:                             # a splash on the ground
-                c.put(x - 1, 59, (90, 110, 170))
-                c.put(x + 1, 59, (90, 110, 170))
     elif scene == "snow":
         for i in range(22):
             snowflake(c, i, t, False)
