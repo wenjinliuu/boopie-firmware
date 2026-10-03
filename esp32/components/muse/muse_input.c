@@ -139,7 +139,7 @@ static void set_asleep(bool asleep, const char *why)
  */
 static void quick_action(void)
 {
-    muse_state_set_caption("计时器：即将推出");   /* the timer app, once there is one */
+    /* Not assigned yet: two presses do nothing. */
 }
 
 static void aux_single(void)

@@ -115,7 +115,7 @@ static const app_t APPS[] = {
     { "相册", "Muse 给你看过的图", true, "album" },
 };
 #define APP_COUNT (int)(sizeof APPS / sizeof APPS[0])
-static const char SOON[] = "即将推出\n接零食 · 重力迷宫 · 计时器 · 白噪音";
+static const char SOON[] = "即将推出\n接零食、重力迷宫、白噪音";
 
 static lv_obj_t *s_app_icons[APP_COUNT];
 static int s_app_icon_for = -1;
