@@ -590,6 +590,8 @@ class Klaude(Rig):
 
     def face(self, c, fx, fy, p):
         eyec = mix(WHITE, p.light, 0.35) if p.light and p.light != WHITE else (255, 246, 236)
+        if self.skin and self.skin.eye:
+            eyec = self.skin.eye
         c.eye, c.shine = eyec, None
         for side in (-1, 1):
             eye(c, fx + side * 7, fy, p, side, square=True)
@@ -609,7 +611,7 @@ class Whale(Rig):
         f = self.frame(p, cx, cy + ry)
         a = math.radians(p.antenna - 18)            # the tail swings like Boopie's antenna
         tx, ty = 46 + 3 * math.sin(a), 21 - 1.5 * math.cos(a)
-        tail = f.ellipse(44 + 1.5 * math.sin(a), 29, 2.6, 5) | f.ellipse(tx - 3, ty, 3.5, 2) | f.ellipse(tx + 3, ty - 0.5, 3.5, 2)
+        tail = f.ellipse(44 + 1.5 * math.sin(a), 27, 2.6, 7.5) | f.ellipse(tx - 3, ty, 3.5, 2) | f.ellipse(tx + 3, ty - 0.5, 3.5, 2)
         body = f.ellipse(cx, cy, rx, ry) | tail
         for h in p.hands:
             if h[0] != "front":
@@ -893,9 +895,9 @@ class Skin:
 
 
 SKINS = {
-    "boopie_starry": Skin("boopie_starry", "boopie", "星空", "典藏", 300, "stars", "2b3170",
-                          eye=(236, 236, 255), cheek=(190, 110, 200), glow=(255, 236, 160),
-                          outline=(118, 118, 214), body_fx="starry"),
+    "boopie_starry": Skin("boopie_starry", "boopie", "星空", "典藏", 300, "stars", "3a2c8c",
+                          eye=(236, 236, 255), cheek=(214, 120, 210), glow=(255, 236, 160),
+                          outline=(150, 128, 238), body_fx="starry"),
     # Drafts, two a character, for review.
     "boopie_jelly": Skin("boopie_jelly", "boopie", "果冻", "普通", 150, "bubbles", "7fe6d4",
                          cheek=(255, 140, 170), outline=(40, 140, 130), body_fx="jelly", draft=True),
@@ -914,10 +916,10 @@ SKINS = {
                          cheek=(0, 255, 200), outline=(20, 10, 60),
                          extra={"screen": (6, 6, 20), "glyph": (0, 255, 200), "glyph_follows_light": False},
                          body_fx="cyber", draft=True),
-    "klaude_clay": Skin("klaude_clay", "klaude", "黏土", "普通", 150, "default", "c9764a",
-                        body_fx="clay", draft=True),
-    "klaude_cookie": Skin("klaude_cookie", "klaude", "饼干", "典藏", 300, "default", "dba25e",
-                          outline=(110, 60, 25), body_fx="cookie", draft=True),
+    "klaude_ice": Skin("klaude_ice", "klaude", "冰块", "普通", 150, "snow", "a9dcf2",
+                       eye=(40, 90, 140), cheek=(150, 200, 240), outline=(70, 140, 190), body_fx="ice", draft=True),
+    "klaude_lava": Skin("klaude_lava", "klaude", "熔岩", "典藏", 300, "fireflies", "3b2c2c",
+                        eye=(255, 210, 90), cheek=(255, 120, 60), outline=(110, 50, 40), body_fx="lava", draft=True),
     "whale_koi": Skin("whale_koi", "whale", "锦鲤", "典藏", 300, "bubbles", "f6f2ec",
                       outline=(150, 70, 50), extra={"belly": ((236, 230, 222), (250, 248, 244))}, body_fx="koi",
                       draft=True),
@@ -927,7 +929,7 @@ SKINS = {
     "doubao_sakura": Skin("doubao_sakura", "doubao", "樱花", "普通", 150, "petals", "f2c9b4",
                           glow=(255, 160, 200), extra={"hair": "d9809e", "top": "f6c6d6"}, draft=True),
     "doubao_winter": Skin("doubao_winter", "doubao", "冬装", "典藏", 300, "snow", "f2c9b4",
-                          extra={"top": "c8323c"}, body_fx="winter", draft=True),
+                          extra={"top": "e6d9bf"}, body_fx="winter", draft=True),
 }
 
 
@@ -979,19 +981,36 @@ def skin_body(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
                         c.put(x, y, (0, 230, 210))
                     elif h01(x, y, int(t * 4)) > 0.97:
                         c.put(x, y, (255, 40, 180))
-    elif fx == "clay":      # thumbprint ridges, lighter and darker
+    elif fx == "ice":       # a shine across it, cracks, frost at the edges
         for y in range(N):
             for x in range(N):
-                if in_body(c, x, y):
-                    r = math.hypot(x - bx - 6, y - by + 2)
-                    if int(r) % 3 == 0 and BAYER[y % 4][x % 4] < 0.4:
-                        c.put(x, y, (176, 98, 60))
-    elif fx == "cookie":    # chocolate chips
-        for i in range(10):
-            x, y = round(bx + (h01(i, 10) - 0.5) * 30), round(by + (h01(i, 11) - 0.5) * 20)
-            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-                if in_body(c, x + dx, y + dy):
-                    c.put(x + dx, y + dy, (90, 50, 30) if (dx + dy) else (130, 80, 50))
+                if not in_body(c, x, y):
+                    continue
+                d = (x - bx) + (y - by)
+                if -14 <= d <= -11 and BAYER[y % 4][x % 4] < 0.8:
+                    c.put(x, y, (240, 252, 255))
+                edge = not (in_body(c, x - 2, y) and in_body(c, x + 2, y) and in_body(c, x, y - 2) and in_body(c, x, y + 2))
+                if edge and BAYER[y % 4][x % 4] < 0.5:
+                    c.put(x, y, (225, 245, 255))
+        x, y = round(bx + 6), round(by - 6)
+        for k in range(7):                      # a crack
+            x += 1 if k % 2 else 0
+            y += 1
+            if in_body(c, x, y):
+                c.put(x, y, (250, 255, 255))
+    elif fx == "lava":      # glowing cracks in dark rock
+        glow = 0.6 + 0.4 * math.sin(t * 2.2)
+        hot, warm = mix((200, 70, 20), (255, 220, 90), glow), (150, 50, 20)
+        for i in range(4):
+            x, y = bx + (h01(i, 20) - 0.5) * 26, by + (h01(i, 21) - 0.5) * 16
+            for k in range(9):
+                x += (h01(i, k, 22) - 0.5) * 2.4
+                y += 0.9
+                xi, yi = round(x), round(y)
+                if in_body(c, xi, yi):
+                    c.put(xi, yi, hot)
+                    if in_body(c, xi + 1, yi):
+                        c.put(xi + 1, yi, warm)
     elif fx == "koi":       # red-orange patches
         for i in range(4):
             px, py = bx + (h01(i, 12) - 0.5) * 24, by + (h01(i, 13) - 0.7) * 16
@@ -1006,19 +1025,23 @@ def skin_body(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
             g = 0.5 + 0.5 * math.sin(t * 2 + i)
             if in_body(c, x, y):
                 c.put(x, y, mix((40, 90, 140), (120, 255, 255), g))
-    elif fx == "winter":    # a knit beanie with a pompom, and a scarf
-        hx, hy = anchors["slots"]["hat"]
-        cx = round(hx + 3)
-        for y in range(round(hy) - 2, round(hy) + 7):
-            for x in range(cx - 13, cx + 14):
-                d = ((x - cx) / 13) ** 2 + ((y - hy - 7) / 9) ** 2
-                if d <= 1 and y <= hy + 6:
-                    c.put(x, y, (240, 240, 245) if y >= hy + 4 else ((200, 40, 50) if (x + y) % 3 else (230, 80, 90)))
-        for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, -1), (0, 1)):
-            c.put(cx + dx, round(hy) - 3 + dy, (250, 250, 255))
-        wear(c, "scarf", anchors["slots"])
-    if fx == "starry":   # stars twinkling inside the body, a few with a cross
-        bx, by = anchors["body"]
+    elif fx == "winter":    # a cable-knit jumper and a red scarf
+        nx, ny, _ = anchors["slots"]["neck"]
+        knit = {tuple(v) for v in ramp("e6d9bf").values()}
+        for y in range(round(ny) + 2, N):
+            for x in range(N):
+                if in_body(c, x, y) and tuple(c.img[y, x]) in knit and (x % 3 == 0 or (x % 3 == 1 and y % 2)):
+                    c.put(x, y, (200, 186, 158))
+        wear(c, "scarf", {"neck": (nx, ny - 1, 16)})
+    if fx == "starry":      # a nebula, then the stars
+        for y in range(N):
+            for x in range(N):
+                if not in_body(c, x, y):
+                    continue
+                n = h01(x // 4, y // 3, 23) * 0.6 + 0.4 * math.sin((x - bx) * 0.35 + (y - by) * 0.25)
+                if n > 0.55 and BAYER[y % 4][x % 4] < n - 0.3:
+                    c.put(x, y, (120, 70, 190) if (x // 4 + y // 3) % 2 else (70, 100, 210))
+        # stars twinkling inside the body, a few with a cross
         for i in range(18):
             x = round(bx + (h01(i, 7) - 0.5) * 28)
             y = round(by + (h01(i, 8) - 0.5) * 22)

@@ -1736,7 +1736,7 @@ static void draw_whale(const rig_t *r, const pose_t *p, anchors_t *a)
     float tx = 46 + 3 * sinf(an), ty = 21 - 1.5f * cosf(an);
     mask_t body, belly, inner;
     m_clear(body);
-    ell(&f, 44 + 1.5f * sinf(an), 29, 2.6f, 5, body);
+    ell(&f, 44 + 1.5f * sinf(an), 27, 2.6f, 7.5f, body);   /* the stalk reaches the flukes */
     ell(&f, tx - 3, ty, 3.5f, 2, body);
     ell(&f, tx + 3, ty - 0.5f, 3.5f, 2, body);
     ell(&f, cx, cy, rx, ry, body);
@@ -1902,7 +1902,7 @@ typedef struct {
 
 static const skin_t SKINS[] = {
     { "boopie_starry", "星空", BOOPIE_CHAR_BOOPIE, true, 300, BOOPIE_SCENE_STARS,
-      0x2b3170, 0xececff, 0xbe6ec8, 0xffeca0, 0x7676d6, NO_COLOUR, NO_COLOUR, false, FX_BODY_STARRY, FX_FACE_NONE },
+      0x3a2c8c, 0xececff, 0xd678d2, 0xffeca0, 0x9680ee, NO_COLOUR, NO_COLOUR, false, FX_BODY_STARRY, FX_FACE_NONE },
 };
 #define SKIN_COUNT (int)(sizeof(SKINS) / sizeof(SKINS[0]))
 
@@ -1958,11 +1958,21 @@ int boopie_skin_from_key(const char *key)
     return -1;
 }
 
-/* Stars twinkling inside the body, a few with a cross (the prototype's skin_body). */
+/* A nebula, then stars twinkling inside the body, a few with a cross (the
+ * prototype's skin_body). */
 static void skin_body(const skin_t *sk, const pose_t *pose, const anchors_t *a)
 {
     if (sk->body_fx != FX_BODY_STARRY) {
         return;
+    }
+    for (int y = 0; y < N; y++) {
+        for (uint64_t row = s_body[y]; row; row &= row - 1) {
+            int x = __builtin_ctzll(row);
+            double n = h01(3, x / 4, y / 3, 23) * 0.6 + 0.4 * sin((x - a->body_x) * 0.35 + (y - a->body_y) * 0.25);
+            if (n > 0.55 && BAYER[y % 4][x % 4] < n - 0.3) {
+                put(x, y, (x / 4 + y / 3) % 2 ? (rgb_t){ 120, 70, 190 } : (rgb_t){ 70, 100, 210 });
+            }
+        }
     }
     for (int i = 0; i < 18; i++) {
         int x = (int)rint(a->body_x + (h01(2, i, 7, 0) - 0.5) * 28);
