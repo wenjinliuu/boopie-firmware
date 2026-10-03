@@ -36,6 +36,9 @@
 typedef enum {
     MUSE_PTT_DOWN,
     MUSE_PTT_UP,
+    /* Boopie: the talk button let go as a tap, not held: keep listening until
+     * the speech ends (or another press ends it, posted as MUSE_PTT_UP). */
+    MUSE_PTT_TAP,
 } muse_ptt_t;
 
 typedef struct {

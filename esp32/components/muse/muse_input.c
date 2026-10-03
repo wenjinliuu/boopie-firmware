@@ -15,6 +15,7 @@
  */
 
 #include "boopie_clock.h"   /* Boopie */
+#include "boopie_pages.h"   /* Boopie: the power menu */
 #include "muse_input.h"
 
 #include <stdint.h>
@@ -57,7 +58,9 @@ static const char *TAG = "muse_input";
 #define POWER_MS 2000          /* refresh battery */
 #define REST_POWER_MS 10000    /* ... while paused */
 #define WIFI_NAP_MS (2 * 60 * 1000)   /* low power this long: Wi-Fi off until it ends */
-#define DOUBLE_TICKS 35        /* 350 ms: a second aux press within this toggles phone setup */
+#define DOUBLE_TICKS 35        /* 350 ms: a second aux press within this is the quick action */
+#define TAP_MS 400             /* Boopie: a talk press let go sooner is a tap: talk hands-free */
+#define HOLD_WARN_MS 7500      /* Boopie: held this long, warn: the PMU cuts power at 10 s */
 
 #define GOODBYE_MS 1500        /* let the goodbye animation play */
 #define HINT_TICKS 60          /* 0.6 s: warn that holding powers off */
@@ -78,7 +81,8 @@ static volatile bool s_nap_now;   /* ">nap": asleep, as if on battery, nap witho
 static void post(muse_ptt_t type, bool wake)
 {
     muse_input_event_t ev = { .type = type, .wake = wake };
-    ESP_LOGI(TAG, "PTT %s%s", type == MUSE_PTT_DOWN ? "down" : "up", wake ? " (waking)" : "");
+    ESP_LOGI(TAG, "PTT %s%s", type == MUSE_PTT_DOWN ? "down" : type == MUSE_PTT_TAP ? "tap" : "up",
+             wake ? " (waking)" : "");
     xQueueSend(s_queue, &ev, 0);
 }
 
@@ -117,25 +121,30 @@ static void set_asleep(bool asleep, const char *why)
     }
 }
 
-static void toggle_phone_setup(void)
-{
-    bool on = !muse_settings_ble_on();
-    ESP_LOGI(TAG, "phone setup %s", on ? "on" : "off");
-    muse_settings_set_ble_on(on);
-    muse_ble_status_t b;
-    muse_ble_status(&b);
-    if (on && b.name[0]) {
-        muse_state_set_caption("PHONE SETUP: %s", b.name);
-    } else {
-        muse_state_set_caption("PHONE SETUP %s", on ? "ON" : "OFF");
-    }
-}
-
 /*
  * Aux button: short press sleeps, a 1.5 s hold powers off, any press wakes.
  * Two quick presses toggle BLE phone setup, so the sleep waits a moment to
  * see whether a second press follows.
+ *
+ * Boopie (docs/boopie-interaction.md): a short press goes back to the face,
+ * and sleeps only from the face; it closes the power menu if that's open. Two
+ * quick presses are the quick action (phone setup is on the Bluetooth page),
+ * and the 1.5 s hold opens the power menu rather than powering straight off.
  */
+static void quick_action(void)
+{
+    muse_state_set_caption("计时器：即将推出");   /* the timer app, once there is one */
+}
+
+static void aux_single(void)
+{
+    if (boopie_pages_menu_open()) {
+        boopie_pages_menu_close();
+    } else if (!muse_ui_go_home()) {
+        set_asleep(true, muse_board->aux_button);
+    }
+}
+
 static void aux_button(bool pressed, bool edge)
 {
     static int held;
@@ -145,7 +154,7 @@ static void aux_button(bool pressed, bool edge)
     static char saved_caption[64];
 
     if (sleep_in && --sleep_in == 0) {
-        set_asleep(true, muse_board->aux_button);
+        aux_single();
     }
     if (edge && pressed) {
         held = 0;
@@ -156,7 +165,7 @@ static void aux_button(bool pressed, bool edge)
         } else if (sleep_in) {
             sleep_in = 0;
             swallow = true;
-            toggle_phone_setup();
+            quick_action();
         }
         return;
     }
@@ -165,11 +174,12 @@ static void aux_button(bool pressed, bool edge)
         if (held == HINT_TICKS) {
             uint32_t v = UINT32_MAX;
             muse_state_caption(saved_caption, sizeof(saved_caption), &v);
-            muse_state_set_caption("HOLD TO POWER OFF");
+            muse_state_set_caption("按住打开电源菜单");
             hinted = true;
         } else if (held == LONG_TICKS) {
             swallow = true;
-            power_off();
+            muse_state_set_caption("%s", saved_caption);
+            boopie_pages_power_menu();
         }
         return;
     }
@@ -199,6 +209,19 @@ static void menu_button(bool pressed, bool edge)
 /* Talk button: push-to-talk, or Select while the menu is open. Asleep, the
  * press wakes and is posted as a waking one: muse_voice records only if it's
  * still held once awake. */
+/* Boopie: the talk button's release. A tap that didn't wake the screen leaves
+ * it listening hands-free, to end by itself; a hold sends on release. */
+static TickType_t s_talk_at;      /* when the talk press began */
+static bool s_talk_waking;        /* that press woke the screen */
+static bool s_hands_free;         /* listening after a tap */
+
+static void talk_released(void)
+{
+    bool tap = !s_talk_waking && xTaskGetTickCount() - s_talk_at < pdMS_TO_TICKS(TAP_MS);
+    post(tap ? MUSE_PTT_TAP : MUSE_PTT_UP, false);
+    s_hands_free = tap;
+}
+
 static void talk_button(unsigned ev)
 {
     bool talk_down = s_talk_down;
@@ -224,19 +247,29 @@ static void talk_button(unsigned ev)
 #endif
     if ((talk_down || swallow) && released) {
         if (talk_down) {
-            post(MUSE_PTT_UP, false);
+            talk_released();
         }
         talk_down = swallow = false;
         released = false;
     }
     if (!talk_down && !swallow && (ev & MUSE_BTN_TALK_PRESS)) {
-        if (muse_link_talk_press()) {
+        float mode_t;
+        bool listening = muse_state_mode(&mode_t) == MUSE_MODE_LISTENING;
+        s_talk_at = xTaskGetTickCount();
+        s_talk_waking = false;
+        if (s_hands_free && listening && !muse_state_asleep()) {
+            /* Boopie: a press while listening hands-free ends it: send now. */
+            post(MUSE_PTT_UP, false);
+            s_hands_free = false;
+            swallow = true;
+        } else if (muse_link_talk_press()) {
             /* Confirmed a Muse app pairing (Link's setup button). */
             muse_state_poke();
             swallow = true;
         } else if (muse_state_asleep()) {
             set_asleep(false, muse_board->talk_button);
             post(MUSE_PTT_DOWN, true);
+            s_talk_waking = true;
             talk_down = true;
         } else if (muse_menu_is_open()) {
             muse_state_poke();
@@ -249,7 +282,7 @@ static void talk_button(unsigned ev)
     }
     if ((talk_down || swallow) && released) {
         if (talk_down) {
-            post(MUSE_PTT_UP, false);
+            talk_released();
         }
         talk_down = swallow = false;
     }
@@ -384,6 +417,15 @@ static void input_task(void *arg)
             aux_button(aux_down, aux_edge);
         } else {
             menu_button(aux_down, aux_edge);
+        }
+
+        /* Boopie: held to talk this long, warn before the PMU's 10 s cut. */
+        static bool warned;
+        if (s_talk_down && !warned && xTaskGetTickCount() - s_talk_at > pdMS_TO_TICKS(HOLD_WARN_MS)) {
+            muse_state_set_caption("松手发送：按住 10 秒会关机");
+            warned = true;
+        } else if (!s_talk_down) {
+            warned = false;
         }
 
         if (s_power_off_requested) {

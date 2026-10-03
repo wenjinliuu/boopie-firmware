@@ -1568,6 +1568,21 @@ void muse_ui_show_face(void)
     lv_tileview_set_tile(s_tv, s_face, LV_ANIM_ON);
 }
 
+bool muse_ui_go_home(void)
+{
+    if (!s_tv) {
+        return false;
+    }
+    muse_board->display_lock(-1);
+    bool away = lv_tileview_get_tile_active(s_tv) != s_face;
+    if (away) {
+        lv_obj_add_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE);
+        lv_tileview_set_tile(s_tv, s_face, LV_ANIM_ON);
+    }
+    muse_board->display_unlock();
+    return away;
+}
+
 void muse_ui_set_swipe_enabled(bool enabled)
 {
     if (!s_tv) {

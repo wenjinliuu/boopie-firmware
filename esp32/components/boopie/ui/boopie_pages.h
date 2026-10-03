@@ -22,3 +22,11 @@ void boopie_pages_tick(lv_obj_t *shown);
 
 /* The time for the home screen, "14:32", or NULL until the clock is known. */
 const char *boopie_pages_clock(void);
+
+/*
+ * The power menu, over everything: power off, restart, mute, factory reset
+ * (asked twice). From any task: these take the display lock.
+ */
+void boopie_pages_power_menu(void);
+bool boopie_pages_menu_open(void);
+void boopie_pages_menu_close(void);

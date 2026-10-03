@@ -34,6 +34,7 @@
 #include "muse_state.h"
 #include "muse_ui.h"
 #include "sim_board.h"
+#include "boopie_pages.h"
 #include "sim_platform.h"
 #include "sim_services.h"
 
@@ -68,7 +69,7 @@ static void usage(FILE *out, const char *argv0)
             "  ble=off|advertising|connected         passkey=0..999999\n"
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
-            "  tap=X,Y            swipe=left|right|up|down\n"
+            "  tap=X,Y            swipe=left|right|up|down   menu=power\n"
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
@@ -353,6 +354,11 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
     }
     if (!strcmp(key, "swipe")) {
         return swipe(value, real_time);
+    }
+    if (!strcmp(key, "menu") && !strcmp(value, "power")) {   /* the bottom button held */
+        boopie_pages_power_menu();
+        render_for(300, real_time);
+        return true;
     }
     bool flag;
     long number;

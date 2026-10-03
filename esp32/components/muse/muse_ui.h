@@ -34,6 +34,10 @@ bool muse_ui_dark(void);
 
 /* Slide back to the face (e.g. when a talk starts). */
 void muse_ui_show_face(void);
+
+/* Boopie: from any task, back to the face if another page is showing; false
+ * if the face was showing already. */
+bool muse_ui_go_home(void);
 /* Settings sub-pages turn off the tile swipe so they can use horizontal gestures. */
 void muse_ui_set_swipe_enabled(bool enabled);
 /* Temporarily applies a brightness while a slider is dragged. */

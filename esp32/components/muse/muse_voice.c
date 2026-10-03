@@ -44,6 +44,12 @@ static const char *TAG = "muse_voice";
 #define TAIL_FRAMES (MUSE_AUDIO_RATE * 12 / 100)   /* capture lag + poll interval, stops before the release click */
 #define MAX_FRAMES (MUSE_AUDIO_RATE * MAX_SECS)
 #define MIN_HELD_FRAMES (MUSE_AUDIO_RATE * 3 / 10)   /* shorter presses are taps, not speech */
+/* Boopie: tapped to talk, the note ends by itself: this long quiet after speech,
+ * or this long with none at all. A chunk's level over VOICE_LEVEL is speech.
+ * To tune on the board. */
+#define END_QUIET_FRAMES (MUSE_AUDIO_RATE * 9 / 10)
+#define NO_SPEECH_FRAMES (MUSE_AUDIO_RATE * 6)
+#define VOICE_LEVEL 0.12f
 #define PRE_CHUNKS 16                                  /* 320 ms of audio kept from before the press */
 #define SETTLE_CHUNKS 10   /* after Muse makes a sound, 200 ms of capture is its own tail */
 #define REST_BACKSTOP_MS 60000
@@ -273,12 +279,20 @@ static bool record(bool barge_in, size_t *held, char *why, size_t cap)
     size_t pre = n;
     bool released = false;
     size_t stop_at = MAX_FRAMES;
+    bool hands_free = false;   /* Boopie: tapped, not held */
+    bool spoke = false;
+    size_t last_voice = n;
     while (n + MUSE_AUDIO_CHUNK <= stop_at) {
         if (muse_audio_read(s_chunk, MUSE_AUDIO_CHUNK) != ESP_OK) {
             break;
         }
-        muse_state_set_level(muse_audio_level(s_chunk, MUSE_AUDIO_CHUNK));
+        float level = muse_audio_level(s_chunk, MUSE_AUDIO_CHUNK);
+        muse_state_set_level(level);
         take(&st, s_chunk);
+        if (level > VOICE_LEVEL) {
+            spoke = true;
+            last_voice = n;
+        }
         /* Live transcript as the caption. A failure stops the streaming; the
          * kept note goes later, or without one the failure is the caption. */
         muse_hatch_ev_t ev;
@@ -312,9 +326,22 @@ static bool record(bool barge_in, size_t *held, char *why, size_t cap)
          * Capture runs 60-80 ms behind real time and people let go on their
          * last syllable, so keep going briefly after release.
          */
-        if (!released && got_event(MUSE_PTT_UP)) {
+        bool up = false;
+        muse_input_event_t press;
+        while (xQueueReceive(s_queue, &press, 0) == pdTRUE) {
+            muse_state_poke();
+            up |= press.type == MUSE_PTT_UP;
+            hands_free |= press.type == MUSE_PTT_TAP;
+        }
+        if (!released && up) {
             released = true;
             stop_at = n + TAIL_FRAMES < MAX_FRAMES ? n + TAIL_FRAMES : MAX_FRAMES;
+        }
+        /* Boopie: tapped to talk, it ends on the quiet after speech. */
+        if (!released && hands_free
+            && ((spoke && n - last_voice > END_QUIET_FRAMES) || (!spoke && n - pre > NO_SPEECH_FRAMES))) {
+            released = true;
+            stop_at = n;
         }
     }
     muse_state_set_level(0);
