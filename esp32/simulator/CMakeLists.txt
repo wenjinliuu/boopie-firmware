@@ -166,9 +166,11 @@ add_executable(muse_simulator
     # Boopie: the avatars, and the switcher between them and Muse's.
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_avatar.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_games.c"
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_pixel.c"
     "${BOOPIE_COMPONENT_DIR}/boopie_expr.c"
     "${BOOPIE_COMPONENT_DIR}/pet/boopie_pet.c"
+    "${BOOPIE_COMPONENT_DIR}/game/boopie_whack.c"
     # Boopie: the Chinese and English text font.
     "${BOOPIE_COMPONENT_DIR}/font/boopie_font.c"
     "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_font.c"
@@ -184,6 +186,7 @@ target_include_directories(muse_simulator PRIVATE
     "${BOOPIE_COMPONENT_DIR}/avatar"
     "${BOOPIE_COMPONENT_DIR}/pet"
     "${BOOPIE_COMPONENT_DIR}/ui"
+    "${BOOPIE_COMPONENT_DIR}/game"
     "${BOOPIE_COMPONENT_DIR}"
 )
 

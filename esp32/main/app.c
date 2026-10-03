@@ -74,6 +74,7 @@
 #if CONFIG_MUSE_ENABLED
 #include "muse_glue.h"
 #include "boopie_avatar.h"   /* Boopie: display.avatar */
+#include "boopie_games.h"    /* Boopie: game.start */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -1919,6 +1920,15 @@ static cJSON *on_ws_command(
         cJSON_AddNumberToObject(result, "xp_into_level", st.xp_into);
         cJSON_AddNumberToObject(result, "xp_for_level", st.xp_need);
         cJSON_AddNumberToObject(result, "stars", st.stars);
+        return result;
+    }
+    if (strcmp(command, "game.start") == 0) {
+        char *game = json_strdup_string(params, "game");
+        bool ok = boopie_games_open(game ? game : "whack");
+        free(game);
+        if (!ok) return command_error("bad_param", "unknown game");
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
         return result;
     }
     if (strcmp(command, "pet.name") == 0) {

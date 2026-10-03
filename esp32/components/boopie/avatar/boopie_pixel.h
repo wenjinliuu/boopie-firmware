@@ -181,3 +181,9 @@ void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t b
  * grid cells: a hat's bottom centre x, y; a scarf's centre x, y and width.
  * NULL wears none. */
 void boopie_pixel_set_slots(const float slots[5]);
+
+/* 戳戳布比 (game/boopie_whack.h) drawn into the grid, read back with boopie_pixel_rgb():
+ * the pets popping up are `head`, a boopie_char_t as it's dressed now, or
+ * BOOPIE_SKIN_MUSE for Muse's own. */
+struct boopie_whack;
+void boopie_pixel_render_whack(const struct boopie_whack *g, int head);

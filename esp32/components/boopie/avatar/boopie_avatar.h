@@ -121,5 +121,12 @@ typedef struct {
 
 void boopie_avatar_pet_status(boopie_pet_status_t *out);
 
+/* A game round ended with `score`: its reward (xp, stars) goes to the pet, up
+ * to the day's caps; *ev says what was given, *best is the best score of that
+ * game so far (kept in NVS) and *record whether this round set it. */
+typedef enum { BOOPIE_GAME_WHACK = 0, BOOPIE_GAME_COUNT } boopie_game_t;
+void boopie_avatar_game_result(boopie_game_t game, int score, int xp, int stars, boopie_pet_event_t *ev,
+                               int *best, bool *record);
+
 /* Item `index` of a kind is unlocked; *level (if given) the level it takes. */
 bool boopie_avatar_unlocked(boopie_unlock_kind_t kind, int index, int *level);

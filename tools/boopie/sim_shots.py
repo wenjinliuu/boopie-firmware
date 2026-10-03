@@ -152,7 +152,9 @@ def render_accessories(binary: Path, out: Path) -> list[Path]:
 # The pages round the face: a finger swiping right shows apps, left settings,
 # down (pulling from the top) the cards, up the pet; and the power menu.
 PAGES = [("page-home", []), ("page-apps", ["swipe=right"]), ("page-settings", ["swipe=left"]),
-         ("page-cards", ["swipe=down"]), ("page-pet", ["swipe=up"]), ("power-menu", ["menu=power"])]
+         ("page-cards", ["swipe=down"]), ("page-pet", ["swipe=up"]), ("power-menu", ["menu=power"]),
+         ("game-ready", ["game=whack"]), ("game-play", ["game=whack", "tap=233,233", "advance=20000"]),
+         ("game-over", ["game=whack", "tap=233,233", "advance=61000"])]
 
 
 def render_pages(binary: Path, out: Path) -> list[Path]:

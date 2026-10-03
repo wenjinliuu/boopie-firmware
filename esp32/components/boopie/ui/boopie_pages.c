@@ -11,6 +11,7 @@
 
 #include "boopie_avatar.h"
 #include "boopie_font.h"
+#include "boopie_games.h"
 #include "muse_board.h"
 #include "muse_input.h"
 #include "muse_settings.h"
@@ -98,18 +99,27 @@ static lv_obj_t *card(lv_obj_t *parent, int w, int h)
 typedef struct {
     const char *name, *note;
     bool ready;
+    const char *game;   /* boopie_games_open()'s id */
 } app_t;
 
 /* The games first; what isn't built yet says so. */
 static const app_t APPS[] = {
-    { "戳戳布比", "触摸", false },
-    { "接零食", "倾斜", false },
-    { "重力迷宫", "倾斜", false },
-    { "计时器", "专注", false },
-    { "白噪音", "助眠", false },
-    { "更多", "敬请期待", false },
+    { "戳戳布比", "触摸", true, "whack" },
+    { "接零食", "倾斜", false, NULL },
+    { "重力迷宫", "倾斜", false, NULL },
+    { "计时器", "专注", false, NULL },
+    { "白噪音", "助眠", false, NULL },
+    { "更多", "敬请期待", false, NULL },
 };
 #define APP_COUNT (int)(sizeof APPS / sizeof APPS[0])
+
+static void on_app(lv_event_t *e)
+{
+    const app_t *a = lv_event_get_user_data(e);
+    if (a->game) {
+        boopie_games_open_locked(a->game);
+    }
+}
 
 static void build_apps(lv_obj_t *page)
 {
@@ -124,6 +134,9 @@ static void build_apps(lv_obj_t *page)
         lv_obj_t *n = text(c, &lv_font_montserrat_20, APPS[i].ready ? COLOR_TEXT : COLOR_DIM, APPS[i].name);
         lv_obj_align(n, LV_ALIGN_CENTER, 0, -14);
         lv_obj_t *s = text(c, &lv_font_montserrat_20, COLOR_DIM, APPS[i].ready ? APPS[i].note : "即将推出");
+        if (APPS[i].ready) {
+            lv_obj_add_event_cb(c, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
+        }
         lv_obj_align(s, LV_ALIGN_CENTER, 0, 16);
     }
 }

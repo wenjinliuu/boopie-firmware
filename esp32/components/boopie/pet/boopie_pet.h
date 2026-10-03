@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "boopie_expr.h"
@@ -45,7 +46,7 @@ typedef enum {
 } boopie_xp_source_t;
 
 /* Kept in NVS as it is: only ever append, and bump version on a change. */
-#define BOOPIE_PET_VERSION 1
+#define BOOPIE_PET_VERSION 2   /* 2: game_stars_today, in what was padding */
 typedef struct {
     uint8_t version;
     uint8_t hungers_today;
@@ -58,7 +59,14 @@ typedef struct {
     uint32_t xp;                    /* all ever earned */
     uint32_t stars;
     uint16_t xp_today[BOOPIE_XP_SOURCE_COUNT];
+    uint8_t game_stars_today;       /* stars from games, up to BOOPIE_GAME_STARS_CAP a day */
 } boopie_pet_t;
+
+#define BOOPIE_GAME_STARS_CAP 10
+
+/* A saved pet from NVS, of this version or an older one it can update; false
+ * if it's neither (then *p is untouched). */
+bool boopie_pet_load(boopie_pet_t *p, const void *blob, size_t n);
 
 /* What happened in a call, for the screen to show. */
 typedef struct {
@@ -89,6 +97,10 @@ bool boopie_pet_tap(boopie_pet_t *p, int64_t now, boopie_pet_event_t *ev);
 
 /* A reply was spoken to it. */
 void boopie_pet_talked(boopie_pet_t *p, boopie_pet_event_t *ev);
+
+/* A game round's reward: experience (BOOPIE_XP_GAME's cap) and stars, up to
+ * BOOPIE_GAME_STARS_CAP a day. */
+void boopie_pet_game(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev);
 
 /* Experience from a source (capped per day; games pass their own amount). */
 void boopie_pet_earn(boopie_pet_t *p, boopie_xp_source_t src, int xp, boopie_pet_event_t *ev);

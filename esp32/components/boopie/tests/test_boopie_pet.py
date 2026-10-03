@@ -57,6 +57,14 @@ class BoopiePetTest(unittest.TestCase):
         self.assertEqual(self.r["early_alone"], "sleepy")
         self.assertEqual(self.r["day_alone"], "idle")
 
+    def test_games_capped_daily(self) -> None:
+        # 45 xp and 10 stars a day from games, then room again the next day.
+        self.assertEqual(self.r["game"], [45, 10, 15, 3])
+
+    def test_old_saves_load(self) -> None:
+        self.assertEqual(self.r["load_v1"], [1, 2, 0, 1])
+        self.assertEqual(self.r["load_bad"], [0, 0])
+
     def test_time_powered_off_doesnt_count(self) -> None:
         self.assertEqual(self.r["off_hungry"], 1)
         self.assertEqual(self.r["off_after"], "hungry")

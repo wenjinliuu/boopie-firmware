@@ -61,7 +61,7 @@ if(CONFIG_MUSE_ENABLED)
     endif()
     # Boopie: the avatar switcher stands in for muse_pixel_*; Muse's own
     # renderer is built as jolly_pixel_* (below) and drawn when Muse is chosen.
-    list(APPEND srcs "${muse_pixel_src}" "../boopie/avatar/boopie_avatar.c" "../boopie/ui/boopie_pages.c")
+    list(APPEND srcs "${muse_pixel_src}" "../boopie/avatar/boopie_avatar.c" "../boopie/ui/boopie_pages.c" "../boopie/ui/boopie_games.c")
     if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C)
         list(APPEND srcs "boards/board_waveshare_s3_175c.c" "boards/muse_lcd_bands.c")
     elseif(CONFIG_MUSE_BOARD_AIPI)

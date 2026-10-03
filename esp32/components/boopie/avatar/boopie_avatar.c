@@ -87,6 +87,7 @@ static int s_worn[BOOPIE_AVATAR_COUNT];   /* the skin each character wears, or -
 static uint32_t s_owned;                  /* bit per skin index */
 static uint32_t s_acc[BOOPIE_AVATAR_COUNT];  /* the accessories each wears, BOOPIE_ACC_BIT()s */
 static char s_name[BOOPIE_PET_NAME_MAX];  /* the pet's name, or "" for its character's */
+static uint32_t s_best[BOOPIE_GAME_COUNT];   /* each game's best score */
 
 /* The pet, ticked from the frames, and what it shows while idle. */
 static boopie_pet_t s_pet_state;
@@ -248,6 +249,7 @@ static void apply(void)
 
 #ifdef ESP_PLATFORM
 static const char *TAG = "boopie_avatar";
+static const char *const GAME_KEYS[BOOPIE_GAME_COUNT] = { [BOOPIE_GAME_WHACK] = "best_whack" };   /* NVS */
 #define NS "boopie"
 
 static void load(void)
@@ -283,10 +285,13 @@ static void load(void)
     if (nvs_get_str(h, "name", s_name, &n) != ESP_OK) {
         s_name[0] = '\0';
     }
+    for (int i = 0; i < BOOPIE_GAME_COUNT; i++) {
+        nvs_get_u32(h, GAME_KEYS[i], &s_best[i]);
+    }
     size_t pn = sizeof s_pet_state;
     boopie_pet_t saved;
-    if (nvs_get_blob(h, "pet", &saved, &pn) == ESP_OK && pn == sizeof saved && saved.version == BOOPIE_PET_VERSION) {
-        s_pet_state = saved;
+    if (nvs_get_blob(h, "pet", &saved, &pn) == ESP_OK) {
+        boopie_pet_load(&s_pet_state, &saved, pn);   /* an older version is brought up to date */
     }
     n = sizeof key;
     if (nvs_get_str(h, "scene", key, &n) == ESP_OK) {
@@ -320,6 +325,9 @@ static void save(void)
         nvs_set_u32(h, wk, s_acc[i]);
     }
     nvs_set_str(h, "name", s_name);
+    for (int i = 0; i < BOOPIE_GAME_COUNT; i++) {
+        nvs_set_u32(h, GAME_KEYS[i], s_best[i]);
+    }
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_commit(h);
     nvs_close(h);
@@ -755,6 +763,30 @@ bool boopie_avatar_tap(int gx, int gy)
     }
     show_event(&ev);
     return fed;
+}
+
+void boopie_avatar_game_result(boopie_game_t game, int score, int xp, int stars, boopie_pet_event_t *ev,
+                               int *best, bool *record)
+{
+    ensure_loaded();
+    boopie_pet_event_t got = { 0 };
+    boopie_pet_game(&s_pet_state, xp, stars, &got);
+    bool rec = false;
+    if ((int)game >= 0 && game < BOOPIE_GAME_COUNT && score > 0 && (uint32_t)score > s_best[game]) {
+        s_best[game] = (uint32_t)score;
+        rec = true;
+    }
+    if (ev) {
+        *ev = got;
+    }
+    if (best) {
+        *best = (int)game >= 0 && game < BOOPIE_GAME_COUNT ? (int)s_best[game] : 0;
+    }
+    if (record) {
+        *record = rec;
+    }
+    show_event(&got);
+    save();
 }
 
 void boopie_avatar_pet_status(boopie_pet_status_t *out)

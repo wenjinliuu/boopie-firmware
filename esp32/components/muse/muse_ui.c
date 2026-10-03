@@ -49,6 +49,7 @@
 #include "boopie_avatar.h"
 #include "boopie_font.h"   /* Boopie: Chinese and English reply text */
 #include "boopie_pages.h"  /* Boopie: the pages round the face */
+#include "boopie_games.h"  /* Boopie: the games, over everything */
 
 static const char *TAG = "muse_ui";
 
@@ -1489,6 +1490,9 @@ static void frame_tick(lv_timer_t *timer)
     }
     if (s_image_dsc.data) {
         return;   /* the image covers the face */
+    }
+    if (boopie_games_active()) {
+        return;   /* Boopie: a game covers the face, and draws with the same renderer */
     }
     if (s_tv && (lv_obj_get_scroll_x(s_tv) != lv_obj_get_x(s_face)
                  || lv_obj_get_scroll_y(s_tv) != lv_obj_get_y(s_face))) {

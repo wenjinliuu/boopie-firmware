@@ -12,6 +12,7 @@
  */
 
 #include "boopie_pixel.h"
+#include "boopie_whack.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -2965,4 +2966,171 @@ void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t b
     }
     scene_post(scene, in->scene_t);
     to_565_all();
+}
+
+/* ---------------------------------------------------------------- games */
+
+/*
+ * The pet's head, 13 x 10, as it pops out of a hole: o outline, d dark, b body,
+ * l light, e eye, c cheek, a its light (Boopie's bulb, the whale's spout), w
+ * white, k ink, s screen or face, g Codex's glyph, h Doubao's hair. Coloured
+ * from the character as it's dressed now (its colour, its skin).
+ */
+#define HEAD_W 13
+#define HEAD_H 10
+static const char *const HEADS[BOOPIE_CHAR_COUNT + 1][HEAD_H] = {
+    [BOOPIE_CHAR_BOOPIE] = { "........aa...", "........aa...", ".......o.....", "...ooooooo...", "..ollbbbbbo..",
+                             ".olbbbbbbbbo.", ".obbebbbebbo.", ".obbebbbebbo.", ".ocbbbbbbbco.", ".obbbbbbbbbo." },
+    [BOOPIE_CHAR_GPT] = { "........kkk..", ".......kwkwk.", "...ooookkkk..", "..ollbbbbbo..", ".olbbbbbbbbo.",
+                          ".obbebbbebbo.", ".obbebbbebbo.", ".ocbbbbbbbco.", ".obbbbbbbbbo.", ".obbbbbbbbbo." },
+    [BOOPIE_CHAR_CODEX] = { "...oo..oo....", "..ollooblo...", ".olbbbbbbboo.", ".obsssssssbo.", "obsssssssssbo",
+                            "obsgsssggssbo", "obssgssssssbo", "obsgsssssssbo", ".obsssssssbo.", ".obbbbbbbbbo." },
+    [BOOPIE_CHAR_KLAUDE] = { ".............", ".ooooooooooo.", ".ollllbbbbbo.", ".olbbbbbbbbo.", ".obbkbbbkbbo.",
+                             ".obbkbbbkbbo.", ".obbbbbbbbbo.", ".obbbbbbbbbo.", ".odddddddddo.", ".obbbbbbbbbo." },
+    [BOOPIE_CHAR_WHALE] = { "..a.a........", "...a.........", "...a.........", "..ooooooo....", ".ollbbbbboo..",
+                            "obbbbbbbbbbo.", "obbebbbebbbo.", "obbebbbebbbo.", "ocwwwwwwwwco.", "owwwwwwwwwwo." },
+    [BOOPIE_CHAR_DOUBAO] = { "...hhhhhhh...", "..hhhhhhhhh..", ".hhhhhhhhhhh.", ".hhbbbbbbbhh.", ".hbbbbbbbbbh.",
+                             ".hbbebbbebbh.", ".hbbebbbebbh.", ".hcbbbbbbbch.", ".hbbbbbbbbbh.", ".hbbbbbbbbbh." },
+    [BOOPIE_CHAR_COUNT] = { "....ooooo....", "..oollllloo..", ".olllbbbbbbo.", ".obsssssssbo.", "obsssssssssbo",
+                            "obskssssksbbo", "obskssssksbbo", "obscssssscbbo", ".obsssssssbo.", ".obbbbbbbbbo." },   /* Muse */
+};
+/* The rain cloud that mustn't be poked. */
+static const char *const CLOUD[HEAD_H] = { ".............", "....ooooo....", "..oowwwwwoo..", ".owwwwwwwwwo.",
+                                          "owwkwwwwwkwwo", "owwwkwwwkwwwo", "owwwwwwwwwwwo", ".owwwwwwwwwo.",
+                                          "..ooooooooo..", "...d..d..d..." };
+/* Score digits, 3 x 5, and + - x. */
+static const char *const DIGITS[13][5] = {
+    { "###", "#.#", "#.#", "#.#", "###" }, { ".#.", "##.", ".#.", ".#.", "###" }, { "###", "..#", "###", "#..", "###" },
+    { "###", "..#", ".##", "..#", "###" }, { "#.#", "#.#", "###", "..#", "..#" }, { "###", "#..", "###", "..#", "###" },
+    { "###", "#..", "###", "#.#", "###" }, { "###", "..#", ".#.", ".#.", ".#." }, { "###", "#.#", "###", "#.#", "###" },
+    { "###", "#.#", "###", "..#", "###" }, { "...", ".#.", "###", ".#.", "..." }, { "...", "...", "###", "...", "..." },
+    { "...", "#.#", ".#.", "#.#", "..." },
+};
+
+static rgb_t head_colour(int head, char ch, bool gold)
+{
+    ramp_t r = gold ? ramp(0xffd246) : head == BOOPIE_CHAR_COUNT ? ramp(0xe6d7bd) : s_rp;
+    switch (ch) {
+    case 'o': return r.out;
+    case 'd': return r.dark;
+    case 'b': return r.mid;
+    case 'l': return r.light;
+    case 'e': return s_eye_base;
+    case 'c': return head == BOOPIE_CHAR_COUNT ? (rgb_t){ 244, 170, 160 } : s_cheek;
+    case 'a': return head == BOOPIE_CHAR_WHALE ? (rgb_t){ 150, 210, 255 } : (rgb_t){ 255, 236, 160 };
+    case 'w': return head == BOOPIE_CHAR_WHALE ? s_whale_belly[1] : head == BOOPIE_CHAR_GPT ? s_rp2.light
+                                                                                              : (rgb_t){ 245, 245, 250 };
+    case 'k': return head == BOOPIE_CHAR_COUNT ? (rgb_t){ 18, 13, 11 } : (rgb_t){ 18, 18, 24 };
+    case 's': return head == BOOPIE_CHAR_COUNT ? (rgb_t){ 246, 223, 189 } : s_codex_screen;
+    case 'g': return s_codex_glyph;
+    case 'h': return s_rp2.mid;
+    default: return (rgb_t){ 0, 0, 0 };
+    }
+}
+
+static void draw_glyph(int which, int x, int y, int scale, rgb_t c)
+{
+    for (int j = 0; j < 5; j++) {
+        for (int i = 0; i < 3; i++) {
+            if (DIGITS[which][j][i] == '#') {
+                for (int v = 0; v < scale; v++) {
+                    for (int u = 0; u < scale; u++) {
+                        put(x + i * scale + u, y + j * scale + v, c);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* A number centred on cx, its top at y; sign: a leading + or -. */
+static void draw_number(int value, int sign, int cx, int y, int scale, rgb_t c)
+{
+    int digits[6], n = 0;
+    int v = value < 0 ? -value : value;
+    do {
+        digits[n++] = v % 10;
+        v /= 10;
+    } while (v && n < 6);
+    int glyphs = n + (sign != 0);
+    int w = glyphs * 4 * scale - scale;
+    int x = cx - w / 2;
+    if (sign) {
+        draw_glyph(sign > 0 ? 10 : 11, x, y, scale, c);
+        x += 4 * scale;
+    }
+    for (int i = n - 1; i >= 0; i--) {
+        draw_glyph(digits[i], x, y, scale, c);
+        x += 4 * scale;
+    }
+}
+
+void boopie_pixel_render_whack(const boopie_whack_t *g, int head)
+{
+    if (head < 0 || head > BOOPIE_CHAR_COUNT) {
+        head = BOOPIE_CHAR_BOOPIE;
+    }
+    memset(s_img, 0, sizeof(s_img));
+    s_dst = s_img;
+    s_dst_mask = NULL;
+    /* The time left, round the edge: green, then yellow, then red. */
+    float left = 1 - g->t / BOOPIE_WHACK_SECONDS;
+    rgb_t tc = left > 0.5f ? (rgb_t){ 110, 240, 160 } : left > 0.2f ? (rgb_t){ 255, 210, 80 } : (rgb_t){ 255, 90, 100 };
+    for (int i = 0; i < 60; i++) {
+        float a = i / 60.0f * 6.2831853f - 1.5707963f;
+        bool lit = i < (int)ceilf(left * 60);
+        put(32 + 30 * cosf(a), 32 + 30 * sinf(a), lit ? tc : (rgb_t){ 34, 28, 52 });
+    }
+    for (int i = 0; i < BOOPIE_WHACK_HOLES; i++) {
+        float hx, hy;
+        boopie_whack_hole_pos(i, &hx, &hy);
+        int cx = (int)rintf(hx), base = (int)rintf(hy) + 3;
+        /* The hole, behind. */
+        for (int dy = -2; dy <= 2; dy++) {
+            for (int dx = -6; dx <= 6; dx++) {
+                if (dx * dx / 36.0f + dy * dy / 6.25f <= 1) {
+                    put(cx + dx, base + dy, (rgb_t){ 14, 10, 26 });
+                }
+            }
+        }
+        const boopie_whack_hole_t *h = &g->holes[i];
+        int shown = (int)rintf(boopie_whack_rise(h) * HEAD_H);
+        if (shown > 0) {
+            bool cloud = h->kind == BOOPIE_WHACK_CLOUD;
+            const char *const *rows = cloud ? CLOUD : HEADS[head];
+            for (int j = 0; j < shown; j++) {   /* the top of the head first, out of the hole */
+                for (int k = 0; k < HEAD_W; k++) {
+                    char ch = rows[j][k];
+                    if (ch == '.') {
+                        continue;
+                    }
+                    rgb_t c = cloud ? (ch == 'o' ? (rgb_t){ 70, 70, 96 } : ch == 'w' ? (rgb_t){ 156, 156, 180 }
+                                       : ch == 'k' ? (rgb_t){ 40, 40, 60 } : (rgb_t){ 110, 170, 255 })
+                                    : head_colour(head, ch, h->kind == BOOPIE_WHACK_GOLD);
+                    put(cx - HEAD_W / 2 + k, base - shown + j, c);
+                }
+            }
+            if (h->kind == BOOPIE_WHACK_GOLD && !h->hit && ((int)(h->t * 8) & 1)) {
+                spark(cx + 6, base - shown - 1, (rgb_t){ 255, 246, 200 }, 1);
+            }
+        }
+        /* Its near lip, over whatever's in it. */
+        for (int dx = -6; dx <= 6; dx++) {
+            int dy = (int)rintf(2.5f * sqrtf(1 - dx * dx / 36.0f));
+            put(cx + dx, base + dy, (rgb_t){ 70, 58, 110 });
+        }
+        if (h->hit) {   /* what the tap scored, floating up */
+            float k = h->t - h->hit_t;
+            rgb_t pc = h->points < 0 ? (rgb_t){ 255, 90, 100 } : h->points >= 3 ? (rgb_t){ 255, 210, 70 }
+                                                                                 : (rgb_t){ 255, 255, 255 };
+            draw_number(h->points, h->points < 0 ? -1 : 1, cx, base - 12 - (int)(k * 12), 1, pc);
+        }
+    }
+    /* The score in the middle, and the combo under it. */
+    draw_number(g->score, 0, 32, 29, 2, (rgb_t){ 242, 239, 255 });
+    if (g->combo >= BOOPIE_WHACK_COMBO) {
+        draw_glyph(12, 28, 41, 1, (rgb_t){ 255, 210, 70 });
+        draw_glyph(2, 32, 41, 1, (rgb_t){ 255, 210, 70 });
+    }
+    /* Read back with boopie_pixel_rgb(): the avatar's scaled buffers are left alone. */
 }

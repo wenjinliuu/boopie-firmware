@@ -1357,6 +1357,13 @@ static char *build_register_json(void) {
     cJSON_AddItemToObject(name_optional, "name", string_param(
         "The pet's new name, up to 8 characters (Chinese is fine); empty goes back to "
         "its character's own name (布比, 小克 ...)."));
+    cJSON *game_optional = cJSON_CreateObject();
+    cJSON_AddItemToObject(game_optional, "game", string_param(
+        "Which game: whack (戳戳布比, poke the pet as it pops up). The default."));
+    add_command(commands, "game.start",
+                "Open a game on the screen for the user to play, when they want to play "
+                "with their pet. Rounds earn the pet experience and stars.",
+                nullptr, game_optional);
     add_command(commands, "pet.name",
                 "Name the pet on the screen, when the user gives it a name. Without "
                 "name, reports the current one. Call the user's pet by this name.",

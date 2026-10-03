@@ -100,6 +100,43 @@ void boopie_pet_earn(boopie_pet_t *p, boopie_xp_source_t src, int xp, boopie_pet
     add_xp(p, xp, ev);
 }
 
+/* Version 1 is this less game_stars_today, which sat in its tail padding. */
+_Static_assert(sizeof(boopie_pet_t) == 56, "version 1 blobs are 56 bytes");
+
+bool boopie_pet_load(boopie_pet_t *p, const void *blob, size_t n)
+{
+    boopie_pet_t saved;
+    if (n != sizeof saved) {
+        return false;
+    }
+    memcpy(&saved, blob, n);
+    if (saved.version == 1) {   /* the byte game_stars_today now uses was padding */
+        saved.game_stars_today = 0;
+        saved.version = BOOPIE_PET_VERSION;
+    }
+    if (saved.version != BOOPIE_PET_VERSION) {
+        return false;
+    }
+    *p = saved;
+    return true;
+}
+
+void boopie_pet_game(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev)
+{
+    boopie_pet_earn(p, BOOPIE_XP_GAME, xp, ev);
+    int room = BOOPIE_GAME_STARS_CAP - p->game_stars_today;
+    if (stars > room) {
+        stars = room;
+    }
+    if (stars > 0) {
+        p->game_stars_today += (uint8_t)stars;
+        p->stars += (uint32_t)stars;
+        if (ev) {
+            ev->stars += stars;
+        }
+    }
+}
+
 void boopie_pet_resume(boopie_pet_t *p, int64_t now)
 {
     if (p->last_tick > 0 && now > p->last_tick) {
@@ -135,6 +172,7 @@ boopie_expr_t boopie_pet_tick(boopie_pet_t *p, bool known, int64_t now, int32_t 
         p->hungers_today = 0;
         p->met_today = 0;
         memset(p->xp_today, 0, sizeof(p->xp_today));
+        p->game_stars_today = 0;
         /* It wakes up fed: the first hunger comes 3.5 h after the day starts. */
         int64_t day_start = now - (int64_t)(minute - BOOPIE_PET_DAY_START_MIN) * 60;
         if (p->last_fed < day_start) {

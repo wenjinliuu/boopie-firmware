@@ -116,6 +116,28 @@ int main(void)
         }
     }
     printf(",\"month\":{\"xp\":%u,\"level\":%d,\"stars\":%u}", p.xp, boopie_pet_level(p.xp, NULL, NULL), p.stars);
+    /* Games: 5 rounds of 15 xp and 3 stars, capped at 45 xp and 10 stars a day. */
+    boopie_pet_init(&p);
+    tick_at(&p, T(0, 9, 0), 0);
+    uint32_t gx0 = p.xp, st0 = p.stars;
+    for (int i = 0; i < 5; i++) {
+        boopie_pet_game(&p, 15, 3, NULL);
+    }
+    printf(",\"game\":[%u,%u", p.xp - gx0, p.stars - st0);
+    tick_at(&p, T(1, 9, 0), 0);   /* the next day: room again */
+    gx0 = p.xp;
+    boopie_pet_game(&p, 15, 3, NULL);
+    printf(",%u,%u]", p.xp - gx0, p.game_stars_today);
+
+    /* A version 1 save loads, with no game stars yet today. */
+    boopie_pet_t v1 = p, loaded;
+    v1.version = 1;
+    v1.game_stars_today = 0xAA;   /* padding then: anything */
+    bool ok1 = boopie_pet_load(&loaded, &v1, sizeof v1);
+    printf(",\"load_v1\":[%d,%d,%d,%u]", ok1, loaded.version, loaded.game_stars_today, loaded.xp == p.xp);
+    v1.version = 9;
+    printf(",\"load_bad\":[%d,%d]", boopie_pet_load(&loaded, &v1, sizeof v1), boopie_pet_load(&loaded, &v1, 10));
+
     printf(",\"unlocks\":[%d,%d,%d,%d,%d]}\n", boopie_pet_unlock_level(BOOPIE_UNLOCK_COLOUR, 2),
            boopie_pet_unlock_level(BOOPIE_UNLOCK_SCENE, 1), boopie_pet_unlock_level(BOOPIE_UNLOCK_SCENE, 8),
            boopie_pet_unlock_level(BOOPIE_UNLOCK_ACCESSORY, 3), boopie_pet_unlock_level(BOOPIE_UNLOCK_COLOUR, 99));
