@@ -13,6 +13,8 @@
 
 #include "boopie_pixel.h"
 #include "boopie_whack.h"
+#include "boopie_catch.h"
+#include "boopie_maze.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -213,7 +215,7 @@ typedef struct {
 
 enum {
     I_HEART, I_Z, I_EXCL, I_DROP, I_DOT, I_NOTE, I_BOWL, I_COOKIE, I_BATTERY, I_BOLT, I_BUBBLE,
-    I_CODE, I_LAPTOP, I_RICE, I_DRUMSTICK, I_ONIGIRI, I_FISH, I_BIG_COOKIE, I_CANDY, I_COUNT,
+    I_CODE, I_LAPTOP, I_RICE, I_DRUMSTICK, I_ONIGIRI, I_FISH, I_BIG_COOKIE, I_CANDY, I_STORM, I_COUNT,
 };
 
 #define ROWS(...) (const char *const[]){ __VA_ARGS__ }, sizeof((const char *const[]){ __VA_ARGS__ }) / sizeof(char *)
@@ -252,6 +254,10 @@ static const icon_t ICONS[I_COUNT] = {
                        "#o", { { 214, 150, 80 }, { 110, 64, 34 } } },
     [I_CANDY] = { ROWS("p.......p", "pp.ryr.pp", "ppryryrpp", "pp.ryr.pp", "p.......p"),
                   "pry", { { 255, 150, 200 }, { 255, 90, 120 }, { 255, 230, 120 } } },
+    /* The storm cloud the snack game's pet must dodge. */
+    [I_STORM] = { ROWS("...ooo....", ".oogggoo..", "oggggggoo.", "ogkgggkggo", "oggggggggo", ".oooyyooo.",
+                       "....yy....", "...yy.....", "...y......"),
+                  "ogky", { { 70, 70, 96 }, { 150, 150, 176 }, { 40, 40, 60 }, { 255, 220, 80 } } },
 };
 /* What the pet may be offered, as boopie_food_t. */
 static const uint8_t FOOD_ICONS[BOOPIE_FOOD_COUNT] = {
@@ -3087,6 +3093,8 @@ static void draw_number(int value, int sign, int cx, int y, int scale, rgb_t c)
     }
 }
 
+static void time_ring(float left);
+
 void boopie_pixel_render_whack(const boopie_whack_t *g, int head)
 {
     if (head < 0 || head > BOOPIE_CHAR_COUNT) {
@@ -3095,14 +3103,7 @@ void boopie_pixel_render_whack(const boopie_whack_t *g, int head)
     memset(s_img, 0, sizeof(s_img));
     s_dst = s_img;
     s_dst_mask = NULL;
-    /* The time left, round the edge: green, then yellow, then red. */
-    float left = 1 - g->t / BOOPIE_WHACK_SECONDS;
-    rgb_t tc = left > 0.5f ? (rgb_t){ 110, 240, 160 } : left > 0.2f ? (rgb_t){ 255, 210, 80 } : (rgb_t){ 255, 90, 100 };
-    for (int i = 0; i < 60; i++) {
-        float a = i / 60.0f * 6.2831853f - 1.5707963f;
-        bool lit = i < (int)ceilf(left * 60);
-        put(32 + 30 * cosf(a), 32 + 30 * sinf(a), lit ? tc : (rgb_t){ 34, 28, 52 });
-    }
+    time_ring(1 - g->t / BOOPIE_WHACK_SECONDS);
     for (int i = 0; i < BOOPIE_WHACK_HOLES; i++) {
         float hx, hy;
         boopie_whack_hole_pos(i, &hx, &hy);
@@ -3155,6 +3156,140 @@ void boopie_pixel_render_whack(const boopie_whack_t *g, int head)
         draw_glyph(2, 32, 41, 1, (rgb_t){ 255, 210, 70 });
     }
     /* Read back with boopie_pixel_rgb(): the avatar's scaled buffers are left alone. */
+}
+
+/* The time left, round the edge: green, then yellow, then red. */
+static void time_ring(float left)
+{
+    rgb_t tc = left > 0.5f ? (rgb_t){ 110, 240, 160 } : left > 0.2f ? (rgb_t){ 255, 210, 80 } : (rgb_t){ 255, 90, 100 };
+    for (int i = 0; i < 60; i++) {
+        float a = i / 60.0f * 6.2831853f - 1.5707963f;
+        bool lit = i < (int)ceilf(left * 60);
+        put(32 + 30 * cosf(a), 32 + 30 * sinf(a), lit ? tc : (rgb_t){ 34, 28, 52 });
+    }
+}
+
+/* An icon centred on (x, y). */
+static void icon_at(int which, float x, float y)
+{
+    const icon_t *ic = &ICONS[which];
+    icon(which, rintf(x - (float)strlen(ic->rows[0]) / 2), rintf(y - ic->nrows / 2.0f));
+}
+
+/* What a catch or a find scored, floating up from (x, y) for `k` seconds. */
+static void points_up(int points, float x, float y, float k)
+{
+    rgb_t pc = points < 0 ? (rgb_t){ 255, 90, 100 } : points >= 3 ? (rgb_t){ 255, 210, 70 } : (rgb_t){ 255, 255, 255 };
+    draw_number(points, points < 0 ? -1 : 1, (int)rintf(x), (int)rintf(y - k * 12), 1, pc);
+}
+
+void boopie_pixel_render_catch(const boopie_catch_t *g, int head)
+{
+    if (head < 0 || head > BOOPIE_CHAR_COUNT) {
+        head = BOOPIE_CHAR_BOOPIE;
+    }
+    memset(s_img, 0, sizeof(s_img));
+    s_dst = s_img;
+    s_dst_mask = NULL;
+    time_ring(1 - g->t / BOOPIE_CATCH_SECONDS);
+    /* The score at the top, behind what falls. */
+    draw_number(g->score, 0, 32, 9, 2, (rgb_t){ 90, 84, 130 });
+    /* The ground the pet stands on. */
+    for (int x = 8; x <= 56; x++) {
+        put(x, BOOPIE_CATCH_PET_Y + HEAD_H, (rgb_t){ 52, 44, 84 });
+    }
+    for (int i = 0; i < BOOPIE_CATCH_ITEMS; i++) {
+        const boopie_catch_item_t *it = &g->items[i];
+        if (it->kind == BOOPIE_CATCH_NONE) {
+            continue;
+        }
+        if (it->caught) {
+            points_up(it->points, it->x, BOOPIE_CATCH_PET_Y - 8, g->t - it->caught_t);
+            continue;
+        }
+        int which = it->kind == BOOPIE_CATCH_CLOUD ? I_STORM : it->kind == BOOPIE_CATCH_GOLD ? I_CANDY
+                                                                                              : FOOD_ICONS[it->food % BOOPIE_FOOD_COUNT];
+        icon_at(which, it->x, it->y);
+        if (it->kind == BOOPIE_CATCH_GOLD && ((int)(g->t * 8) & 1)) {
+            spark(it->x + 6, it->y - 3, (rgb_t){ 255, 246, 200 }, 1);
+        }
+    }
+    /* The pet, dizzy a moment after a cloud. */
+    int px = (int)rintf(g->x) - HEAD_W / 2;
+    bool dizzy = g->dizzy > 0;
+    for (int j = 0; j < HEAD_H; j++) {
+        for (int k = 0; k < HEAD_W; k++) {
+            char ch = HEADS[head][j][k];
+            if (ch == '.') {
+                continue;
+            }
+            rgb_t c = head_colour(head, ch, false);
+            if (dizzy && ch == 'e') {
+                c = (rgb_t){ 255, 255, 255 };
+            }
+            put(px + k, BOOPIE_CATCH_PET_Y + j, c);
+        }
+    }
+    if (dizzy) {
+        for (int i = 0; i < 3; i++) {
+            float a = g->t * 9 + i * 2.094f;
+            put(g->x + 6 * cosf(a), BOOPIE_CATCH_PET_Y - 2 + 1.5f * sinf(a), (rgb_t){ 255, 220, 80 });
+        }
+    }
+    if (g->combo >= BOOPIE_CATCH_COMBO) {
+        draw_glyph(12, 26, 21, 1, (rgb_t){ 255, 210, 70 });
+        draw_glyph(2, 30, 21, 1, (rgb_t){ 255, 210, 70 });
+    }
+}
+
+void boopie_pixel_render_maze(const boopie_maze_t *g)
+{
+    memset(s_img, 0, sizeof(s_img));
+    s_dst = s_img;
+    s_dst_mask = NULL;
+    time_ring(1 - g->t / BOOPIE_MAZE_SECONDS);
+    int ox, oy, size = boopie_maze_size(g);
+    boopie_maze_origin(g, &ox, &oy);
+    bool flash = g->cleared > 0 && ((int)(g->cleared * 10) & 1);
+    rgb_t wall = flash ? (rgb_t){ 255, 210, 70 } : (rgb_t){ 120, 90, 210 };
+    rgb_t floor_ = { 22, 18, 40 };
+    for (int y = 0; y < size; y++) {
+        for (int x = 0; x < size; x++) {
+            put(ox + x, oy + y, boopie_maze_wall(g, x, y) ? wall : floor_);
+        }
+    }
+    /* The way out: a door in the last cell, glowing. */
+    int gx = ox + (g->n - 1) * BOOPIE_MAZE_CELL + 1, gy = oy + (g->n - 1) * BOOPIE_MAZE_CELL + 1;
+    float glow = 0.6f + 0.4f * sinf(g->t * 5);
+    for (int y = 0; y < BOOPIE_MAZE_CELL - 1; y++) {
+        for (int x = 0; x < BOOPIE_MAZE_CELL - 1; x++) {
+            bool edge = x == 0 || y == 0 || x == BOOPIE_MAZE_CELL - 2 || y == BOOPIE_MAZE_CELL - 2;
+            rgb_t c = edge ? (rgb_t){ 110, 240, 160 } : (rgb_t){ (uint8_t)(40 * glow), (uint8_t)(200 * glow), (uint8_t)(120 * glow) };
+            put(gx + x, gy + y, c);
+        }
+    }
+    /* The star, twinkling. */
+    if (g->star >= 0) {
+        float sx = ox + (g->star % g->n) * BOOPIE_MAZE_CELL + 3, sy = oy + (g->star / g->n) * BOOPIE_MAZE_CELL + 3;
+        spark(sx, sy, (rgb_t){ 255, 210, 70 }, ((int)(g->t * 4) & 1) ? 1 : 0);
+        if (!((int)(g->t * 4) & 1)) {
+            put(sx + 1, sy + 1, (rgb_t){ 255, 246, 200 });
+            put(sx - 1, sy - 1, (rgb_t){ 255, 246, 200 });
+        }
+    }
+    /* The ball: 3 x 3, rounded, with a shine. */
+    int bx = ox + (int)floorf(g->x) - 1, by = oy + (int)floorf(g->y) - 1;
+    static const char *const BALL[3] = { "lbl", "bbb", "dbd" };
+    for (int j = 0; j < 3; j++) {
+        for (int i = 0; i < 3; i++) {
+            char ch = BALL[j][i];
+            rgb_t c = ch == 'l' ? (rgb_t){ 255, 230, 240 } : ch == 'b' ? (rgb_t){ 255, 120, 170 } : (rgb_t){ 190, 70, 120 };
+            put(bx + i, by + j, c);
+        }
+    }
+    put(bx, by, (rgb_t){ 255, 255, 255 });
+    /* The score under the maze. */
+    draw_number(g->score, 0, 32, oy + size + 2 < 57 ? oy + size + 2 : 57, 1, (rgb_t){ 242, 239, 255 });
 }
 
 void boopie_pixel_head_image(int head, uint16_t *dst, int scale)

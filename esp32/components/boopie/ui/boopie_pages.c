@@ -13,6 +13,7 @@
 #include "boopie_font.h"
 #include "boopie_games.h"
 #include "boopie_heads.h"
+#include "boopie_icons.h"
 #include "boopie_viewers.h"
 #include "boopie_input.h"
 #include "boopie_store.h"
@@ -104,76 +105,129 @@ static lv_obj_t *card(lv_obj_t *parent, int w, int h)
 
 typedef struct {
     const char *name, *note;
-    bool ready;
-    const char *game;   /* boopie_games_open()'s id */
+    const char *id;     /* boopie_games_open()'s id, or a viewer */
+    int icon;           /* boopie_icon_t, or -1: the pet's head */
 } app_t;
 
-/* What's built, each a card; what isn't yet, named below. */
+/* What's built, a big icon each, in a list that scrolls up and down; the one
+ * in the middle full size, the rest smaller and dimmer toward the round edge. */
 static const app_t APPS[] = {
-    { "戳戳布比", "宠物冒头就戳它", true, "whack" },
-    { "聊天记录", "最近 100 条", true, "chat" },
-    { "相册", "Muse 给你看过的图", true, "album" },
+    { "戳戳布比", "宠物冒头就戳它", "whack", -1 },
+    { "接零食", "倾斜接住掉下的零食", "catch", BOOPIE_ICON_CATCH },
+    { "重力迷宫", "倾斜把小球滚出迷宫", "maze", BOOPIE_ICON_MAZE },
+    { "聊天记录", "最近 100 条", "chat", BOOPIE_ICON_CHAT },
+    { "相册", "Muse 给你看过的图", "album", BOOPIE_ICON_ALBUM },
 };
 #define APP_COUNT (int)(sizeof APPS / sizeof APPS[0])
-static const char SOON[] = "即将推出\n接零食、重力迷宫、白噪音";
+#define APP_ROW_H 112
+#define APP_TILE 92
+static const char SOON[] = "即将推出：白噪音";
 
-static lv_obj_t *s_app_icons[APP_COUNT];
-static int s_app_icon_for = -1;
+static lv_obj_t *s_app_list;
+static lv_obj_t *s_app_head;   /* 戳戳布比's icon: the pet as it is now */
+static int s_app_head_for = -1;
 
 static void on_app(lv_event_t *e)
 {
     const app_t *a = lv_event_get_user_data(e);
-    if (strcmp(a->game, "chat") == 0) {
+    if (strcmp(a->id, "chat") == 0) {
         boopie_viewer_chat_locked();
-    } else if (strcmp(a->game, "album") == 0) {
+    } else if (strcmp(a->id, "album") == 0) {
         boopie_viewer_album_locked();
     } else {
-        boopie_games_open_locked(a->game);
+        boopie_games_open_locked(a->id);
+    }
+}
+
+/* Each row by how far it is from the middle: smaller and dimmer toward the edge. */
+static void on_app_scroll(lv_event_t *e)
+{
+    (void)e;
+    lv_area_t box;
+    lv_obj_get_coords(s_app_list, &box);
+    int mid = (box.y1 + box.y2) / 2;
+    uint32_t n = lv_obj_get_child_count(s_app_list);
+    for (uint32_t i = 0; i < n; i++) {
+        lv_obj_t *row = lv_obj_get_child(s_app_list, (int32_t)i);
+        lv_area_t a;
+        lv_obj_get_coords(row, &a);
+        int d = LV_ABS((a.y1 + a.y2) / 2 - mid);
+        int scale = 256 - d * 70 / 200;
+        int opa = 255 - d * 170 / 200;
+        lv_obj_set_style_transform_scale(row, scale < 170 ? 170 : scale, 0);
+        lv_obj_set_style_opa(row, (lv_opa_t)(opa < 60 ? 60 : opa), 0);
     }
 }
 
 static void build_apps(lv_obj_t *page)
 {
-    title(page, "应用");
-    const int w = 320, h = 74, gap = 10, top = 86;
+    s_app_list = lv_obj_create(page);
+    lv_obj_remove_style_all(s_app_list);
+    lv_obj_set_size(s_app_list, lv_pct(100), lv_pct(100));
+    lv_obj_set_flex_flow(s_app_list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(s_app_list, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    /* The first row and the last can come to the middle. */
+    lv_obj_set_style_pad_top(s_app_list, 233 - APP_ROW_H / 2, 0);
+    lv_obj_set_style_pad_bottom(s_app_list, 233 - APP_ROW_H / 2, 0);
+    lv_obj_set_scroll_dir(s_app_list, LV_DIR_VER);
+    lv_obj_set_scroll_snap_y(s_app_list, LV_SCROLL_SNAP_CENTER);
+    lv_obj_set_scrollbar_mode(s_app_list, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_event_cb(s_app_list, on_app_scroll, LV_EVENT_SCROLL, NULL);
+
     for (int i = 0; i < APP_COUNT; i++) {
-        lv_obj_t *c = card(page, w, h);
-        lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_align(c, LV_ALIGN_TOP_MID, 0, top + i * (h + gap));
-        if (i == 0) {
-            /* The game's icon: the pet that pops up in it. */
-            s_app_icons[i] = lv_image_create(c);
-            lv_obj_remove_flag(s_app_icons[i], LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_align(s_app_icons[i], LV_ALIGN_LEFT_MID, 14, 0);
+        lv_obj_t *row = lv_obj_create(s_app_list);
+        lv_obj_remove_style_all(row);
+        lv_obj_set_size(row, 340, APP_ROW_H);
+        lv_obj_set_style_radius(row, 26, 0);
+        lv_obj_set_style_bg_color(row, lv_color_hex(COLOR_CARD_PRESSED), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(row, LV_OPA_COVER, LV_STATE_PRESSED);
+        lv_obj_set_style_transform_pivot_x(row, 170, 0);
+        lv_obj_set_style_transform_pivot_y(row, APP_ROW_H / 2, 0);
+        lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SNAPPABLE);
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_t *tile;
+        if (APPS[i].icon < 0) {
+            tile = boopie_icon_tile_custom(row, NULL, 0x2a2150, APP_TILE);
+            s_app_head = lv_image_create(tile);
+            lv_obj_remove_flag(s_app_head, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_center(s_app_head);
         } else {
-            s_app_icons[i] = NULL;
-            lv_obj_t *icon = text(c, &lv_font_montserrat_28, COLOR_ACCENT, i == 1 ? LV_SYMBOL_LIST : LV_SYMBOL_IMAGE);
-            lv_obj_align(icon, LV_ALIGN_LEFT_MID, 30, 0);
+            tile = boopie_icon_tile(row, (boopie_icon_t)APPS[i].icon, APP_TILE, 5);
         }
-        lv_obj_t *n = text(c, &lv_font_montserrat_20, COLOR_TEXT, APPS[i].name);
-        lv_obj_align(n, LV_ALIGN_LEFT_MID, 92, -12);
-        lv_obj_t *d = text(c, &lv_font_montserrat_16, COLOR_DIM, APPS[i].note);
-        lv_obj_align(d, LV_ALIGN_LEFT_MID, 92, 14);
-        lv_obj_add_event_cb(c, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
+        lv_obj_align(tile, LV_ALIGN_LEFT_MID, 10, 0);
+        lv_obj_t *n = text(row, boopie_font_ui(28) ? boopie_font_ui(28) : &lv_font_montserrat_28, COLOR_TEXT,
+                           APPS[i].name);
+        lv_obj_align(n, LV_ALIGN_LEFT_MID, APP_TILE + 26, -16);
+        lv_obj_t *d = text(row, &lv_font_montserrat_16, COLOR_DIM, APPS[i].note);
+        lv_obj_align(d, LV_ALIGN_LEFT_MID, APP_TILE + 26, 20);
+        lv_obj_add_event_cb(row, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
     }
-    lv_obj_t *n = text(page, &lv_font_montserrat_16, COLOR_DIM, SOON);
-    lv_obj_set_width(n, 300);
-    lv_label_set_long_mode(n, LV_LABEL_LONG_MODE_WRAP);
-    lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(n, LV_ALIGN_TOP_MID, 0, top + APP_COUNT * (h + gap) + 8);
+    lv_obj_t *n = text(s_app_list, &lv_font_montserrat_16, COLOR_DIM, SOON);
+    lv_obj_set_style_pad_top(n, 18, 0);
+
+    /* The title over the list, on a band the rows pass under. */
+    lv_obj_t *band = lv_obj_create(page);
+    lv_obj_remove_style_all(band);
+    lv_obj_set_size(band, lv_pct(100), TITLE_Y + 46);
+    lv_obj_set_style_bg_opa(band, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(band, lv_color_black(), 0);
+    lv_obj_remove_flag(band, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    title(page, "应用");
+    lv_obj_update_layout(s_app_list);   /* where the rows are, for their sizes */
+    on_app_scroll(NULL);
 }
 
 static void tick_apps(void)
 {
     int cur = boopie_avatar_current();
-    if (cur == s_app_icon_for) {
+    if (cur == s_app_head_for) {
         return;
     }
-    const lv_image_dsc_t *head = boopie_head(cur, 4);
-    if (head && s_app_icons[0]) {
-        lv_image_set_src(s_app_icons[0], head);
+    const lv_image_dsc_t *head = boopie_head(cur, 5);
+    if (head && s_app_head) {
+        lv_image_set_src(s_app_head, boopie_icon_keyed(head));
     }
-    s_app_icon_for = cur;
+    s_app_head_for = cur;
 }
 
 /* ---------------------------------------------------------------- cards */

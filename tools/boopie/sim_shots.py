@@ -213,7 +213,10 @@ def render_phone(binary: Path, out: Path) -> list[Path]:
 # Looking back: the chat history, the album and the box asking before a clear,
 # over a user data folder with a few turns and a picture in it.
 LOOK = [("viewer-chat", ["viewer=chat"]), ("viewer-album", ["viewer=album"]), ("ask-clear", ["ask=chat"]),
-        ("settings-storage", ["settings=storage", "advance=600"])]
+        ("settings-storage", ["settings=storage", "advance=600"]),
+        ("apps-scrolled", ["swipe=right", "advance=600", "swipe=up", "advance=1500"]),
+        ("game-catch", ["game=catch", "tap=233,233", "advance=9000"]),
+        ("game-maze", ["game=maze", "tap=233,233", "advance=3000"])]
 
 
 def user_data(root: Path) -> Path:

@@ -48,6 +48,7 @@
 #include "boopie_history.h"
 #include "boopie_store.h"
 #include "boopie_viewers.h"
+#include "boopie_icons.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -271,6 +272,24 @@ static lv_obj_t *row(lv_obj_t *list, const char *icon, const char *text, lv_obj_
         *value_out = v;
     }
     lv_obj_add_event_cb(c, cb, LV_EVENT_CLICKED, user);
+    return c;
+}
+
+/* Boopie: a settings home row, its pixel icon on a coloured tile. */
+static lv_obj_t *icon_row(lv_obj_t *list, boopie_icon_t icon, const char *text, lv_obj_t **value_out,
+                          lv_event_cb_t cb, void *user)
+{
+    lv_obj_t *c = row(list, NULL, text, value_out, cb, user);
+    lv_obj_t *tile = boopie_icon_tile(c, icon, 36, 2);
+    lv_obj_move_to_index(tile, 0);
+    return c;
+}
+
+/* Boopie: a row leading on to another page: its arrow on the right. */
+static lv_obj_t *nav_row(lv_obj_t *list, const char *text, lv_event_cb_t cb, void *user)
+{
+    lv_obj_t *c = row(list, NULL, text, NULL, cb, user);
+    label(c, &lv_font_montserrat_16, COLOR_DIM, LV_SYMBOL_RIGHT);
     return c;
 }
 
@@ -1580,8 +1599,8 @@ static void build_brain_page(lv_obj_t *tile)
         lv_obj_set_style_text_color(s_brain_checks[i], lv_color_hex(COLOR_ACCENT), 0);
     }
     note(list, "小智：国内服务器，不用代理。\nMuse：需要 Muse App 配对和海外网络。");
-    row(list, LV_SYMBOL_RIGHT, "小智接入", NULL, on_nav, (void *)&XIAOZHI);
-    row(list, LV_SYMBOL_RIGHT, "Muse 接入与设置", NULL, on_nav, (void *)&HATCH);
+    nav_row(list, "小智接入", on_nav, (void *)&XIAOZHI);
+    nav_row(list, "Muse 接入与设置", on_nav, (void *)&HATCH);
 }
 
 static void tick_brain(void)
@@ -1812,18 +1831,19 @@ static void build_home(lv_obj_t *tile)
 {
     lv_obj_t *list;
     s_home = page(tile, "设置", false, &list);
-    row(list, LV_SYMBOL_WIFI, "无线网络", &s_home_wifi, on_nav, (void *)&WIFI);
-    row(list, LV_SYMBOL_UPLOAD, "手机扫码设置", NULL, on_phone_setup, NULL);   /* Boopie */
-    row(list, LV_SYMBOL_HOME, "大脑", &s_home_brain, on_nav, (void *)&BRAIN);      /* Boopie */
-    row(list, LV_SYMBOL_IMAGE, "伙伴", &s_home_avatar, on_nav, (void *)&AVATAR);    /* Boopie */
-    row(list, LV_SYMBOL_SHUFFLE, "VPN", &s_home_vpn, on_nav, (void *)&VPN);         /* Boopie */
-    row(list, LV_SYMBOL_BLUETOOTH, "蓝牙", &s_home_ble, on_nav, (void *)&BLE);
-    row(list, LV_SYMBOL_VOLUME_MAX, "声音", &s_home_sound, on_nav, (void *)&SOUND);
-    row(list, LV_SYMBOL_EYE_CLOSE, "显示与熄屏", &s_home_sleep, on_nav, (void *)&SLEEP);
-    row(list, LV_SYMBOL_BATTERY_FULL, "电池", &s_home_battery, on_nav, (void *)&BATTERY);
-    row(list, LV_SYMBOL_SD_CARD, "存储空间", &s_home_storage, on_nav, (void *)&STORAGE);   /* Boopie */
+    /* Boopie: pixel icons on coloured tiles, as the apps page's. */
+    icon_row(list, BOOPIE_ICON_WIFI, "无线网络", &s_home_wifi, on_nav, (void *)&WIFI);
+    icon_row(list, BOOPIE_ICON_PHONE, "手机扫码设置", NULL, on_phone_setup, NULL);
+    icon_row(list, BOOPIE_ICON_BRAIN, "大脑", &s_home_brain, on_nav, (void *)&BRAIN);
+    icon_row(list, BOOPIE_ICON_PAW, "伙伴", &s_home_avatar, on_nav, (void *)&AVATAR);
+    icon_row(list, BOOPIE_ICON_VPN, "VPN", &s_home_vpn, on_nav, (void *)&VPN);
+    icon_row(list, BOOPIE_ICON_BLUETOOTH, "蓝牙", &s_home_ble, on_nav, (void *)&BLE);
+    icon_row(list, BOOPIE_ICON_SOUND, "声音", &s_home_sound, on_nav, (void *)&SOUND);
+    icon_row(list, BOOPIE_ICON_DISPLAY, "显示与熄屏", &s_home_sleep, on_nav, (void *)&SLEEP);
+    icon_row(list, BOOPIE_ICON_BATTERY, "电池", &s_home_battery, on_nav, (void *)&BATTERY);
+    icon_row(list, BOOPIE_ICON_STORAGE, "存储空间", &s_home_storage, on_nav, (void *)&STORAGE);
     /* Boopie: no power off here; holding the bottom button opens the power menu. */
-    row(list, LV_SYMBOL_LOOP, "重新引导", NULL, on_guide, NULL);   /* Boopie: the setup guide again */
+    icon_row(list, BOOPIE_ICON_GUIDE, "重新引导", NULL, on_guide, NULL);   /* Boopie: the setup guide again */
     s_about = note(list, "");
 }
 

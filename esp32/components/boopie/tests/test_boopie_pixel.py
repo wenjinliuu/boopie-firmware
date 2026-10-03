@@ -52,7 +52,8 @@ class BoopiePixelTest(unittest.TestCase):
             cc + ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                   "-I", str(COMPONENT), "-I", str(COMPONENT / "avatar"), "-I", str(COMPONENT / "game"),
                   str(HERE / "boopie_pixel_harness.c"), str(COMPONENT / "avatar" / "boopie_pixel.c"),
-                  str(COMPONENT / "game" / "boopie_whack.c"),
+                  str(COMPONENT / "game" / "boopie_whack.c"), str(COMPONENT / "game" / "boopie_catch.c"),
+                  str(COMPONENT / "game" / "boopie_maze.c"),
                   str(COMPONENT / "boopie_expr.c"), "-lm", "-o", str(cls.exe)],
             check=True)
 

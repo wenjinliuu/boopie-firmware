@@ -5,6 +5,7 @@
 
 #include "boopie_games.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -13,11 +14,16 @@
 #include "boopie_pixel.h"
 #include "boopie_sound.h"
 #include "boopie_whack.h"
+#include "boopie_catch.h"
+#include "boopie_maze.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "lvgl.h"
 #include "muse_board.h"
 #include "muse_state.h"
+#ifdef ESP_PLATFORM
+#include "boopie_imu.h"
+#endif
 
 #define CELL 7                        /* screen pixels a grid cell */
 #define SIZE (BOOPIE_PX * CELL)       /* 448 */
@@ -29,10 +35,54 @@
 #define COLOR_ACCENT 0xa77dff
 #define COLOR_GOLD 0xffd246
 
+/*
+ * Tilt, for 接零食 and 重力迷宫: the screen's x follows the accelerometer's
+ * y and its y the x, as Waveshare's own tilt demo for this board reads them
+ * (examples/esp-idf/04_Immersive_block). Not yet checked on the board: flip a
+ * sign here if a game rolls the wrong way. Level is wherever it's held when
+ * the round starts.
+ */
+#define TILT_X_AXIS 1
+#define TILT_Y_AXIS 0
+#define TILT_X_SIGN 1.0f
+#define TILT_Y_SIGN 1.0f
+#define TILT_DEAD 0.04f   /* g */
+
 typedef enum { G_OFF, G_READY, G_PLAY, G_PAUSE, G_OVER } state_t;
 
+/* What steers: the finger held on the screen (grid cells), else the tilt (g). */
+typedef struct {
+    bool held;
+    float fx, fy;
+    float tx, ty;
+} steer_t;
+
+typedef struct {
+    const char *id, *title, *intro;
+    boopie_game_t which;
+    void (*start)(uint32_t seed);
+    /* Plays dt seconds; the sound to play for it, or BOOPIE_SOUND_COUNT. */
+    boopie_sound_t (*tick)(float dt, const steer_t *in);
+    void (*tap)(float x, float y);   /* NULL: taps don't play */
+    bool (*over)(void);
+    int (*score)(void);
+    void (*reward)(int score, int *xp, int *stars);
+    void (*render)(int head);
+    /* The results card's extra line ("过了 3 关"), into out. */
+    void (*extra)(char *out, size_t cap);
+} game_def_t;
+
+static boopie_whack_t s_whack;
+static boopie_catch_t s_catch;
+static boopie_maze_t s_maze;
+
 static state_t s_state;
-static boopie_whack_t s_game;
+static const game_def_t *s_def;
+static steer_t s_steer;
+static bool s_hold_armed;   /* a finger down since the round began steers; the one that started it doesn't */
+#ifdef ESP_PLATFORM
+static float s_bias[3];   /* the accelerometer held level */
+#endif
 static lv_obj_t *s_root, *s_image, *s_card;
 static uint16_t *s_buf;
 static lv_image_dsc_t s_dsc;
@@ -72,9 +122,97 @@ static void scale(void)
 
 static void draw(void)
 {
-    boopie_pixel_render_whack(&s_game, head());
+    s_def->render(head());
     scale();
     lv_obj_invalidate(s_image);
+}
+
+/* ---- the games ---- */
+
+static void whack_start(uint32_t seed) { boopie_whack_start(&s_whack, seed); }
+static boopie_sound_t whack_tick(float dt, const steer_t *in)
+{
+    (void)in;
+    boopie_whack_tick(&s_whack, dt);
+    return BOOPIE_SOUND_COUNT;
+}
+static int s_tap_points;
+static void whack_tap(float x, float y) { s_tap_points = boopie_whack_tap(&s_whack, x, y); }
+static bool whack_over(void) { return s_whack.over; }
+static int whack_score(void) { return s_whack.score; }
+static void whack_render(int h) { boopie_pixel_render_whack(&s_whack, h); }
+static void whack_extra(char *out, size_t cap) { snprintf(out, cap, "戳中 %d 次", s_whack.hits); }
+
+static void catch_start(uint32_t seed) { boopie_catch_start(&s_catch, seed); }
+static boopie_sound_t catch_tick(float dt, const steer_t *in)
+{
+    /* Held: toward the finger. Tilted: 0.4 g is flat out. */
+    float move = in->held ? (in->fx - s_catch.x) / 4 : in->tx * 2.5f;
+    boopie_catch_kind_t what = BOOPIE_CATCH_NONE;
+    int points = boopie_catch_tick(&s_catch, dt, move, &what);
+    if (!points) {
+        return BOOPIE_SOUND_COUNT;
+    }
+    return what == BOOPIE_CATCH_CLOUD ? BOOPIE_SOUND_CLOUD : what == BOOPIE_CATCH_GOLD ? BOOPIE_SOUND_GOLD
+                                                                                       : BOOPIE_SOUND_SCORE;
+}
+static bool catch_over(void) { return s_catch.over; }
+static int catch_score(void) { return s_catch.score; }
+static void catch_render(int h) { boopie_pixel_render_catch(&s_catch, h); }
+static void catch_extra(char *out, size_t cap) { snprintf(out, cap, "接住 %d 个", s_catch.caught); }
+
+static void maze_start(uint32_t seed) { boopie_maze_start(&s_maze, seed); }
+static boopie_sound_t maze_tick(float dt, const steer_t *in)
+{
+    /* Held: leaning toward the finger from the middle. Tilted: 0.4 g is all the way. */
+    float tx = in->held ? (in->fx - 32) / 20 : in->tx * 2.5f;
+    float ty = in->held ? (in->fy - 32) / 20 : in->ty * 2.5f;
+    int level = s_maze.level, stars = s_maze.stars;
+    boopie_maze_tick(&s_maze, dt, tx, ty);
+    return s_maze.level != level ? BOOPIE_SOUND_LEVEL_UP : s_maze.stars != stars ? BOOPIE_SOUND_GOLD
+                                                                                  : BOOPIE_SOUND_COUNT;
+}
+static bool maze_over(void) { return s_maze.over; }
+static int maze_score(void) { return s_maze.score; }
+static void maze_render(int h)
+{
+    (void)h;
+    boopie_pixel_render_maze(&s_maze);
+}
+static void maze_extra(char *out, size_t cap) { snprintf(out, cap, "过了 %d 关  ★ %d", s_maze.level, s_maze.stars); }
+
+static const game_def_t GAMES[] = {
+    { "whack", "戳戳布比", "宠物冒头就戳它\n别戳小乌云！\n\n点一下开始", BOOPIE_GAME_WHACK, whack_start, whack_tick,
+      whack_tap, whack_over, whack_score, boopie_whack_reward, whack_render, whack_extra },
+    { "catch", "接零食", "左右倾斜或按住屏幕\n接住掉下来的零食\n躲开雷雨云！\n点一下开始", BOOPIE_GAME_CATCH, catch_start,
+      catch_tick, NULL, catch_over, catch_score, boopie_catch_reward, catch_render, catch_extra },
+    { "maze", "重力迷宫", "倾斜板子或按住屏幕\n把小球滚到绿色出口\n顺路摘星星加分\n点一下开始", BOOPIE_GAME_MAZE, maze_start,
+      maze_tick, NULL, maze_over, maze_score, boopie_maze_reward, maze_render, maze_extra },
+};
+#define GAME_COUNT (int)(sizeof GAMES / sizeof GAMES[0])
+
+/* The tilt now, less the level the round started at; false without an IMU. */
+static bool read_tilt(float *tx, float *ty, bool level)
+{
+#ifdef ESP_PLATFORM
+    float a[3], gy[3];
+    boopie_imu_keepalive();   /* read it fast: the face isn't drawing meanwhile */
+    if (!boopie_imu_read(a, gy)) {
+        return false;
+    }
+    if (level) {
+        memcpy(s_bias, a, sizeof s_bias);
+    }
+    float x = (a[TILT_X_AXIS] - s_bias[TILT_X_AXIS]) * TILT_X_SIGN;
+    float y = (a[TILT_Y_AXIS] - s_bias[TILT_Y_AXIS]) * TILT_Y_SIGN;
+    *tx = fabsf(x) < TILT_DEAD ? 0 : x;
+    *ty = fabsf(y) < TILT_DEAD ? 0 : y;
+    return true;
+#else
+    (void)level;
+    *tx = *ty = 0;
+    return false;
+#endif
 }
 
 static lv_obj_t *text(lv_obj_t *parent, const lv_font_t *font, uint32_t colour, const char *s)
@@ -131,7 +269,7 @@ static void show_card(const char *title, const char *lines, bool buttons)
     close_card();
     s_card = lv_obj_create(s_root);
     lv_obj_remove_style_all(s_card);
-    lv_obj_set_size(s_card, 320, buttons ? 280 : 200);
+    lv_obj_set_size(s_card, 320, buttons ? 280 : 230);
     lv_obj_center(s_card);
     lv_obj_set_style_radius(s_card, 28, 0);
     lv_obj_set_style_bg_opa(s_card, LV_OPA_90, 0);
@@ -152,7 +290,11 @@ static void show_card(const char *title, const char *lines, bool buttons)
 static void start(void)
 {
     close_card();
-    boopie_whack_start(&s_game, (uint32_t)esp_timer_get_time() | 1u);
+    s_def->start((uint32_t)esp_timer_get_time() | 1u);
+    float tx, ty;
+    read_tilt(&tx, &ty, true);   /* level is as it's held now */
+    s_hold_armed = false;
+    s_steer.held = false;
     s_state = G_PLAY;
     s_last_us = esp_timer_get_time();
     draw();
@@ -177,10 +319,12 @@ static void finish(void)
     int xp, stars, best;
     bool record;
     boopie_pet_event_t ev;
-    boopie_whack_reward(s_game.score, &xp, &stars);
-    boopie_avatar_game_result(BOOPIE_GAME_WHACK, s_game.score, xp, stars, &ev, &best, &record);
-    char lines[160];
-    int n = snprintf(lines, sizeof lines, "%d 分%s\n最高 %d 分\n", s_game.score, record ? "  新纪录！" : "", best);
+    int score = s_def->score();
+    s_def->reward(score, &xp, &stars);
+    boopie_avatar_game_result(s_def->which, score, xp, stars, &ev, &best, &record);
+    char extra[48], lines[200];
+    s_def->extra(extra, sizeof extra);
+    int n = snprintf(lines, sizeof lines, "%d 分%s  %s\n最高 %d 分\n", score, record ? "  新纪录！" : "", extra, best);
     if (ev.xp || ev.stars) {
         snprintf(lines + n, sizeof lines - n, "经验 +%d   ★ +%d", ev.xp, ev.stars);
     } else {
@@ -203,12 +347,39 @@ static void tick(lv_timer_t *t)
     int64_t now = esp_timer_get_time();
     float dt = (float)(now - s_last_us) / 1e6f;
     s_last_us = now;
-    boopie_whack_tick(&s_game, dt > 0.1f ? 0.1f : dt);
+    read_tilt(&s_steer.tx, &s_steer.ty, false);
+    boopie_sound_t sound = s_def->tick(dt > 0.1f ? 0.1f : dt, &s_steer);
+    if (sound != BOOPIE_SOUND_COUNT) {
+        boopie_sound_play(sound);
+    }
     muse_state_poke();   /* playing keeps the screen on */
     draw();
-    if (s_game.over) {
+    if (s_def->over()) {
         finish();
     }
+}
+
+/* A finger held on the screen steers (接零食, 重力迷宫); lifted, the tilt does. */
+static void on_hold(lv_event_t *e)
+{
+    lv_indev_t *in = lv_event_get_indev(e);
+    if (!in || s_state != G_PLAY || !s_hold_armed) {
+        return;
+    }
+    lv_point_t p;
+    lv_indev_get_point(in, &p);
+    lv_area_t a;
+    lv_obj_get_coords(s_image, &a);
+    s_steer.held = true;
+    s_steer.fx = (float)(p.x - a.x1) / CELL;
+    s_steer.fy = (float)(p.y - a.y1) / CELL;
+}
+
+static void on_release(lv_event_t *e)
+{
+    (void)e;
+    s_steer.held = false;
+    s_hold_armed = true;
 }
 
 static void on_press(lv_event_t *e)
@@ -227,9 +398,15 @@ static void on_press(lv_event_t *e)
         set_paused(false);
         break;
     case G_PLAY: {
+        if (!s_def->tap) {
+            s_hold_armed = true;
+            on_hold(e);
+            break;
+        }
         lv_area_t a;
         lv_obj_get_coords(s_image, &a);
-        int points = boopie_whack_tap(&s_game, (float)(p.x - a.x1) / CELL, (float)(p.y - a.y1) / CELL);
+        s_def->tap((float)(p.x - a.x1) / CELL, (float)(p.y - a.y1) / CELL);
+        int points = s_tap_points;
         if (points) {
             boopie_sound_play(points < 0 ? BOOPIE_SOUND_CLOUD : points >= 3 ? BOOPIE_SOUND_GOLD : BOOPIE_SOUND_SCORE);
         }
@@ -256,12 +433,19 @@ static void leave(void)
 
 bool boopie_games_open_locked(const char *game)
 {
-    if (!game || strcmp(game, "whack") != 0) {
+    const game_def_t *def = NULL;
+    for (int i = 0; game && i < GAME_COUNT; i++) {
+        if (strcmp(game, GAMES[i].id) == 0) {
+            def = &GAMES[i];
+        }
+    }
+    if (!def) {
         return false;
     }
     if (s_state != G_OFF) {
-        return true;
+        return def == s_def;   /* one at a time */
     }
+    s_def = def;
     if (!s_buf) {
         s_buf = heap_caps_malloc(SIZE * SIZE * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!s_buf) {
@@ -281,16 +465,18 @@ bool boopie_games_open_locked(const char *game)
     lv_obj_set_style_bg_opa(s_root, LV_OPA_COVER, 0);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(s_root, on_press, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(s_root, on_hold, LV_EVENT_PRESSING, NULL);
+    lv_obj_add_event_cb(s_root, on_release, LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(s_root, on_release, LV_EVENT_PRESS_LOST, NULL);
     s_image = lv_image_create(s_root);
     lv_image_set_src(s_image, &s_dsc);
     lv_obj_center(s_image);
     lv_obj_remove_flag(s_image, LV_OBJ_FLAG_CLICKABLE);   /* presses land on the root */
 
-    boopie_whack_start(&s_game, 1);
-    s_game.t = 0;
+    s_def->start(1);
     s_state = G_READY;
     draw();
-    show_card("戳戳布比", "宠物冒头就戳它\n别戳小乌云！\n\n点一下开始", false);
+    show_card(s_def->title, s_def->intro, false);
     s_timer = lv_timer_create(tick, FRAME_MS, NULL);
     return true;
 }

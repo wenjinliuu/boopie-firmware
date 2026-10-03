@@ -172,6 +172,7 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_setup.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_heads.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_viewers.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_icons.c"
     "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin_dict.c"
@@ -182,6 +183,8 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/boopie_expr.c"
     "${BOOPIE_COMPONENT_DIR}/pet/boopie_pet.c"
     "${BOOPIE_COMPONENT_DIR}/game/boopie_whack.c"
+    "${BOOPIE_COMPONENT_DIR}/game/boopie_catch.c"
+    "${BOOPIE_COMPONENT_DIR}/game/boopie_maze.c"
     # Boopie: the Chinese and English text font.
     "${BOOPIE_COMPONENT_DIR}/font/boopie_font.c"
     "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_font.c"
