@@ -38,6 +38,7 @@
 #include "boopie_store.h"
 #include "boopie_input.h"
 #include "boopie_setup.h"
+#include "boopie_viewers.h"
 #include "boopie_pages.h"
 #include "sim_platform.h"
 #include "sim_services.h"
@@ -75,6 +76,7 @@ static void usage(FILE *out, const char *argv0)
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
             "  tap=X,Y            swipe=left|right|up|down   menu=power|setup\n"
             "  game=whack         input=TEXT             settings=PAGE\n"
+            "  viewer=chat|album  ask=chat|album|notes|all\n"
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
@@ -368,6 +370,20 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
     if (!strcmp(key, "game")) {   /* a game opened, as from the apps page */
         bool ok = boopie_games_open_locked(value);
         render_for(100, real_time);
+        return ok;
+    }
+    if (!strcmp(key, "viewer")) {   /* the chat history or the album, as from the apps page */
+        if (!strcmp(value, "album")) {
+            boopie_viewer_album_locked();
+        } else {
+            boopie_viewer_chat_locked();
+        }
+        render_for(400, real_time);
+        return true;
+    }
+    if (!strcmp(key, "ask")) {   /* the AI asked to clear something */
+        bool ok = boopie_viewer_ask_clear(value);
+        render_for(300, real_time);
         return ok;
     }
     if (!strcmp(key, "settings")) {   /* a settings page, as the guide opens one */

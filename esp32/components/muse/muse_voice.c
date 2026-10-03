@@ -17,11 +17,14 @@
 #include "muse_voice.h"
 #include "boopie_avatar.h"   /* Boopie: which brain */
 #include "boopie_sdk_token.h"
+#include "boopie_history.h"   /* Boopie: notes kept through a power-off */
+#include "boopie_store.h"
 #include "boopie_sound.h"   /* Boopie: its sounds, played here as the speaker's owner */
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include "esp_heap_caps.h"
@@ -115,6 +118,7 @@ typedef struct {
     size_t frames;
     int64_t at_us;   /* when it was recorded */
     int tries;
+    char file[BOOPIE_NOTE_NAME_MAX];   /* Boopie: its copy in user data, "" if none */
 } held_note_t;
 
 static int s_held_count;
@@ -572,6 +576,11 @@ static void hold_rec(bool tried)
         .at_us = esp_timer_get_time(),
         .tries = tried,
     };
+    /* Boopie: and in user data, so it outlives a power-off. */
+    held_note_t *h = &s_held[s_held_count - 1];
+    if (!boopie_notes_save(h->pcm, h->frames, h->file)) {
+        h->file[0] = '\0';
+    }
     s_rec = NULL;
     if (tried) {
         back_off();
@@ -582,6 +591,7 @@ static void hold_rec(bool tried)
 
 static void drop_oldest(void)
 {
+    boopie_notes_drop(s_held[0].file);   /* Boopie */
     free(s_held[0].pcm);
     s_held_count--;
     memmove(s_held, s_held + 1, s_held_count * sizeof(s_held[0]));
@@ -816,11 +826,63 @@ static bool can_record(void)
     return true;
 }
 
+#if HOLD_NOTES
+/* Boopie: the notes saved before the last power-off, back in line to go. */
+static void load_held(void)
+{
+    char names[HELD_MAX][BOOPIE_NOTE_NAME_MAX];
+    int n = boopie_notes_list(names, HELD_MAX);
+    for (int i = 0; i < n && s_held_count < HELD_MAX; i++) {
+        size_t frames = boopie_notes_frames(names[i]);
+        int16_t *pcm = frames ? heap_caps_malloc(frames * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) : NULL;
+        if (!pcm || !boopie_notes_read(names[i], pcm, frames)) {
+            free(pcm);
+            boopie_notes_drop(names[i]);
+            continue;
+        }
+        int64_t age = boopie_notes_age(names[i]);
+        held_note_t *h = &s_held[s_held_count++];
+        *h = (held_note_t){ .pcm = pcm, .frames = frames,
+                            .at_us = esp_timer_get_time() - (age > 0 ? age * 1000000LL : 0) };
+        strlcpy(h->file, names[i], sizeof h->file);
+    }
+    if (s_held_count) {
+        ESP_LOGI(TAG, "%d saved note(s) from before, waiting to go", s_held_count);
+    }
+}
+
+/* Boopie: settings or a voice command emptied the notes; the voice task forgets them. */
+static atomic_bool s_clear_notes;
+
+static void clear_held(void)
+{
+    while (s_held_count) {
+        drop_oldest();
+    }
+    boopie_store_clear(BOOPIE_STORE_NOTES);
+}
+#endif
+
+void muse_voice_clear_notes(void)
+{
+#if HOLD_NOTES
+    atomic_store(&s_clear_notes, true);
+#endif
+}
+
 static void voice_task(void *arg)
 {
     bool pending_down = false;
     muse_audio_selftest();
+#if HOLD_NOTES
+    load_held();
+#endif
     for (;;) {
+#if HOLD_NOTES
+        if (atomic_exchange(&s_clear_notes, false)) {
+            clear_held();
+        }
+#endif
         bool wake = false;
         if (!pending_down) {
             muse_input_event_t ev;

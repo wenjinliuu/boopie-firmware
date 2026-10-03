@@ -144,7 +144,7 @@ else()
     # Both LVGL's SDL display driver and its SDL2 OS abstraction include SDL
     # headers while LVGL itself is compiled.
     target_link_libraries(lvgl PRIVATE ${MUSE_SIM_SDL_TARGET})
-    target_compile_definitions(lvgl PRIVATE _POSIX_C_SOURCE=200809L)
+    target_compile_definitions(lvgl PRIVATE _POSIX_C_SOURCE=200809L _DEFAULT_SOURCE)   # Boopie: DT_DIR for lv_fs_stdio
 endif()
 
 set(MUSE_COMPONENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/muse")
@@ -171,6 +171,8 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_guide.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_setup.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_heads.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_viewers.c"
+    "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin_dict.c"
     "${BOOPIE_COMPONENT_DIR}/store/boopie_assets.c"
@@ -213,8 +215,9 @@ target_link_libraries(muse_simulator PRIVATE
 
 target_link_libraries(muse_simulator PRIVATE m)
 
-# Boopie: strdup for the settings pages, localtime_r for the clock.
-set_source_files_properties("${MUSE_COMPONENT_DIR}/muse_settings_ui.c" "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c" PROPERTIES COMPILE_DEFINITIONS
+# Boopie: strdup for the settings pages, localtime_r for the clock and the chat history.
+set_source_files_properties("${MUSE_COMPONENT_DIR}/muse_settings_ui.c" "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_viewers.c" "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c" PROPERTIES COMPILE_DEFINITIONS
     "_POSIX_C_SOURCE=200809L")
 
 # Boopie: Muse's renderer under the names the avatar switcher calls.

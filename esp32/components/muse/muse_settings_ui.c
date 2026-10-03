@@ -45,6 +45,9 @@
 #include "boopie_heads.h"
 #include "boopie_sdk_token.h"
 #include "boopie_vpn.h"
+#include "boopie_history.h"
+#include "boopie_store.h"
+#include "boopie_viewers.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -1697,6 +1700,100 @@ static void tick_vpn(void)
 
 static const page_t VPN = { &s_vpn, build_vpn_page };
 
+/* ---------- Storage (Boopie) ---------- */
+
+static const struct {
+    const char *what, *name;
+    boopie_store_kind_t kind;
+} STORE_ROWS[] = {
+    { "chat", "聊天记录", BOOPIE_STORE_CHAT },
+    { "album", "相册", BOOPIE_STORE_ALBUM },
+    { "notes", "断网留言", BOOPIE_STORE_NOTES },
+};
+#define STORE_ROWS_N (int)(sizeof STORE_ROWS / sizeof STORE_ROWS[0])
+
+static lv_obj_t *s_storage, *s_home_storage, *s_store_total, *s_store_bar, *s_store_vals[STORE_ROWS_N];
+static int64_t s_store_armed_us[STORE_ROWS_N];
+static int64_t s_store_shown_us;
+
+static void on_store_row(lv_event_t *e)
+{
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    int64_t now = esp_timer_get_time();
+    if (s_store_armed_us[i] && now - s_store_armed_us[i] < 5000000) {
+        s_store_armed_us[i] = 0;
+        boopie_viewer_clear(STORE_ROWS[i].what);
+    } else {
+        s_store_armed_us[i] = now;   /* the second tap clears */
+    }
+    s_store_shown_us = 0;
+}
+
+static void build_storage_page(lv_obj_t *tile)
+{
+    lv_obj_t *list;
+    s_storage = page(tile, "存储空间", true, &list);
+    s_store_total = note(list, "");
+    s_store_bar = lv_bar_create(list);
+    lv_obj_set_size(s_store_bar, lv_pct(94), 12);
+    lv_obj_set_style_bg_color(s_store_bar, lv_color_hex(0x2a2345), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_store_bar, lv_color_hex(COLOR_ACCENT), LV_PART_INDICATOR);
+    for (int i = 0; i < STORE_ROWS_N; i++) {
+        row(list, NULL, STORE_ROWS[i].name, &s_store_vals[i], on_store_row, (void *)(intptr_t)i);
+        s_store_armed_us[i] = 0;
+    }
+    note(list, "点一行，再点一下就清空它。\n满了自动删最旧的：聊天记录 100 条，\n相册 10 张，"
+               "留言发出或过 7 天就删。");
+    s_store_shown_us = 0;
+}
+
+static void kb(char *buf, size_t cap, size_t bytes)
+{
+    if (bytes >= 1024 * 1024) {
+        snprintf(buf, cap, "%u.%u MB", (unsigned)(bytes >> 20), (unsigned)((bytes & 0xFFFFF) * 10 >> 20));
+    } else {
+        snprintf(buf, cap, "%u KB", (unsigned)((bytes + 1023) / 1024));
+    }
+}
+
+static void tick_storage(void)
+{
+    int64_t now = esp_timer_get_time();
+    if (s_store_shown_us && now - s_store_shown_us < 2000000) {
+        return;   /* sizes walk the folders: every couple of seconds is plenty */
+    }
+    s_store_shown_us = now;
+    size_t used = boopie_store_used(), total = boopie_store_total();
+    char a[16], b[16], buf[64];
+    kb(a, sizeof a, used);
+    kb(b, sizeof b, total);
+    snprintf(buf, sizeof buf, total ? "已用 %s，共 %s" : "用户数据区不可用", a, b);
+    set_text(s_store_total, buf);
+    lv_bar_set_range(s_store_bar, 0, 1000);
+    lv_bar_set_value(s_store_bar, total ? (int32_t)((uint64_t)used * 1000 / total) : 0, LV_ANIM_OFF);
+    int counts[STORE_ROWS_N] = { boopie_chat_count(), -1, -1 };
+    char paths[BOOPIE_ALBUM_MAX][BOOPIE_ALBUM_PATH_MAX];
+    counts[1] = boopie_album_list(paths, BOOPIE_ALBUM_MAX);
+    char names[8][BOOPIE_NOTE_NAME_MAX];
+    counts[2] = boopie_notes_list(names, 8);
+    static const char *const UNITS[STORE_ROWS_N] = { "条", "张", "条" };
+    for (int i = 0; i < STORE_ROWS_N; i++) {
+        if (s_store_armed_us[i] && now - s_store_armed_us[i] < 5000000) {
+            set_text(s_store_vals[i], "再点一下清空");
+            lv_obj_set_style_text_color(s_store_vals[i], lv_color_hex(COLOR_DANGER), 0);
+            s_store_shown_us = 0;   /* back to the size once it's disarmed */
+            continue;
+        }
+        s_store_armed_us[i] = 0;
+        kb(a, sizeof a, boopie_store_kind_bytes(STORE_ROWS[i].kind));
+        snprintf(buf, sizeof buf, "%d %s   %s", counts[i], UNITS[i], a);
+        set_text(s_store_vals[i], buf);
+        lv_obj_set_style_text_color(s_store_vals[i], lv_color_hex(COLOR_DIM), 0);
+    }
+}
+
+static const page_t STORAGE = { &s_storage, build_storage_page };
+
 /* Boopie: the setup guide, from the top. */
 static void on_guide(lv_event_t *e)
 {
@@ -1724,6 +1821,7 @@ static void build_home(lv_obj_t *tile)
     row(list, LV_SYMBOL_VOLUME_MAX, "声音", &s_home_sound, on_nav, (void *)&SOUND);
     row(list, LV_SYMBOL_EYE_CLOSE, "显示与熄屏", &s_home_sleep, on_nav, (void *)&SLEEP);
     row(list, LV_SYMBOL_BATTERY_FULL, "电池", &s_home_battery, on_nav, (void *)&BATTERY);
+    row(list, LV_SYMBOL_SD_CARD, "存储空间", &s_home_storage, on_nav, (void *)&STORAGE);   /* Boopie */
     /* Boopie: no power off here; holding the bottom button opens the power menu. */
     row(list, LV_SYMBOL_LOOP, "重新引导", NULL, on_guide, NULL);   /* Boopie: the setup guide again */
     s_about = note(list, "");
@@ -1738,6 +1836,10 @@ static void tick_home(void)
 
     set_text(s_home_brain, boopie_avatar_brain() == BOOPIE_BRAIN_MUSE ? "Muse" : "小智");
     set_text(s_home_vpn, boopie_vpn_on() ? "已开" : "已关");
+    size_t st_total = boopie_store_total();
+    char st[16];
+    snprintf(st, sizeof st, "已用 %u%%", st_total ? (unsigned)((uint64_t)boopie_store_used() * 100 / st_total) : 0u);
+    set_text(s_home_storage, st);
 
     muse_ble_status_t b;
     muse_ble_status(&b);
@@ -1808,6 +1910,8 @@ void muse_settings_ui_tick(bool visible)
         tick_brain();    /* Boopie */
     } else if (s_current == s_vpn) {
         tick_vpn();      /* Boopie */
+    } else if (s_current == s_storage) {
+        tick_storage();  /* Boopie */
     }
 }
 
@@ -1824,7 +1928,8 @@ void muse_settings_ui_open(const char *name)
         const page_t *page;
     } PAGES[] = { { "wifi", &WIFI }, { "muse", &HATCH }, { "avatar", &AVATAR }, { "bluetooth", &BLE },
                   { "sound", &SOUND }, { "sleep", &SLEEP }, { "battery", &BATTERY }, { "power", &POWER },
-                  { "brain", &BRAIN }, { "xiaozhi", &XIAOZHI }, { "vpn", &VPN } };
+                  { "brain", &BRAIN }, { "xiaozhi", &XIAOZHI }, { "vpn", &VPN },
+                  { "storage", &STORAGE } };
     for (size_t i = 0; i < sizeof PAGES / sizeof PAGES[0]; i++) {
         if (strcmp(PAGES[i].name, name) == 0) {
             if (!*PAGES[i].page->obj) {

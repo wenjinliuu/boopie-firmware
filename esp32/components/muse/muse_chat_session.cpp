@@ -73,6 +73,7 @@ extern "C" {
 #include "muse_wifi.h"
 }
 #include "muse_chat_priv.h"
+#include "boopie_history.h"   /* Boopie: the chat history */
 
 #include <xplat/noise/core/ClientSession.h>
 #include <xplat/noise/core/PsaCryptoBackend.h>
@@ -230,6 +231,7 @@ struct turn_t {
     char *texts;             /* MAX_MSGS * TEXT_MAX: each message's text */
     uint32_t pcm_out;        /* reply audio frames handed to the voice task */
     char committed[512];     /* finals that arrived before the half-close */
+    char said[256];          /* Boopie: what was said, for the chat history */
     char partial[512];
     char user_ids[2][80];
     msg_t msgs[MAX_MSGS];
@@ -972,8 +974,31 @@ static void turn_fail(const char *why)
 }
 
 /* Ends the turn once its reply is in; `complete` is false when it was cut off. */
+/* Boopie: a spoken turn and its reply go into the chat history. */
+static void keep_turn(void)
+{
+    if (s_turn.text || !s_turn.said[0] || !s_turn.texts) {
+        return;
+    }
+    char *reply = static_cast<char *>(psram_alloc(BOOPIE_CHAT_REPLY_MAX));
+    if (!reply) {
+        return;
+    }
+    size_t o = 0;
+    reply[0] = '\0';
+    for (int i = 0; i < s_turn.nmsgs && o + 2 < BOOPIE_CHAT_REPLY_MAX; i++) {
+        const char *t = s_turn.texts + i * TEXT_MAX;
+        if (*t) {
+            o += snprintf(reply + o, BOOPIE_CHAT_REPLY_MAX - o, "%s%s", o ? "\n" : "", t);
+        }
+    }
+    boopie_chat_add(0, s_turn.said, reply);
+    free(reply);
+}
+
 static void turn_done(bool complete)
 {
+    keep_turn();
     if (s_turn.text) {
         muse_hatch_console("done", nullptr, "\"messages\":%d,\"complete\":%s", s_turn.nmsgs,
                            complete ? "true" : "false");
@@ -1209,9 +1234,10 @@ static void post_chat(const char *text)
         text++;
     }
     if (!*text) {
-        turn_fail("DIDN'T CATCH THAT");
+        turn_fail("没听清");
         return;
     }
+    strlcpy(s_turn.said, text, sizeof(s_turn.said));   /* Boopie: for the chat history */
     ESP_LOGI(TAG, "heard: \"%s\"", text);
     emit(MUSE_HATCH_EV_HEARD, text);
     send_chat(text, "voice");

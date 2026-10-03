@@ -35,6 +35,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "rom/tjpgd.h"
+#if CONFIG_MUSE_ENABLED
+#include "boopie_history.h"   // Boopie: the album
+#endif
 
 static const char *TAG = "link.image";
 
@@ -94,6 +97,7 @@ typedef struct {
     bool low_memory;
     bool timed_out;
     bool scheme_changed;
+    FILE *album;          // Boopie: the JPEG as it arrives, kept for the album
     // JPEG output placement and one MCU converted for the panel.
     int x0, y0;
     uint16_t mcu[JPEG_MCU_PIXELS];
@@ -209,10 +213,19 @@ static const char *draw_raw(fetch_t *f, int *rows_drawn) {
 
 // ---- JPEG --------------------------------------------------------------------
 
+// Boopie: every JPEG byte read also goes to the album's file.
+static void keep(fetch_t *f, const void *p, int n) {
+    if (f->album && n > 0 && fwrite(p, 1, (size_t)n, f->album) != (size_t)n) {
+        fclose(f->album);   // the partition's full: no picture this time
+        f->album = NULL;
+    }
+}
+
 static UINT jpeg_in(JDEC *jd, BYTE *buf, UINT len) {
     fetch_t *f = jd->device;
     if (buf) {
         int n = fetch_read(f, buf, len);
+        keep(f, buf, n);
         return n < 0 ? 0 : (UINT)n;
     }
     // Skip: read into the MCU buffer, which is free between output calls.
@@ -222,6 +235,7 @@ static UINT jpeg_in(JDEC *jd, BYTE *buf, UINT len) {
         if (chunk > sizeof(f->mcu)) chunk = sizeof(f->mcu);
         int n = fetch_read(f, (uint8_t *)f->mcu, chunk);
         if (n <= 0) break;
+        keep(f, f->mcu, n);
         skipped += (UINT)n;
     }
     return skipped;
@@ -356,7 +370,20 @@ static void fetch_task(void *arg) {
         const char *fail;
         if (f->peek_len == 2 && f->peek[0] == 0xFF && f->peek[1] == 0xD8) {
             result.format = "jpeg";
+#if CONFIG_MUSE_ENABLED
+            f->album = boopie_album_begin();   // the peeked bytes are read again through jpeg_in
+#endif
             fail = draw_jpeg(f, &result.width, &result.height, &result.scale);
+#if CONFIG_MUSE_ENABLED
+            if (f->album && !fail) {
+                // The decoder stops at the image's end: keep what follows too.
+                uint8_t *tail = (uint8_t *)f->mcu;
+                int n;
+                while ((n = fetch_read(f, tail, sizeof(f->mcu))) > 0) keep(f, tail, n);
+            }
+            if (f->album) boopie_album_end(f->album, !fail);
+            f->album = NULL;
+#endif
         } else {
             int rows = 0;
             result.format = "rgb565";

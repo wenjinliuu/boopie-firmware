@@ -31,7 +31,7 @@ if(CONFIG_MUSE_ENABLED)
     # The clock (NTP) and the IMU, on the device only.
     list(APPEND srcs "device/boopie_clock.c" "device/boopie_imu.c")
     # The user data partition (LittleFS, from idf_component.yml).
-    list(APPEND srcs "store/boopie_store.c")
+    list(APPEND srcs "store/boopie_store.c" "store/boopie_history.c")
     # The VPN: the relay, the subscription and the resolve hook.
     list(APPEND srcs "vpn/boopie_vpn.c")
 endif()

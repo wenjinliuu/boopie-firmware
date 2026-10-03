@@ -17,8 +17,8 @@
  */
 
 typedef enum {
-    BOOPIE_STORE_CHAT = 0,    /* chat history: the last 500 */
-    BOOPIE_STORE_ALBUM,       /* pictures kept: 30 */
+    BOOPIE_STORE_CHAT = 0,    /* chat history: the last 100 turns */
+    BOOPIE_STORE_ALBUM,       /* pictures kept: 10 */
     BOOPIE_STORE_NOTES,       /* notes waiting to be sent: gone once sent, or after 7 days */
     BOOPIE_STORE_LOGS,        /* written round in a fixed size */
     BOOPIE_STORE_GAMES,       /* game saves */

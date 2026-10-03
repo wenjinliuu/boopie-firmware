@@ -1364,6 +1364,15 @@ static char *build_register_json(void) {
                 "Open a game on the screen for the user to play, when they want to play "
                 "with their pet. Rounds earn the pet experience and stars.",
                 nullptr, game_optional);
+    cJSON *clear_required = cJSON_CreateObject();
+    cJSON_AddItemToObject(clear_required, "what", string_param(
+        "What to clear: chat (the chat history), album (pictures shown), notes "
+        "(voice notes waiting for the network) or all."));
+    add_command(commands, "storage.clear",
+                "When the user asks to delete their chat history, pictures or saved notes: "
+                "puts a question on the screen, and only the user's tap clears them. Tell "
+                "the user to confirm on the screen.",
+                clear_required, nullptr);
     add_command(commands, "pet.name",
                 "Name the pet on the screen, when the user gives it a name. Without "
                 "name, reports the current one. Call the user's pet by this name.",

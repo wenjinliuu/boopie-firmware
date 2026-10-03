@@ -13,6 +13,7 @@
 #include "boopie_font.h"
 #include "boopie_games.h"
 #include "boopie_heads.h"
+#include "boopie_viewers.h"
 #include "boopie_input.h"
 #include "boopie_store.h"
 #include "muse_board.h"
@@ -107,12 +108,14 @@ typedef struct {
     const char *game;   /* boopie_games_open()'s id */
 } app_t;
 
-/* What's built, each a big card; what isn't yet, named on one card below. */
+/* What's built, each a card; what isn't yet, named below. */
 static const app_t APPS[] = {
     { "戳戳布比", "宠物冒头就戳它", true, "whack" },
+    { "聊天记录", "最近 100 条", true, "chat" },
+    { "相册", "Muse 给你看过的图", true, "album" },
 };
 #define APP_COUNT (int)(sizeof APPS / sizeof APPS[0])
-static const char SOON[] = "接零食 · 重力迷宫\n计时器 · 白噪音";
+static const char SOON[] = "即将推出\n接零食 · 重力迷宫 · 计时器 · 白噪音";
 
 static lv_obj_t *s_app_icons[APP_COUNT];
 static int s_app_icon_for = -1;
@@ -120,7 +123,11 @@ static int s_app_icon_for = -1;
 static void on_app(lv_event_t *e)
 {
     const app_t *a = lv_event_get_user_data(e);
-    if (a->game) {
+    if (strcmp(a->game, "chat") == 0) {
+        boopie_viewer_chat_locked();
+    } else if (strcmp(a->game, "album") == 0) {
+        boopie_viewer_album_locked();
+    } else {
         boopie_games_open_locked(a->game);
     }
 }
@@ -128,28 +135,32 @@ static void on_app(lv_event_t *e)
 static void build_apps(lv_obj_t *page)
 {
     title(page, "应用");
-    const int w = 320, h = 96, gap = 12, top = 92;
+    const int w = 320, h = 74, gap = 10, top = 86;
     for (int i = 0; i < APP_COUNT; i++) {
         lv_obj_t *c = card(page, w, h);
         lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_align(c, LV_ALIGN_TOP_MID, 0, top + i * (h + gap));
-        /* Its icon: the pet that pops up in it. */
-        s_app_icons[i] = lv_image_create(c);
-        lv_obj_remove_flag(s_app_icons[i], LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_align(s_app_icons[i], LV_ALIGN_LEFT_MID, 18, 0);
+        if (i == 0) {
+            /* The game's icon: the pet that pops up in it. */
+            s_app_icons[i] = lv_image_create(c);
+            lv_obj_remove_flag(s_app_icons[i], LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_align(s_app_icons[i], LV_ALIGN_LEFT_MID, 14, 0);
+        } else {
+            s_app_icons[i] = NULL;
+            lv_obj_t *icon = text(c, &lv_font_montserrat_28, COLOR_ACCENT, i == 1 ? LV_SYMBOL_LIST : LV_SYMBOL_IMAGE);
+            lv_obj_align(icon, LV_ALIGN_LEFT_MID, 30, 0);
+        }
         lv_obj_t *n = text(c, &lv_font_montserrat_20, COLOR_TEXT, APPS[i].name);
-        lv_obj_align(n, LV_ALIGN_LEFT_MID, 106, -14);
+        lv_obj_align(n, LV_ALIGN_LEFT_MID, 92, -12);
         lv_obj_t *d = text(c, &lv_font_montserrat_16, COLOR_DIM, APPS[i].note);
-        lv_obj_align(d, LV_ALIGN_LEFT_MID, 106, 16);
+        lv_obj_align(d, LV_ALIGN_LEFT_MID, 92, 14);
         lv_obj_add_event_cb(c, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
     }
-    lv_obj_t *c = card(page, w, 110);
-    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, top + APP_COUNT * (h + gap));
-    lv_obj_t *t = text(c, &lv_font_montserrat_16, COLOR_DIM, "即将推出");
-    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 14);
-    lv_obj_t *n = text(c, &lv_font_montserrat_20, COLOR_DIM, SOON);
+    lv_obj_t *n = text(page, &lv_font_montserrat_16, COLOR_DIM, SOON);
+    lv_obj_set_width(n, 300);
+    lv_label_set_long_mode(n, LV_LABEL_LONG_MODE_WRAP);
     lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(n, LV_ALIGN_TOP_MID, 0, 42);
+    lv_obj_align(n, LV_ALIGN_TOP_MID, 0, top + APP_COUNT * (h + gap) + 8);
 }
 
 static void tick_apps(void)
@@ -158,9 +169,9 @@ static void tick_apps(void)
     if (cur == s_app_icon_for) {
         return;
     }
-    const lv_image_dsc_t *head = boopie_head(cur, 5);
-    for (int i = 0; head && i < APP_COUNT; i++) {
-        lv_image_set_src(s_app_icons[i], head);
+    const lv_image_dsc_t *head = boopie_head(cur, 4);
+    if (head && s_app_icons[0]) {
+        lv_image_set_src(s_app_icons[0], head);
     }
     s_app_icon_for = cur;
 }

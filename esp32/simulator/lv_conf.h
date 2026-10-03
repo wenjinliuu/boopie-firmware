@@ -56,6 +56,9 @@
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
 /* Boopie: the smooth Chinese font from the assets pack (BOOPIE_ASSETS). */
+/* Boopie: the album decodes pictures with tjpgd (ui/boopie_viewers.c): the
+ * board has it in ROM, the simulator borrows LVGL's copy. */
+#define LV_USE_TJPGD 1
 /* Boopie: QR codes for phone setup (ui/boopie_setup.c). */
 #define LV_USE_QRCODE 1
 #define LV_USE_TINY_TTF 1

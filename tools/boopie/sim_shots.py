@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -209,6 +210,39 @@ def render_phone(binary: Path, out: Path) -> list[Path]:
                 for name, env in PHONE]
 
 
+# Looking back: the chat history, the album and the box asking before a clear,
+# over a user data folder with a few turns and a picture in it.
+LOOK = [("viewer-chat", ["viewer=chat"]), ("viewer-album", ["viewer=album"]), ("ask-clear", ["ask=chat"]),
+        ("settings-storage", ["settings=storage", "advance=600"])]
+
+
+def user_data(root: Path) -> Path:
+    data = root / "data"
+    for d in ("chat", "album", "notes", "logs", "games"):
+        (data / d).mkdir(parents=True, exist_ok=True)
+    turns = [("今天天气怎么样？", "今天晴，最高 25℃，适合出去走走。\\n记得带水哦。"),
+             ("给布比起个名字叫小白", "好呀，以后我就叫小白啦！"),
+             ("What's 12 times 12?", "12 times 12 is 144.")]
+    (data / "chat" / "log.txt").write_text(
+        "".join(f"{1759480000 + i * 3600}\t{q}\t{a}\n" for i, (q, a) in enumerate(turns)), encoding="utf-8")
+    im = Image.new("RGB", (480, 360), (40, 32, 80))
+    draw = ImageDraw.Draw(im)
+    for i in range(12):
+        draw.ellipse((20 + i * 36, 120 + (i % 3) * 40, 70 + i * 36, 170 + (i % 3) * 40),
+                     fill=(255, 120 + i * 10, 180 - i * 8))
+    im.save(data / "album" / "1759480000.jpg", "JPEG", quality=85, progressive=False)
+    (data / "notes" / f"{int(time.time()) - 600:010d}.pcm").write_bytes(b"\0\0" * 16000)
+    return data
+
+
+def render_look(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        data = user_data(Path(tmp))
+        return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
+                      {"BOOPIE_DATA": str(data), "BOOPIE_VPN": "1"}, 400)
+                for name, steps in LOOK]
+
+
 # The settings pages, reached by a scripted finger (466 px screen).
 SETTINGS = [
     ("settings-home", ["swipe=left"]),
@@ -262,6 +296,7 @@ def main() -> int:
     pages += render_guide(args.binary, args.out)
     contact_sheet(pages, args.out / "pages.png", cols=len(PAGES))
     pages += render_phone(args.binary, args.out)
+    pages += render_look(args.binary, args.out)
     settings = render_settings(args.binary, args.out)
     contact_sheet(settings, args.out / "settings.png", cols=len(SETTINGS))
     wears = render_accessories(args.binary, args.out)

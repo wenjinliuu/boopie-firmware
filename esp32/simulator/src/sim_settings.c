@@ -205,3 +205,6 @@ boopie_vpn_busy_t boopie_vpn_busy(char *msg, size_t cap)
 void boopie_vpn_update(void) {}
 void boopie_vpn_test(void) {}
 bool boopie_vpn_active(void) { return getenv("BOOPIE_VPN") != NULL; }
+
+/* Boopie: the voice task's notes (the simulator has none). */
+void muse_voice_clear_notes(void) {}

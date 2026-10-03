@@ -26,8 +26,8 @@ static const char *const DIRS[BOOPIE_STORE_COUNT] = { "chat", "album", "notes", 
 static const char *const NAMES[BOOPIE_STORE_COUNT] = { "聊天记录", "相册", "留言", "日志", "游戏存档" };
 
 static bool s_ready;
-static char s_base[64];
-static char s_dirs[BOOPIE_STORE_COUNT][80];
+static char s_base[128];
+static char s_dirs[BOOPIE_STORE_COUNT][160];
 
 static void make_dirs(void)
 {
@@ -93,7 +93,7 @@ static size_t walk(const char *dir, bool remove_them)
         return 0;
     }
     struct dirent *e;
-    char path[96 + 256];   /* the folder, and a name as long as dirent allows */
+    char path[160 + 256];   /* the folder, and a name as long as dirent allows */
     while ((e = readdir(d)) != NULL) {
         if (e->d_name[0] == '.') {
             continue;

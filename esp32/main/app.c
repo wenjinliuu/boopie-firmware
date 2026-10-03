@@ -75,6 +75,7 @@
 #include "muse_glue.h"
 #include "boopie_avatar.h"   /* Boopie: display.avatar */
 #include "boopie_games.h"    /* Boopie: game.start */
+#include "boopie_viewers.h"  /* Boopie: storage.clear */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -1929,6 +1930,17 @@ static cJSON *on_ws_command(
         if (!ok) return command_error("bad_param", "unknown game");
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
+        return result;
+    }
+    if (strcmp(command, "storage.clear") == 0) {
+        /* Boopie: never straight away: the screen asks, and only a tap clears. */
+        char *what = json_strdup_string(params, "what");
+        bool ok = boopie_viewer_ask_clear(what ? what : "");
+        free(what);
+        if (!ok) return command_error("bad_param", "what: chat, album, notes or all");
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "status", "asked on screen; cleared only if the user taps to confirm");
         return result;
     }
     if (strcmp(command, "pet.name") == 0) {
