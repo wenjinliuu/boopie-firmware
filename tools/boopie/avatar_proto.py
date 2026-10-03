@@ -148,6 +148,7 @@ class Pose:
     fx: list = field(default_factory=list)
     dim: float = 1.0
     wear: tuple = ()           # accessories (ACCESSORIES)
+    scene: str = "default"     # the idle background (SCENES)
 
 
 # ---------------------------------------------------------------- drawing
@@ -705,6 +706,160 @@ def wear(c: Canvas, name: str, slots: dict):
                 c.put(nx + w / 4 + dx + (dy > 5), ny + dy, dark if dy == 7 else red)
 
 
+# ---------------------------------------------------------------- scenes
+# The idle background a skin brings: drawn behind the character, in front of
+# it, or over the whole frame afterwards (glitch). "default" is Muse's own:
+# the glow and sparkles alone.
+SCENES = {
+    "default": "默认光晕", "stars": "星空", "fireflies": "萤火", "rain": "细雨", "snow": "飘雪",
+    "petals": "花瓣", "bubbles": "气泡", "matrix": "代码雨", "neon_grid": "霓虹网格", "glitch": "像素故障",
+}
+
+
+def h01(*v) -> float:
+    """A stable hash of the arguments, 0..1."""
+    x = 0x9E3779B9
+    for k in v:
+        x = (x ^ (int(k) * 0x85EBCA6B + 0x632BE5AB)) & 0xFFFFFFFF
+        x = (x * 0x27D4EB2D) & 0xFFFFFFFF
+        x ^= x >> 15
+    return (x & 0xFFFFFF) / 16777216.0
+
+
+def scene_back(c: Canvas, scene: str, t: float, acc):
+    if scene == "stars":
+        for i in range(34):
+            x, y = int(h01(i, 1) * 64), int(h01(i, 2) * 50)
+            tw = 0.5 + 0.5 * math.sin(t * (1.5 + h01(i, 3) * 2) + i)
+            if tw > 0.35:
+                c.put(x, y, mix((40, 40, 70), (230, 230, 255), tw))
+            if tw > 0.9 and i % 5 == 0:
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    c.put(x + dx, y + dy, (90, 90, 140))
+        k = (t % 4.0) / 0.6                       # a shooting star every 4 s
+        if k < 1:
+            for j in range(6):
+                c.put(50 - k * 30 + j, 4 + k * 12 - j * 0.4, mix((255, 255, 255), (60, 60, 110), j / 6))
+    elif scene == "fireflies":
+        for i in range(9):
+            if i % 3 == 0:
+                continue                           # those fly in front
+            firefly(c, i, t)
+    elif scene == "rain":
+        for i in range(26):
+            x0, sp = h01(i, 1) * 80, 40 + h01(i, 2) * 20
+            y = (h01(i, 3) * 64 + t * sp) % 70 - 4
+            x = x0 - y * 0.35
+            for j in range(3):
+                c.put(x + j * 0.35, y - j, (70, 90, 150) if j else (120, 150, 210))
+            if y > 56:                             # a splash on the ground
+                c.put(x - 1, 59, (90, 110, 170))
+                c.put(x + 1, 59, (90, 110, 170))
+    elif scene == "snow":
+        for i in range(22):
+            snowflake(c, i, t, False)
+    elif scene == "petals":
+        for i in range(12):
+            petal(c, i, t, False)
+    elif scene == "bubbles":
+        for i in range(9):
+            sp, r = 6 + h01(i, 2) * 6, 1 + int(h01(i, 4) * 2)
+            y = 66 - (h01(i, 3) * 70 + t * sp) % 72
+            x = h01(i, 1) * 64 + math.sin(t * 2 + i) * 1.5
+            ring = [(dx, dy) for dx in range(-r, r + 1) for dy in range(-r, r + 1)
+                    if r - 0.5 <= math.hypot(dx, dy) <= r + 0.5]
+            for dx, dy in ring:
+                c.put(x + dx, y + dy, (90, 160, 210))
+            c.put(x - r / 2, y - r / 2, (220, 240, 255))
+    elif scene == "matrix":
+        for i in range(16):
+            x = i * 4 + 1
+            sp, ln = 14 + h01(i, 2) * 16, 6 + int(h01(i, 3) * 8)
+            head = (h01(i, 1) * 90 + t * sp) % 90 - 10
+            for j in range(ln):
+                y = int(head) - j
+                if 0 <= y < 64 and h01(i, y, int(t * 6) if j == 0 else 0) > 0.25:
+                    col = (200, 255, 210) if j == 0 else mix((30, 200, 90), (6, 40, 18), j / ln)
+                    c.put(x, y, col)
+    elif scene == "neon_grid":
+        horizon = 44
+        for x in range(64):                        # a sunset band
+            for y in range(horizon - 10, horizon):
+                if BAYER[y % 4][x % 4] < (y - horizon + 10) / 12:
+                    c.put(x, y, (90, 30, 90))
+        for k in range(7):                         # rows rushing toward you
+            d = ((k + t * 0.8) % 7) / 7
+            y = horizon + d * d * 20
+            for x in range(64):
+                c.put(x, y, (200, 60, 200) if d > 0.4 else (110, 40, 130))
+        for k in range(-8, 9):                     # rails to the vanishing point
+            for y in range(horizon, 64):
+                x = 32 + k * 2.2 * (y - horizon) / 6 + k * 0.6
+                c.put(x, y, (130, 50, 160))
+
+
+def scene_front(c: Canvas, scene: str, t: float):
+    if scene == "fireflies":
+        for i in range(0, 9, 3):
+            firefly(c, i, t)
+    elif scene == "snow":
+        for i in range(22, 30):
+            snowflake(c, i, t, True)
+    elif scene == "petals":
+        for i in range(12, 16):
+            petal(c, i, t, True)
+
+
+def scene_post(img, scene: str, t: float):
+    if scene != "glitch":
+        return img
+    out = img.copy()
+    out[1::2] = (out[1::2] * 0.82).astype(np.uint8)     # scanlines
+    burst = int(t / 1.6)
+    if (t % 1.6) < 0.35:                                # a burst every 1.6 s
+        for b in range(3):
+            y0 = int(h01(burst, b, 1) * 56)
+            hgt = 2 + int(h01(burst, b, 2) * 6)
+            shift = int((h01(burst, b, 3) - 0.5) * 10)
+            out[y0:y0 + hgt] = np.roll(out[y0:y0 + hgt], shift, axis=1)
+        out[:, :, 0] = np.roll(out[:, :, 0], 1, axis=1)  # red split
+        for k in range(10):
+            x, y = int(h01(burst, k, 4) * 64), int(h01(burst, k, 5) * 64)
+            out[y, x:x + 3] = (80, 255, 200) if k % 2 else (255, 60, 160)
+    return out
+
+
+def firefly(c, i, t):
+    x = 32 + 26 * math.sin(t * 0.4 * (1 + h01(i, 1)) + i * 2.1)
+    y = 30 + 20 * math.sin(t * 0.33 * (1 + h01(i, 2)) + i * 1.3)
+    glow = 0.5 + 0.5 * math.sin(t * 3 + i * 1.7)
+    core = mix((80, 90, 30), (230, 255, 140), glow)
+    c.put(x, y, core)
+    if glow > 0.5:
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            c.put(x + dx, y + dy, mix((20, 24, 10), (110, 130, 50), glow))
+
+
+def snowflake(c, i, t, front):
+    sp = 5 + h01(i, 2) * 6 + (4 if front else 0)
+    y = (h01(i, 3) * 64 + t * sp) % 68 - 2
+    x = h01(i, 1) * 64 + math.sin(t * 1.3 + i) * 2
+    col = (250, 250, 255) if front else (150, 160, 200)
+    c.put(x, y, col)
+    if front:
+        c.put(x + 1, y, (200, 210, 240))
+
+
+def petal(c, i, t, front):
+    sp = 7 + h01(i, 2) * 6
+    y = (h01(i, 3) * 64 + t * sp) % 68 - 2
+    x = (h01(i, 1) * 70 + t * 5 + math.sin(t * 1.8 + i) * 3) % 70 - 3
+    a = int(t * 3 + i) % 2
+    col, dark = ((255, 190, 215), (230, 130, 170)) if front else ((170, 110, 140), (120, 70, 100))
+    c.put(x, y, col)
+    c.put(x + 1, y + a, dark)
+
+
 CHARACTERS = [Boopie, GPT, Codex, Klaude, Whale, Doubao]
 
 
@@ -986,6 +1141,7 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
     for dx in range(-12, 13):
         if abs(dx) < 12 - (dx % 2):
             c.put(32 + dx, 59, (22, 18, 34))
+    scene_back(c, pose.scene, t, acc)
     sparkles(c, 32, 40, t, pose.sparkle_speed, False, acc)
     c.rim = mix(acc, WHITE, 0.2)
     anchors = rig.draw(c, pose)
@@ -1010,6 +1166,7 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
         c.flat(front, hr["light"])
         c.outline(front, hr["out"])
     sparkles(c, 32, 40, t, pose.sparkle_speed, True, acc)
+    scene_front(c, pose.scene, t)
     lx, ly = anchors["light"]
     for e in pose.fx:
         kind = e[0]
@@ -1027,7 +1184,7 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
             c.icon(e[1], round(fx + e[2]), round(fy + e[3]))
         elif kind == "bicon":
             c.icon(e[1], round(bx + e[2]), round(by + e[3]))
-    out = c.img
+    out = scene_post(c.img, pose.scene, t)
     if pose.dim < 1:
         out = (out * pose.dim).astype(np.uint8)
     return out
