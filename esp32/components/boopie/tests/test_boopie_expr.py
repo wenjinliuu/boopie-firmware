@@ -34,6 +34,7 @@ EXTENDED = {
     "shy": "happy",
     "low_battery": "sleepy",
     "charging": "idle",
+    "working": "thinking",
 }
 
 

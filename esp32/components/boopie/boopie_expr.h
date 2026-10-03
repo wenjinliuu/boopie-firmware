@@ -41,6 +41,7 @@ typedef enum {
     BOOPIE_EXPR_SHY,
     BOOPIE_EXPR_LOW_BATTERY,
     BOOPIE_EXPR_CHARGING,
+    BOOPIE_EXPR_WORKING,       /* busy on a task: typing on a tiny laptop */
 
     BOOPIE_EXPR_COUNT,
 } boopie_expr_t;

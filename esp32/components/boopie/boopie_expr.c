@@ -33,6 +33,7 @@ static const expr_info_t s_info[BOOPIE_EXPR_COUNT] = {
     [BOOPIE_EXPR_SHY]         = { "shy",         BOOPIE_EXPR_HAPPY },
     [BOOPIE_EXPR_LOW_BATTERY] = { "low_battery", BOOPIE_EXPR_SLEEPY },
     [BOOPIE_EXPR_CHARGING]    = { "charging",    BOOPIE_EXPR_IDLE },
+    [BOOPIE_EXPR_WORKING]     = { "working",     BOOPIE_EXPR_THINKING },
 };
 
 _Static_assert(BOOPIE_EXPR_COUNT <= 32, "boopie_expr_set_t holds one bit per expression");
