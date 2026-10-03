@@ -407,9 +407,9 @@ class Boopie(Rig):
         return {"face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": light, "show_face": p.scale > 0.6}
 
 
-class GPT(Rig):
-    """GPT: a cloud-headed robot whose face is a terminal; its eyes are the prompt, >_ ."""
-    key, name, colour = "gpt", "GPT", "5b86f5"
+class Codex(Rig):
+    """Codex: a cloud-headed robot whose face is a terminal; its eyes are the prompt, >_ ."""
+    key, name, colour = "codex", "Codex", "5b86f5"
     size, squash_k, jump_k = 1.08, 0.35, 0.4
     screen = (30, 34, 84)
     glyph = (120, 236, 240)
@@ -464,117 +464,66 @@ class GPT(Rig):
                     c.put(fx + side * 9 + dx, fy + 4, CHEEK)
 
 
-# The knot of GPT's logo, 34 x 34: # the bands, . the holes between them.
+# The knot of GPT's logo at 16 x 16 (# the bands, . the holes between them),
+# traced from the logo once; for personal use only, like the brand itself.
 KNOT = [
-    "            ######                ",
-    "          ##########              ",
-    "         #####...####             ",
-    "        ###........########       ",
-    "        ##........###########     ",
-    "       ###......#####.....####    ",
-    "     ####.....#####.........###   ",
-    "   ######....####............##   ",
-    "  #######...####.....##......###  ",
-    "  ###..##...##......#####.....##  ",
-    " ###..###...#.....###.#####...##  ",
-    "###...###...#...###.....####..##  ",
-    "###...###...#.######......######  ",
-    "##....###...####..###......#####  ",
-    "##....###...##......###......###  ",
-    "##....###...#........####.....### ",
-    "###...###...#........#..###....## ",
-    " ##....###..#........#...###...###",
-    " ###.....####........#...###....##",
-    "  ###......###......##...###....##",
-    "  #####.....####..####...###....##",
-    "  ######......######.#...###...###",
-    "  ##..####.....###...#...###...###",
-    "  ##...#####.###.....#...###..### ",
-    "  ##.....######.....##...###.#### ",
-    "  ###......##......###...#######  ",
-    "   ##............#####...######   ",
-    "   ###.........#####.....####     ",
-    "    ####.....#####......###       ",
-    "     ###########........###       ",
-    "       ########........###        ",
-    "             ####....####         ",
-    "              ##########          ",
-    "                ######            ",
+    "     ####       ",
+    "    ##..#####   ",
+    "   ##...##..##  ",
+    "  ##..##.....## ",
+    " #.#.##..###..# ",
+    "#..#.#.##..#### ",
+    "#..#.##..#...## ",
+    "#..#......##..##",
+    "##..##......#..#",
+    " ##..##..##.#..#",
+    " ####..##.#.#..#",
+    " #..###..##.#.# ",
+    " ##.....##..##  ",
+    "  ##..##...##   ",
+    "   #####..##    ",
+    "       ####     ",
 ]
+KNOT_GRID = np.array([list(r) for r in KNOT])
 
 
-class GPTMono(Rig):
-    """GPT (black and white): its head is the knot of its logo, white bands
-    interlaced round a little face plate; a small white body below."""
-    key, name, colour = "gpt_mono", "GPT 黑白", "e8e8e8"
-    size, squash_k, jump_k = 1.0, 0.35, 0.4
+class GPT(Rig):
+    """GPT: a white mochi, Boopie's shape and face, with the knot of its logo
+    clipped on its head like a hair clip."""
+    key, name, colour = "gpt", "GPT", "e8e8e8"
     ink = (18, 18, 24)
     hole = (34, 34, 44)
 
+    def __init__(self, colour=None):
+        super().__init__(colour)
+        self.rp["out"] = self.ink
+        self.bands = ramp("f6f6f6")
+        self.bands["out"] = self.ink
+
     def draw(self, c, p):
-        cx, base = 32, 57
-        f = self.frame(p, cx, base)
-        body = f.ellipse(32, 47, 8.5, 6.5)
+        cx, cy, rx, ry = 32, 41, 16, 14
+        f = self.frame(p, cx, cy + ry)
+        body = f.ellipse(cx, cy, rx, ry)
         if p.feet and p.scale > 0.6:
-            body |= f.ellipse(28, 54, 2.6, 3.0) | f.ellipse(36, 54, 2.6, 3.0)
+            body |= f.ellipse(cx - 7, cy + ry - 1, 4, 2.5) | f.ellipse(cx + 7, cy + ry - 1, 4, 2.5)
         for h in p.hands:
             if h[0] != "front":
-                body |= f.ellipse(32 + h[0] * 11, 46 + h[1] * 0.8, 2.8, 2.4)
+                body |= f.ellipse(cx + h[0] * rx, cy + h[1], 3, 2.6)
         c.shaded(body, self.rp)
         c.outline(body, self.ink)
-        ox, oy = 15, 7
-        gx = np.floor(f.rx - ox).astype(int)
-        gy = np.floor(f.ry - oy).astype(int)
-        ok = (gx >= 0) & (gx < 34) & (gy >= 0) & (gy < 34)
+        n, kx, ky = len(KNOT), 42, 25          # the clip, up on the right like Boopie's antenna
+        gx = np.floor(f.rx - (kx - n / 2)).astype(int)
+        gy = np.floor(f.ry - (ky - n / 2)).astype(int)
+        ok = (gx >= 0) & (gx < n) & (gy >= 0) & (gy < n)
         cells = np.full((N, N), " ")
-        cells[ok] = np.array([list(r) for r in KNOT])[gy[ok], gx[ok]]
+        cells[ok] = KNOT_GRID[gy[ok], gx[ok]]
         bands, holes = cells == "#", cells == "."
         c.flat(holes, self.hole)
-        rim, c.rim = c.rim, None          # the bands are too thin for a rim light
-        c.shaded(bands, ramp("f6f6f6"))
+        rim, c.rim = c.rim, None               # the bands are too thin for a rim light
+        c.shaded(bands, self.bands)
         c.rim = rim
         c.outline(bands | holes, self.ink)
-        plate = f.ellipse(32, 24, 5.2, 4.6)
-        c.flat(plate, (250, 250, 252))
-        c.outline(plate, self.ink)
-        return {"face": f.pt(32, 24), "body": f.pt(32, 43), "light": f.pt(48, 9), "show_face": p.scale > 0.6}
-
-    def face(self, c, fx, fy, p):
-        c.eye = self.ink
-        for side in (-1, 1):                 # small eyes, the plate is small
-            ex = fx + side * 2
-            k = p.eyes
-            if k in ("blink", "half"):
-                c.put(ex, fy, c.eye)
-            elif k in ("happy", "down"):
-                c.put(ex - 1, fy, c.eye)
-                c.put(ex, fy - 1, c.eye)
-                c.put(ex + 1, fy, c.eye)
-            elif k == "x":
-                for d in (-1, 1):
-                    c.put(ex + d, fy + d, c.eye)
-                    c.put(ex + d, fy - d, c.eye)
-                c.put(ex, fy, c.eye)
-            else:
-                lx, ly = p.look if k == "look" else (0, 0)
-                c.put(ex + lx, fy - 1 + ly, c.eye)
-                c.put(ex + lx, fy + ly, c.eye)
-        col = p.light or (120, 120, 140)
-        if p.mouth in ("talk", "o", "chomp"):
-            h = max(1, min(2, p.talk)) if p.mouth == "talk" else 1
-            for dy in range(h):
-                c.put(fx, fy + 2 + dy, col if p.mouth == "talk" else self.ink)
-        elif p.mouth in ("frown", "wavy"):
-            c.put(fx - 1, fy + 3, self.ink)
-            c.put(fx, fy + 2, self.ink)
-            c.put(fx + 1, fy + 3, self.ink)
-        else:
-            c.put(fx - 1, fy + 2, self.ink)
-            c.put(fx, fy + 3, self.ink)
-            c.put(fx + 1, fy + 2, self.ink)
-        if p.blush == "big":
-            for side in (-1, 1):
-                c.put(fx + side * 4, fy + 2, CHEEK)
+        return {"face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": f.pt(42, 17), "show_face": True}
 
 
 GLYPHS = {
@@ -706,7 +655,7 @@ class Doubao(Rig):
         return self.rp
 
 
-CHARACTERS = [Boopie, GPT, GPTMono, Klaude, Whale, Doubao]
+CHARACTERS = [Boopie, GPT, Codex, Klaude, Whale, Doubao]
 
 
 # ---------------------------------------------------------------- the expressions
@@ -1087,7 +1036,7 @@ TELLING = {"boot": 0.8, "happy": 0.3, "off": 0.3, "surprised": 0.15, "celebrate"
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--character", default="all", help="boopie, gpt, gpt_mono, klaude, whale, doubao or all")
+    ap.add_argument("--character", default="all", help="boopie, gpt, codex, klaude, whale, doubao or all")
     ap.add_argument("--color", help="body colour, RRGGBB (one character only)")
     ap.add_argument("--scale", type=int, default=4)
     args = ap.parse_args()
