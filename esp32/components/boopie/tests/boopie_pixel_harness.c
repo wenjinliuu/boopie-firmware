@@ -52,6 +52,21 @@ int main(void)
             sscanf(kp + 5, "%31s", skin);
             *kp = '\0';
         }
+        char wear[64] = "";
+        char *wp = strstr(line, "wear:");
+        if (wp) {
+            sscanf(wp + 5, "%63s", wear);
+            *wp = '\0';
+        }
+        uint32_t worn = 0;
+        for (char *tok = strtok(wear, ","); tok; tok = strtok(NULL, ",")) {
+            boopie_acc_t acc;
+            if (!boopie_acc_from_key(tok, &acc)) {
+                fprintf(stderr, "bad accessory: %s\n", tok);
+                return 1;
+            }
+            worn |= BOOPIE_ACC_BIT(acc);
+        }
         char scene[32] = "";
         char *sp = strstr(line, "scene:");
         if (sp) {
@@ -87,6 +102,7 @@ int main(void)
                 return 1;
             }
         }
+        boopie_pixel_set_wear(worn);
         boopie_pixel_set_skin(skin[0] ? boopie_skin_from_key(skin) : -1);
         boopie_pixel_set_character((boopie_char_t)c, BOOPIE_COLOUR_DEFAULT);
         boopie_pixel_render(&p);

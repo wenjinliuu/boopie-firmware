@@ -64,6 +64,14 @@ __attribute__((weak)) bool jolly_pixel_frame(const uint8_t **fb, const uint16_t 
     return false;
 }
 
+/* Where Muse's accessories go this frame (hat x, y; scarf x, y, width); a
+ * custom avatar without it wears none. */
+__attribute__((weak)) bool jolly_pixel_slots(float out[5])
+{
+    (void)out;
+    return false;
+}
+
 static bool s_muse_composed;   /* the last Muse frame went through boopie_pixel_compose */
 
 #define LOW_BATTERY_PCT 15
@@ -72,11 +80,13 @@ static bool s_loaded;
 static void ensure_loaded(void);
 static void save(void);
 static void apply(void);
-static int s_avatar = BOOPIE_AVATAR_MUSE;
+static int s_avatar = BOOPIE_AVATAR_BOOPIE;   /* Boopie, until one's chosen */
 static uint32_t s_colour[BOOPIE_AVATAR_COUNT];
 static boopie_scene_t s_scene = BOOPIE_SCENE_DEFAULT;
 static int s_worn[BOOPIE_AVATAR_COUNT];   /* the skin each character wears, or -1 */
 static uint32_t s_owned;                  /* bit per skin index */
+static uint32_t s_acc[BOOPIE_AVATAR_COUNT];  /* the accessories each wears, BOOPIE_ACC_BIT()s */
+static char s_name[BOOPIE_PET_NAME_MAX];  /* the pet's name, or "" for its character's */
 
 /* The pet, ticked from the frames, and what it shows while idle. */
 static boopie_pet_t s_pet_state;
@@ -224,6 +234,7 @@ bool boopie_avatar_recolourable(int avatar)
 
 static void apply(void)
 {
+    boopie_pixel_set_wear(s_acc[s_avatar]);
     if (s_avatar != BOOPIE_AVATAR_MUSE) {
         boopie_pixel_set_skin(s_worn[s_avatar]);
         boopie_pixel_set_character((boopie_char_t)(s_avatar - 1), s_colour[s_avatar]);
@@ -249,7 +260,7 @@ static void load(void)
     size_t n = sizeof key;
     if (nvs_get_str(h, "avatar", key, &n) == ESP_OK) {
         int a = from_key(key);
-        s_avatar = a >= 0 ? a : BOOPIE_AVATAR_MUSE;
+        s_avatar = a >= 0 ? a : BOOPIE_AVATAR_BOOPIE;
     }
     for (int i = 1; i < BOOPIE_AVATAR_COUNT; i++) {
         char ck[16];
@@ -257,7 +268,7 @@ static void load(void)
         nvs_get_u32(h, ck, &s_colour[i]);
     }
     nvs_get_u32(h, "owned", &s_owned);
-    for (int i = 1; i < BOOPIE_AVATAR_COUNT; i++) {
+    for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         char wk[16], sk[24];
         size_t sn = sizeof sk;
         snprintf(wk, sizeof wk, "w_%s", boopie_avatar_key(i));
@@ -265,6 +276,12 @@ static void load(void)
             int k = boopie_skin_from_key(sk);
             s_worn[i] = k >= 0 && (s_owned >> k & 1u) ? k : -1;
         }
+        snprintf(wk, sizeof wk, "a_%s", boopie_avatar_key(i));
+        nvs_get_u32(h, wk, &s_acc[i]);
+    }
+    n = sizeof s_name;
+    if (nvs_get_str(h, "name", s_name, &n) != ESP_OK) {
+        s_name[0] = '\0';
     }
     size_t pn = sizeof s_pet_state;
     boopie_pet_t saved;
@@ -295,11 +312,14 @@ static void save(void)
     }
     nvs_set_str(h, "scene", boopie_scene_key(s_scene));
     nvs_set_u32(h, "owned", s_owned);
-    for (int i = 1; i < BOOPIE_AVATAR_COUNT; i++) {
+    for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         char wk[16];
         snprintf(wk, sizeof wk, "w_%s", boopie_avatar_key(i));
         nvs_set_str(h, wk, s_worn[i] >= 0 ? boopie_skin_key(s_worn[i]) : "");
+        snprintf(wk, sizeof wk, "a_%s", boopie_avatar_key(i));
+        nvs_set_u32(h, wk, s_acc[i]);
     }
+    nvs_set_str(h, "name", s_name);
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_commit(h);
     nvs_close(h);
@@ -333,6 +353,21 @@ static void load(void)
     if (skin >= 0) {   /* owned and worn by its character */
         s_owned |= 1u << skin;
         s_worn[boopie_avatar_of_skin(skin)] = skin;
+    }
+    const char *wear = getenv("BOOPIE_WEAR");   /* bow,scarf */
+    while (wear && *wear) {
+        char k[16];
+        size_t len = strcspn(wear, ",");
+        snprintf(k, sizeof k, "%.*s", (int)(len < sizeof k ? len : sizeof k - 1), wear);
+        boopie_acc_t acc;
+        if (boopie_acc_from_key(k, &acc)) {
+            s_acc[s_avatar] |= BOOPIE_ACC_BIT(acc);
+        }
+        wear += len + (wear[len] == ',');
+    }
+    const char *name = getenv("BOOPIE_NAME");
+    if (name) {
+        snprintf(s_name, sizeof s_name, "%s", name);
     }
     int sc = scene_from_key(getenv("BOOPIE_SCENE"));
     if (sc >= 0) {
@@ -437,10 +472,128 @@ void boopie_avatar_set_overlay(boopie_overlay_t overlay, bool on)
     }
 }
 
+uint32_t boopie_avatar_accessories(void)
+{
+    ensure_loaded();
+    return s_acc[s_avatar];
+}
+
+bool boopie_avatar_set_accessory(boopie_acc_t acc, bool on, const char **error)
+{
+    ensure_loaded();
+    if ((int)acc < 0 || acc >= BOOPIE_ACC_COUNT) {
+        *error = "unknown accessory";
+        return false;
+    }
+    if (on && !boopie_avatar_unlocked(BOOPIE_UNLOCK_ACCESSORY, acc, NULL)) {
+        *error = "that accessory unlocks at a higher level";
+        return false;
+    }
+    uint32_t worn = s_acc[s_avatar];
+    if (on && boopie_acc_is_hat(acc)) {   /* one hat at a time */
+        for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
+            if (boopie_acc_is_hat((boopie_acc_t)i)) {
+                worn &= ~BOOPIE_ACC_BIT(i);
+            }
+        }
+    }
+    worn = on ? worn | BOOPIE_ACC_BIT(acc) : worn & ~BOOPIE_ACC_BIT(acc);
+    if (worn != s_acc[s_avatar]) {
+        s_acc[s_avatar] = worn;
+        apply();
+        save();
+    }
+    return true;
+}
+
+/* What each character's pet is called until the user names it: short, as
+ * the AI says it. */
+static const char *const PET_NAMES[BOOPIE_AVATAR_COUNT] = {
+    [BOOPIE_AVATAR_MUSE] = "Muse",
+    [BOOPIE_CHAR_BOOPIE + 1] = "布比",
+    [BOOPIE_CHAR_GPT + 1] = "GPT",
+    [BOOPIE_CHAR_CODEX + 1] = "Codex",
+    [BOOPIE_CHAR_KLAUDE + 1] = "小克",
+    [BOOPIE_CHAR_WHALE + 1] = "小鲸鱼",
+    [BOOPIE_CHAR_DOUBAO + 1] = "豆包",
+};
+_Static_assert(BOOPIE_AVATAR_COUNT == 7, "a pet name for each character");
+
+const char *boopie_avatar_pet_name(void)
+{
+    ensure_loaded();
+    return s_name[0] ? s_name : PET_NAMES[s_avatar];
+}
+
+bool boopie_avatar_has_own_name(void)
+{
+    ensure_loaded();
+    return s_name[0] != '\0';
+}
+
+/* Characters in UTF-8 text, or -1 if it isn't valid UTF-8 or has a control
+ * character in it. */
+static int utf8_chars(const char *s)
+{
+    int n = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; n++) {
+        int len = *p < 0x80 ? 1 : (*p >> 5) == 6 ? 2 : (*p >> 4) == 14 ? 3 : (*p >> 3) == 30 ? 4 : 0;
+        if (len == 0 || (len == 1 && *p < 0x20)) {
+            return -1;
+        }
+        for (int i = 1; i < len; i++) {
+            if ((p[i] & 0xc0) != 0x80) {
+                return -1;
+            }
+        }
+        p += len;
+    }
+    return n;
+}
+
+bool boopie_avatar_set_pet_name(const char *name, const char **error)
+{
+    ensure_loaded();
+    while (name && *name == ' ') {
+        name++;
+    }
+    size_t len = name ? strlen(name) : 0;
+    while (len > 0 && name[len - 1] == ' ') {
+        len--;
+    }
+    char clean[BOOPIE_PET_NAME_MAX];
+    if (len >= sizeof clean) {
+        *error = "that name is too long";
+        return false;
+    }
+    memcpy(clean, name ? name : "", len);
+    clean[len] = '\0';
+    int chars = utf8_chars(clean);
+    if (chars < 0 || chars > BOOPIE_PET_NAME_CHARS) {
+        *error = chars < 0 ? "that name has characters it can't use" : "that name is too long";
+        return false;
+    }
+    if (strcmp(clean, s_name) != 0) {
+        memcpy(s_name, clean, len + 1);
+        save();
+    }
+    return true;
+}
+
 bool boopie_avatar_command(const char *avatar, const char *colour, const char *pet, const char *reaction,
-                           const char *scene, const char *skin, bool on, const char **error)
+                           const char *scene, const char *skin, const char *accessory, bool on,
+                           const char **error)
 {
     int a = -1, sc = -1, sk = -2;
+    boopie_acc_t acc = BOOPIE_ACC_COUNT;
+    if (accessory && !boopie_acc_from_key(accessory, &acc)) {
+        *error = "unknown accessory";
+        return false;
+    }
+    if (accessory && on && !boopie_avatar_unlocked(BOOPIE_UNLOCK_ACCESSORY, acc, NULL)) {
+        *error = "that accessory unlocks at a higher level";
+        return false;
+    }
     if (skin) {
         sk = strcmp(skin, "none") == 0 ? -1 : boopie_skin_from_key(skin);
         if (sk == -1 && strcmp(skin, "none") != 0) {
@@ -510,8 +663,11 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
     if (sk >= 0 && boopie_avatar_of_skin(sk) != boopie_avatar_current()) {
         boopie_avatar_select(boopie_avatar_of_skin(sk));   /* wearing it means showing that character */
     }
-    if (sk != -2) {
-        return boopie_avatar_wear(sk, error);
+    if (sk != -2 && !boopie_avatar_wear(sk, error)) {
+        return false;
+    }
+    if (accessory) {
+        return boopie_avatar_set_accessory(acc, on, error);
     }
     return true;
 }
@@ -771,6 +927,8 @@ void muse_pixel_render(const muse_pose_t *p)
         const uint16_t *palette;
         uint32_t bg;
         s_muse_composed = jolly_pixel_frame(&fb, &palette, &bg);
+        float slots[5];
+        boopie_pixel_set_slots(jolly_pixel_slots(slots) ? slots : NULL);
         if (s_muse_composed) {
             boopie_pixel_compose(fb, palette, bg, &bp);
         }

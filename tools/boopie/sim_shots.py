@@ -138,6 +138,17 @@ def render_pets(binary: Path, out: Path) -> list[Path]:
                 for avatar in ("boopie", "muse") for name, env in PETS]
 
 
+WEARS = ["bow,scarf", "crown", "party_hat,scarf"]
+
+
+def render_accessories(binary: Path, out: Path) -> list[Path]:
+    """Every character in each accessory, idle."""
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"wear-{avatar}-{wear.replace(',', '+')}.png", ["face=idle"],
+                      {"BOOPIE_AVATAR": avatar, "BOOPIE_WEAR": wear}, 600)
+                for avatar in AVATARS for wear in WEARS]
+
+
 def contact_sheet(pngs: list[Path], dest: Path, cols: int = 5) -> None:
     ims = [Image.open(p) for p in pngs]
     w, h = ims[0].size
@@ -169,7 +180,9 @@ def main() -> int:
     contact_sheet(scenes, args.out / "scenes.png", cols=len(SCENES))
     skins = render_skins(args.binary, args.out)
     contact_sheet(skins, args.out / "skins.png", cols=len(SKIN_STATES) * 2)
-    print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes) + len(skins)} screenshots in {args.out}",
+    wears = render_accessories(args.binary, args.out)
+    contact_sheet(wears, args.out / "accessories.png", cols=len(WEARS) * 2)
+    print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes) + len(skins) + len(wears)} screenshots in {args.out}",
           file=sys.stderr)
     return 0
 

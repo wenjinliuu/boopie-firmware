@@ -103,6 +103,28 @@ bool boopie_skin_muse_colours(int skin, boopie_muse_colours_t *out);
  * for another character is ignored. */
 void boopie_pixel_set_skin(int skin);
 
+/*
+ * Accessories, worn over any skin: a hat (one at most) and a scarf. In the
+ * order levels unlock them (boopie_pet_unlock_level); only ever appended.
+ */
+typedef enum {
+    BOOPIE_ACC_BOW = 0,
+    BOOPIE_ACC_CROWN,
+    BOOPIE_ACC_SCARF,
+    BOOPIE_ACC_PARTY_HAT,
+    BOOPIE_ACC_COUNT,
+} boopie_acc_t;
+
+#define BOOPIE_ACC_BIT(a) (1u << (a))
+
+const char *boopie_acc_key(boopie_acc_t a);    /* "party_hat"; NULL out of range */
+const char *boopie_acc_name(boopie_acc_t a);   /* "生日帽" */
+bool boopie_acc_is_hat(boopie_acc_t a);
+bool boopie_acc_from_key(const char *key, boopie_acc_t *out);
+
+/* What's worn from the next frame, BOOPIE_ACC_BIT()s. */
+void boopie_pixel_set_wear(uint32_t worn);
+
 /* The accent of an expression (glow, rim light, sparkles, the UI round it),
  * 0xRRGGBB. The core ones are Muse's official accents. */
 uint32_t boopie_pixel_accent(boopie_expr_t e);
@@ -143,3 +165,8 @@ void boopie_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, in
  */
 void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t bg_mask,
                           const boopie_pixel_pose_t *pose);
+
+/* Where boopie_pixel_compose() puts the accessories worn on that frame, in
+ * grid cells: a hat's bottom centre x, y; a scarf's centre x, y and width.
+ * NULL wears none. */
+void boopie_pixel_set_slots(const float slots[5]);

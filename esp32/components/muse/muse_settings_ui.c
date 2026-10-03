@@ -1255,6 +1255,7 @@ static lv_obj_t *s_scene_checks[BOOPIE_SCENE_COUNT];
 static lv_obj_t *s_pet_line;
 #define SKIN_ROWS_MAX 32
 static lv_obj_t *s_skin_box, *s_skin_none_check, *s_skin_rows[SKIN_ROWS_MAX], *s_skin_checks[SKIN_ROWS_MAX];
+static lv_obj_t *s_acc_checks[BOOPIE_ACC_COUNT];
 static int s_avatar_shown = -1;
 
 static void on_avatar_choice(lv_event_t *e)
@@ -1274,6 +1275,14 @@ static void on_skin_choice(lv_event_t *e)
     }
 }
 
+/* An accessory row: put it on, or take it off. */
+static void on_acc_choice(lv_event_t *e)
+{
+    boopie_acc_t a = (boopie_acc_t)(intptr_t)lv_event_get_user_data(e);
+    const char *error = NULL;
+    boopie_avatar_set_accessory(a, !(boopie_avatar_accessories() & BOOPIE_ACC_BIT(a)), &error);
+}
+
 static void on_scene_choice(lv_event_t *e)
 {
     int i = (int)(intptr_t)lv_event_get_user_data(e);
@@ -1286,7 +1295,8 @@ static void on_scene_choice(lv_event_t *e)
 static void lock_or_tick(lv_obj_t *l, bool chosen, boopie_unlock_kind_t kind, int index)
 {
     int level;
-    if (index > 0 && !(kind == BOOPIE_UNLOCK_COLOUR && index == 1) && !boopie_avatar_unlocked(kind, index, &level)) {
+    bool from_start = kind != BOOPIE_UNLOCK_ACCESSORY && (index == 0 || (kind == BOOPIE_UNLOCK_COLOUR && index == 1));
+    if (!from_start && !boopie_avatar_unlocked(kind, index, &level)) {
         char buf[16];
         snprintf(buf, sizeof buf, "Lv %d", level);
         set_text(l, buf);
@@ -1346,6 +1356,10 @@ static void build_avatar_page(lv_obj_t *tile)
         snprintf(name, sizeof name, "%s%s", boopie_skin_name(i), boopie_skin_collector(i) ? " · 典藏" : "");
         s_skin_rows[i] = row(s_skin_box, NULL, name, &s_skin_checks[i], on_skin_choice, (void *)(intptr_t)i);
     }
+    note(list, "Accessory 配饰");
+    for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
+        row(list, NULL, boopie_acc_name((boopie_acc_t)i), &s_acc_checks[i], on_acc_choice, (void *)(intptr_t)i);
+    }
     note(list, "Background 背景");
     for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
         row(list, NULL, boopie_scene_name((boopie_scene_t)i), &s_scene_checks[i], on_scene_choice, (void *)(intptr_t)i);
@@ -1362,8 +1376,8 @@ static void tick_avatar(void)
     }
     boopie_pet_status_t pet;
     boopie_avatar_pet_status(&pet);
-    char line[64];
-    snprintf(line, sizeof line, "Lv %d  ·  %u/%u  ·  ★ %u", pet.level,
+    char line[96];
+    snprintf(line, sizeof line, "%s  ·  Lv %d  ·  %u/%u  ·  ★ %u", boopie_avatar_pet_name(), pet.level,
              (unsigned)pet.xp_into, (unsigned)pet.xp_need, (unsigned)pet.stars);
     set_text(s_pet_line, line);
     /* Skins: this character's only. */
@@ -1404,6 +1418,10 @@ static void tick_avatar(void)
         }
     }
 
+    uint32_t worn_acc = boopie_avatar_accessories();
+    for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
+        lock_or_tick(s_acc_checks[i], worn_acc & BOOPIE_ACC_BIT(i), BOOPIE_UNLOCK_ACCESSORY, i);
+    }
     boopie_scene_t scene = boopie_avatar_scene();
     for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
         lock_or_tick(s_scene_checks[i], i == (int)scene, BOOPIE_UNLOCK_SCENE, i);

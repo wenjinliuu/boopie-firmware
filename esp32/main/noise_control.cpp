@@ -1342,17 +1342,29 @@ static char *build_register_json(void) {
         "Idle background: default, stars, fireflies, snow, petals, bubbles, matrix, neon_grid or glitch."));
     cJSON_AddItemToObject(avatar_optional, "skin", string_param(
         "A skin the user has bought, by id (such as boopie_starry), or none."));
+    cJSON_AddItemToObject(avatar_optional, "accessory", string_param(
+        "An accessory for this character, unlocked by level: bow, crown, scarf or party_hat. "
+        "Put on, or taken off with on=false; one hat at a time."));
     cJSON *avatar_on = cJSON_CreateObject();
     cJSON_AddStringToObject(avatar_on, "type", "boolean");
-    cJSON_AddStringToObject(avatar_on, "description", "With reaction: on (default) or off.");
+    cJSON_AddStringToObject(avatar_on, "description", "With reaction or accessory: on (default) or off.");
     cJSON_AddItemToObject(avatar_optional, "on", avatar_on);
     add_command(commands, "pet.status",
-                "How the pet on the screen is: hungry or not, its mood, level, "
-                "experience and stars.",
+                "How the pet on the screen is: its name, hungry or not, its mood, "
+                "level, experience and stars.",
                 nullptr, nullptr);
+    cJSON *name_optional = cJSON_CreateObject();
+    cJSON_AddItemToObject(name_optional, "name", string_param(
+        "The pet's new name, up to 8 characters (Chinese is fine); empty goes back to "
+        "its character's own name (布比, 小克 ...)."));
+    add_command(commands, "pet.name",
+                "Name the pet on the screen, when the user gives it a name. Without "
+                "name, reports the current one. Call the user's pet by this name.",
+                nullptr, name_optional);
     add_command(commands, "display.avatar",
-                "Change the character on screen, its colour, its background, its "
-                "pet expression or a reaction. Without parameters, reports the current ones.",
+                "Change the character on screen, its colour, its background, its skin, "
+                "its accessories, its pet expression or a reaction. Without parameters, "
+                "reports the current ones.",
                 nullptr, avatar_optional);
 #endif
 

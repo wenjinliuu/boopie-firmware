@@ -64,9 +64,10 @@ class BoopiePixelTest(unittest.TestCase):
                              check=True).stdout
         return np.frombuffer(out, np.uint8).reshape(-1, N, N, 3)
 
-    def compare(self, jobs, scene: str | None = None, skin: str | None = None) -> None:
+    def compare(self, jobs, scene: str | None = None, skin: str | None = None, wear: tuple = ()) -> None:
         """jobs: (rig class, expression, t, overlay or None) each."""
-        tail = (f" scene:{scene}" if scene else "") + (f" skin:{skin}" if skin else "") + "\n"
+        tail = ((f" scene:{scene}" if scene else "") + (f" skin:{skin}" if skin else "")
+                + (f" wear:{','.join(wear)}" if wear else "") + "\n")
         lines = [f"{R.key} {e} {t!r} {o} {t!r}{tail}" if o else f"{R.key} {e} {t!r}{tail}" for R, e, t, o in jobs]
         frames = self.render_c(lines)
         loops = {n: ln for n, ln, _ in ap.EXPRESSIONS}
@@ -78,6 +79,7 @@ class BoopiePixelTest(unittest.TestCase):
                 p = ap.overlay(p, o, t, overlay_loops[o])
             if scene:
                 p.scene = scene
+            p.wear = wear
             want = ap.render(R(skin=ap.SKINS[skin] if skin else None), p)
             diff = float((want != got).any(-1).mean())
             diffs.append(diff)
@@ -123,6 +125,14 @@ class BoopiePixelTest(unittest.TestCase):
                     for name, length, _ in ap.EXPRESSIONS for i in range(0, round(length * ap.FPS), 4)]
             with self.subTest(skin=key):
                 self.compare(jobs, skin=key)
+
+    def test_accessories(self) -> None:
+        self.assertEqual(list(ap.ACCESSORIES), ["bow", "party_hat", "crown", "scarf"])
+        for hat in ("bow", "party_hat", "crown"):
+            jobs = [(R, name, i / ap.FPS, None) for R in ap.CHARACTERS
+                    for name, length, _ in ap.EXPRESSIONS for i in range(0, round(length * ap.FPS), 6)]
+            with self.subTest(wear=hat):
+                self.compare(jobs, wear=(hat, "scarf"))
 
     def test_characters(self) -> None:
         self.assertEqual([R.key for R in ap.CHARACTERS], ["boopie", "gpt", "codex", "klaude", "whale", "doubao"])

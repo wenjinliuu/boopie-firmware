@@ -89,6 +89,7 @@ static float s_pet_t;                  /* seconds in it */
 static bool s_blush, s_wide;           /* overlays: big blush, surprised eyes */
 static int s_pet_on;                   /* this frame's pet expression, or 0 */
 static boopie_muse_colours_t s_skin;   /* a skin's colours over the cream ones */
+static float s_slots[5];               /* where accessories go this frame: hat x, y; scarf x, y, width */
 static bool s_skin_on;
 
 void jolly_pixel_set_extra(int pet, float pet_t, bool blush, bool wide)
@@ -97,6 +98,14 @@ void jolly_pixel_set_extra(int pet, float pet_t, bool blush, bool wide)
     s_pet_t = pet_t;
     s_blush = blush;
     s_wide = wide;
+}
+
+/* Boopie: where this frame's accessories go, in grid cells: a hat's bottom
+ * centre on top of the hood, and a scarf's centre and width under the face. */
+bool jolly_pixel_slots(float out[5])
+{
+    memcpy(out, s_slots, sizeof(s_slots));
+    return true;
 }
 
 /* Boopie: a skin's colours, or NULL for Muse's own. */
@@ -1109,6 +1118,11 @@ void muse_pixel_render(const muse_pose_t *p)
     j.fb = 7.4f * squash;
     j.fx = j.cx + lean * 0.3f;
     j.fy = j.cy - j.b * 0.30f + bob * 0.3f;
+    s_slots[0] = j.cx;                  /* Boopie: accessories */
+    s_slots[1] = j.cy - j.b + 1.0f;
+    s_slots[2] = j.cx;
+    s_slots[3] = j.fy + j.fb + 1.5f;
+    s_slots[4] = j.a * 1.6f;
 
     /* ---- background layers ---- */
     float aura_r = 29.0f + level * 4.0f + sinf(t * 1.5f) * 1.0f;

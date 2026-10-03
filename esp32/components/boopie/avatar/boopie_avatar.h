@@ -18,12 +18,14 @@
  * character to the official renderer (avatar/muse_pixel.c, built with its
  * functions renamed jolly_pixel_*) and every other to boopie_pixel.c.
  *
- * Avatar 0 is Muse; 1 ... BOOPIE_CHAR_COUNT are boopie_char_t + 1. The choice
- * and each character's colour are kept in NVS (namespace "boopie") on the
- * device; the simulator takes them from BOOPIE_AVATAR and BOOPIE_COLOUR.
+ * Avatar 0 is Muse; 1 ... BOOPIE_CHAR_COUNT are boopie_char_t + 1; Boopie is
+ * shown until another is chosen. The choice and each character's colour are
+ * kept in NVS (namespace "boopie") on the device; the simulator takes them
+ * from BOOPIE_AVATAR and BOOPIE_COLOUR.
  */
 
 #define BOOPIE_AVATAR_MUSE 0
+#define BOOPIE_AVATAR_BOOPIE (BOOPIE_CHAR_BOOPIE + 1)
 #define BOOPIE_AVATAR_COUNT (BOOPIE_CHAR_COUNT + 1)
 
 /* Its id ("muse", "boopie") and display name; NULL out of range. */
@@ -68,10 +70,12 @@ void boopie_avatar_set_overlay(boopie_overlay_t overlay, bool on);
  * avatar is an id ("boopie"); colour is RRGGBB or "default"; pet an
  * expression id ("hungry", "idle" to clear); reaction an overlay id, turned
  * on or off; scene a background id ("stars"); skin an owned skin's id, or
- * "none". On a bad value returns false with *error set, changing nothing.
+ * "none"; accessory an id ("crown"), put on or taken off. On a bad value
+ * returns false with *error set, changing nothing.
  */
 bool boopie_avatar_command(const char *avatar, const char *colour, const char *pet, const char *reaction,
-                           const char *scene, const char *skin, bool on, const char **error);
+                           const char *scene, const char *skin, const char *accessory, bool on,
+                           const char **error);
 
 /* Skins (boopie_skin_*): the one the current character wears (-1 none),
  * whether one is owned, wear an owned one (-1 takes it off), and buy one with
@@ -82,6 +86,23 @@ int boopie_avatar_of_skin(int skin);   /* the avatar it's for */
 bool boopie_avatar_owns(int skin);
 bool boopie_avatar_wear(int skin, const char **error);
 bool boopie_avatar_buy(int skin, const char **error);
+
+/* Accessories (boopie_acc_t) the current character wears, BOOPIE_ACC_BIT()s;
+ * each character keeps its own. Put one on (a hat replaces the hat worn) or
+ * take it off; false with *error set if it isn't unlocked yet. */
+uint32_t boopie_avatar_accessories(void);
+bool boopie_avatar_set_accessory(boopie_acc_t acc, bool on, const char **error);
+
+/*
+ * The pet's name: the one the user gave it, or else its character's ("布比",
+ * "小克" ... follows the character chosen). Setting "" goes back to the
+ * character's. At most BOOPIE_PET_NAME_CHARS characters, kept in NVS.
+ */
+#define BOOPIE_PET_NAME_CHARS 8
+#define BOOPIE_PET_NAME_MAX 40   /* bytes, with the terminator */
+const char *boopie_avatar_pet_name(void);
+bool boopie_avatar_has_own_name(void);
+bool boopie_avatar_set_pet_name(const char *name, const char **error);
 
 /* ---- the pet (pet/boopie_pet.c), kept here with the rest ---- */
 

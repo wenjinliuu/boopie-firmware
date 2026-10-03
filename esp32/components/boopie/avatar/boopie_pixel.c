@@ -1231,6 +1231,7 @@ static void pt(const frame_t *f, float x, float y, float *sx, float *sy)
     *sx = f->cx + (x - f->cx) * f->sx + f->dx + f->tilt * (*sy - f->dy - f->base);
 }
 
+
 /* ---------------------------------------------------------------- faces */
 
 static void eye(float ex, float ey, const pose_t *p, int side, bool square)
@@ -1410,11 +1411,21 @@ static void blush(float fx, float fy, const pose_t *p, int dx_cheek, rgb_t colou
 
 typedef struct {
     float face_x, face_y, body_x, body_y, light_x, light_y;
-    float neck_x, neck_y;                  /* Doubao: where a scarf goes, for skins */
+    float hat_x, hat_y;                    /* accessory slots: a hat's bottom centre, */
+    float neck_x, neck_y, neck_w;          /* a scarf's centre and width */
     bool show_face;
     bool has_screen;                       /* Codex: its screen, for skins */
     float screen_x0, screen_y0, screen_x1, screen_y1;
 } anchors_t;
+
+/* Where accessories go, in rest coordinates: a hat's bottom centre, and a
+ * scarf's centre and width. */
+static void slots(const frame_t *f, anchors_t *a, float hx, float hy, float nx, float ny, float w)
+{
+    pt(f, hx, hy, &a->hat_x, &a->hat_y);
+    pt(f, nx, ny, &a->neck_x, &a->neck_y);
+    a->neck_w = w * f->sx;
+}
 
 /* The live skin's colours (EYE, CHEEK and Codex's own without one). */
 static rgb_t s_eye_base = { 30, 22, 46 };
@@ -1518,6 +1529,7 @@ static void draw_boopie(const rig_t *r, const pose_t *p, anchors_t *a)
     outline(body, s_rp.out);
     antenna(&f, cx + 3, cy - ry + 1, p, s_rp.out, 2.4f, light_colour(p), s_rp.out, &a->light_x, &a->light_y);
     pt(&f, cx, cy - 1, &a->face_x, &a->face_y);
+    slots(&f, a, 27, 27, cx, 47, 26);
     pt(&f, cx, cy, &a->body_x, &a->body_y);
     a->show_face = p->scale > 0.6f;
 }
@@ -1578,6 +1590,7 @@ static void draw_gpt(const rig_t *r, const pose_t *p, anchors_t *a)
     pt(&f, cx, cy - 1, &a->face_x, &a->face_y);
     pt(&f, cx, cy, &a->body_x, &a->body_y);
     pt(&f, 42, 17, &a->light_x, &a->light_y);
+    slots(&f, a, 25, 29, cx, 48, 24);
     a->show_face = true;
 }
 
@@ -1631,6 +1644,7 @@ static void draw_codex(const rig_t *r, const pose_t *p, anchors_t *a)
     pt(&f, 32, 27, &a->face_x, &a->face_y);
     pt(&f, 32, 40, &a->body_x, &a->body_y);
     pt(&f, 44, 14, &a->light_x, &a->light_y);
+    slots(&f, a, 31, 10, 32, 38, 16);
     a->show_face = p->scale > 0.6f;
 }
 
@@ -1712,6 +1726,7 @@ static void draw_klaude(const rig_t *r, const pose_t *p, anchors_t *a)
     pt(&f, 32, 30, &a->face_x, &a->face_y);
     pt(&f, 32, 35, &a->body_x, &a->body_y);
     pt(&f, 44, 16, &a->light_x, &a->light_y);
+    slots(&f, a, 32, 23, 32, 42, 30);
     a->show_face = p->scale > 0.6f;
 }
 
@@ -1782,6 +1797,7 @@ static void draw_whale(const rig_t *r, const pose_t *p, anchors_t *a)
         put(hx + SPRAY[i][0], hy + SPRAY[i][1], col);
     }
     pt(&f, cx, cy - 2, &a->face_x, &a->face_y);
+    slots(&f, a, 37, 27, cx, 47, 24);
     pt(&f, cx, cy, &a->body_x, &a->body_y);
     a->light_x = hx;
     a->light_y = hy - h - 1;
@@ -1844,7 +1860,7 @@ static void draw_doubao(const rig_t *r, const pose_t *p, anchors_t *a)
     pt(&f, 32, 30, &a->face_x, &a->face_y);
     pt(&f, 32, 44, &a->body_x, &a->body_y);
     pt(&f, 45, 16, &a->light_x, &a->light_y);
-    pt(&f, 32, 43, &a->neck_x, &a->neck_y);
+    slots(&f, a, 29, 11, 32, 43, 12);
     a->show_face = p->scale > 0.6f;
 }
 
@@ -2417,6 +2433,107 @@ bool boopie_skin_muse_colours(int skin, boopie_muse_colours_t *out)
     return true;
 }
 
+/* ---------------------------------------------------------------- accessories */
+
+/* As the prototype's ACCESSORIES and HAT_SPRITES. */
+typedef struct {
+    const char *key, *name;
+    const char *const *rows;   /* a hat's sprite, NULL for the scarf */
+    int nrows;
+    const char *keys;          /* its colour letters ... */
+    const uint32_t *colours;   /* ... and their colours */
+} acc_t;
+
+static const char *const BOW_ROWS[] = { "##.....##", "#pp#.#pp#", "#ppp#ppp#", "#pp#.#pp#", "##.....##" };
+static const uint32_t BOW_COLOURS[] = { 0x962850, 0xff78aa };
+static const char *const CROWN_ROWS[] = { "g...g...g", "gg.ggg.gg", "ggggggggg", "grgggggbg", "ddddddddd" };
+static const uint32_t CROWN_COLOURS[] = { 0xffd246, 0xbe821e, 0xf03c50, 0x50aaff };
+static const char *const PARTY_ROWS[] = { "...w...", "..www..", "...#...", "..#p#..", "..#y#..", ".#ppp#.", ".#yyy#.",
+                                          "#ppppp#", "#######" };
+static const uint32_t PARTY_COLOURS[] = { 0xffffff, 0x3c286e, 0x78c8ff, 0xffdc5a };
+
+static const acc_t ACCS[BOOPIE_ACC_COUNT] = {
+    [BOOPIE_ACC_BOW] = { "bow", "蝴蝶结", BOW_ROWS, 5, "#p", BOW_COLOURS },
+    [BOOPIE_ACC_CROWN] = { "crown", "小皇冠", CROWN_ROWS, 5, "gdrb", CROWN_COLOURS },
+    [BOOPIE_ACC_SCARF] = { "scarf", "红围巾", NULL, 0, NULL, NULL },
+    [BOOPIE_ACC_PARTY_HAT] = { "party_hat", "生日帽", PARTY_ROWS, 9, "w#py", PARTY_COLOURS },
+};
+
+static uint32_t s_wear;
+
+const char *boopie_acc_key(boopie_acc_t a)
+{
+    return (int)a >= 0 && a < BOOPIE_ACC_COUNT ? ACCS[a].key : NULL;
+}
+
+const char *boopie_acc_name(boopie_acc_t a)
+{
+    return (int)a >= 0 && a < BOOPIE_ACC_COUNT ? ACCS[a].name : NULL;
+}
+
+bool boopie_acc_is_hat(boopie_acc_t a)
+{
+    return (int)a >= 0 && a < BOOPIE_ACC_COUNT && ACCS[a].rows != NULL;
+}
+
+bool boopie_acc_from_key(const char *key, boopie_acc_t *out)
+{
+    for (int i = 0; key && i < BOOPIE_ACC_COUNT; i++) {
+        if (strcmp(ACCS[i].key, key) == 0) {
+            *out = (boopie_acc_t)i;
+            return true;
+        }
+    }
+    return false;
+}
+
+void boopie_pixel_set_wear(uint32_t worn)
+{
+    s_wear = worn & (BOOPIE_ACC_BIT(BOOPIE_ACC_COUNT) - 1);
+}
+
+static void wear(boopie_acc_t which, const anchors_t *a)
+{
+    const acc_t *ac = &ACCS[which];
+    if (ac->rows) {   /* a hat, its bottom row on the slot */
+        int w = (int)strlen(ac->rows[0]);
+        int x0 = (int)rint(a->hat_x - w / 2.0), y0 = (int)rint(a->hat_y) - ac->nrows + 1;
+        for (int j = 0; j < ac->nrows; j++) {
+            for (int i = 0; i < w; i++) {
+                const char *k = strchr(ac->keys, ac->rows[j][i]);
+                if (k && *k) {
+                    put(x0 + i, y0 + j, hex(ac->colours[k - ac->keys]));
+                }
+            }
+        }
+        return;
+    }
+    const rgb_t red = { 230, 60, 70 }, dark = { 160, 30, 45 };   /* the scarf */
+    double nx = a->neck_x, ny = a->neck_y, w = a->neck_w;
+    int half = (int)rint(w / 2);
+    for (int dx = -half; dx <= half; dx++) {
+        for (int dy = 0; dy < 3; dy++) {
+            putd(nx + dx, ny + dy, pymod(dx + dy, 4) == 0 ? dark : red);
+        }
+    }
+    for (int dy = 3; dy < 8; dy++) {   /* the tail */
+        for (int dx = 0; dx < 2; dx++) {
+            putd(nx + w / 4 + dx + (dy > 5), ny + dy, dy == 7 ? dark : red);
+        }
+    }
+}
+
+/* All worn, in the prototype's order: hats, then the scarf. */
+static void wear_all(const anchors_t *a)
+{
+    static const boopie_acc_t ORDER[] = { BOOPIE_ACC_BOW, BOOPIE_ACC_PARTY_HAT, BOOPIE_ACC_CROWN, BOOPIE_ACC_SCARF };
+    for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
+        if (s_wear & BOOPIE_ACC_BIT(ORDER[i])) {
+            wear(ORDER[i], a);
+        }
+    }
+}
+
 void boopie_pixel_set_skin(int skin)
 {
     s_skin = skin_at(skin) ? skin : -1;
@@ -2572,6 +2689,7 @@ static void render(const rig_t *rig, const pose_t *pose)
             skin_face(sk, &an);
         }
     }
+    wear_all(&an);
     if (pose->laptop) {
         icon(I_LAPTOP, rintf(an.body_x) - 7, rintf(an.body_y) + 8);
     }
@@ -2756,6 +2874,21 @@ static void to_565_all(void)
     }
 }
 
+static anchors_t s_slots;
+static bool s_slots_set;
+
+void boopie_pixel_set_slots(const float slots[5])
+{
+    s_slots_set = slots != NULL;
+    if (slots) {
+        s_slots.hat_x = slots[0];
+        s_slots.hat_y = slots[1];
+        s_slots.neck_x = slots[2];
+        s_slots.neck_y = slots[3];
+        s_slots.neck_w = slots[4];
+    }
+}
+
 void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t bg_mask,
                           const boopie_pixel_pose_t *in)
 {
@@ -2786,6 +2919,9 @@ void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t b
         }
     }
     scene_front(scene, in->scene_t);
+    if (s_slots_set) {
+        wear_all(&s_slots);
+    }
     static pose_t pose;   /* the overlays draw at fixed places */
     memset(&pose, 0, sizeof(pose));
     pose.light_level = 1;

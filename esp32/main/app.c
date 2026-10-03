@@ -1877,8 +1877,11 @@ static cJSON *on_ws_command(
         char *reaction = json_strdup_string(params, "reaction");
         char *scene = json_strdup_string(params, "background");
         char *skin = json_strdup_string(params, "skin");
+        char *accessory = json_strdup_string(params, "accessory");
         const char *error = NULL;
-        bool ok = boopie_avatar_command(avatar, colour, pet, reaction, scene, skin, !cJSON_IsFalse(on), &error);
+        bool ok = boopie_avatar_command(avatar, colour, pet, reaction, scene, skin, accessory,
+                                        !cJSON_IsFalse(on), &error);
+        free(accessory);
         free(scene);
         free(skin);
         free(avatar);
@@ -1893,6 +1896,12 @@ static cJSON *on_ws_command(
         cJSON_AddStringToObject(result, "background", boopie_scene_key(boopie_avatar_scene()));
         int worn = boopie_avatar_skin();
         cJSON_AddStringToObject(result, "skin", worn >= 0 ? boopie_skin_key(worn) : "none");
+        cJSON *accessories = cJSON_AddArrayToObject(result, "accessories");
+        for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
+            if (boopie_avatar_accessories() & BOOPIE_ACC_BIT(i)) {
+                cJSON_AddItemToArray(accessories, cJSON_CreateString(boopie_acc_key((boopie_acc_t)i)));
+            }
+        }
         return result;
     }
 #endif
@@ -1903,12 +1912,25 @@ static cJSON *on_ws_command(
         boopie_avatar_pet_status(&st);
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "name", boopie_avatar_pet_name());
         cJSON_AddBoolToObject(result, "hungry", st.hungry);
         cJSON_AddStringToObject(result, "mood", boopie_expr_name(st.mood));
         cJSON_AddNumberToObject(result, "level", st.level);
         cJSON_AddNumberToObject(result, "xp_into_level", st.xp_into);
         cJSON_AddNumberToObject(result, "xp_for_level", st.xp_need);
         cJSON_AddNumberToObject(result, "stars", st.stars);
+        return result;
+    }
+    if (strcmp(command, "pet.name") == 0) {
+        char *name = json_strdup_string(params, "name");
+        const char *error = NULL;
+        bool ok = !name || boopie_avatar_set_pet_name(name, &error);
+        free(name);
+        if (!ok) return command_error("bad_param", error);
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "name", boopie_avatar_pet_name());
+        cJSON_AddBoolToObject(result, "own_name", boopie_avatar_has_own_name());
         return result;
     }
 #endif
