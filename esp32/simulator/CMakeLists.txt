@@ -181,8 +181,10 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/game/boopie_whack.c"
     # Boopie: the Chinese and English text font.
     "${BOOPIE_COMPONENT_DIR}/font/boopie_font.c"
-    "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_font.c"
-    "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_glyphs.c"
+    "${BOOPIE_COMPONENT_DIR}/boopie_text.c"
+    "${BOOPIE_COMPONENT_DIR}/font/boopie_ui_metrics.c"
+    "${BOOPIE_COMPONENT_DIR}/font/boopie_ui_metrics_data.c"
+    src/sim_ui_font.c
 )
 
 target_include_directories(muse_simulator PRIVATE
@@ -278,3 +280,8 @@ endif()
 
 message(STATUS "Muse simulator LVGL target: ${MUSE_SIM_LVGL_TARGET}")
 message(STATUS "Muse simulator SDL2 target: ${MUSE_SIM_SDL_TARGET}")
+
+# Boopie: the UI font, linked in as the firmware links it (src/sim_ui_font.c).
+set_source_files_properties(src/sim_ui_font.c PROPERTIES
+    COMPILE_DEFINITIONS "BOOPIE_UI_FONT=\"${BOOPIE_COMPONENT_DIR}/font/ui.otf\""
+    OBJECT_DEPENDS "${BOOPIE_COMPONENT_DIR}/font/ui.otf")

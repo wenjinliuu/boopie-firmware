@@ -100,7 +100,8 @@ void muse_hatch_tail_words(const char *src, char *out, size_t cap)
 /*
  * The next line of `text` wrapped to `cols` columns as the caption shows
  * them (an ellipsis as three dots, muse_text.h), splitting only words longer
- * than a line. Boopie: a Chinese character takes two columns, and a line may
+ * than a line. Boopie: a Chinese character takes two columns (or the screen
+ * measures each character: boopie_text_set_measure), and a line may
  * break between Chinese characters, but not before closing punctuation or
  * after opening punctuation (boopie_text.h).
  */
@@ -112,15 +113,22 @@ static bool next_line(const char **text, int cols, const char **start, size_t *l
     }
     const char *end = p, *brk = NULL;
     uint32_t prev = 0;
-    int n = 0;
+    int n = 0, room = cols * boopie_text_col_width();
     while (*end && *end != '\n') {
         size_t bytes, cp_len;
         char shown[4];
         int w = muse_text_ascii(end, &bytes, shown);
         uint32_t cp = boopie_text_decode(end, &cp_len);
-        w = w < 0 ? boopie_text_cols(cp) : w;
+        if (w < 0) {
+            w = boopie_text_width(cp);
+        } else {
+            int stand_in = w;   /* the stand-in's characters, as drawn */
+            for (int i = w = 0; i < stand_in; i++) {
+                w += boopie_text_width((unsigned char)shown[i]);
+            }
+        }
         bool can_break = n && boopie_text_can_break(prev, cp);
-        if (n + w > cols && n) {
+        if (n + w > room && n) {
             if (can_break) {
                 brk = end;
             }

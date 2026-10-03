@@ -16,11 +16,14 @@ set(srcs
     "store/boopie_assets.c"
     "sound/boopie_sound.c"
     "boopie_text.c"
-    "font/boopie_pixel_font.c"
-    "font/boopie_pixel_glyphs.c")
+    "font/boopie_ui_metrics.c"
+    "font/boopie_ui_metrics_data.c")
+set(embed)
 if(CONFIG_MUSE_ENABLED)
     # LVGL comes from idf_component.yml, on the same boards as Muse's UI.
     list(APPEND srcs "font/boopie_font.c")
+    # The UI font itself (font/boopie_font.h), 1.5 MB.
+    list(APPEND embed "font/ui.otf")
     # The clock (NTP) and the IMU, on the device only.
     list(APPEND srcs "device/boopie_clock.c" "device/boopie_imu.c")
     # The user data partition (LittleFS, from idf_component.yml).
@@ -29,6 +32,7 @@ endif()
 
 idf_component_register(
     SRCS ${srcs}
+    EMBED_FILES ${embed}
     INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup"
     REQUIRES esp_driver_i2c
     PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs
