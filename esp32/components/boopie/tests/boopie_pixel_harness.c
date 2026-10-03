@@ -4,7 +4,7 @@
  */
 
 /* Renders frames for test_boopie_pixel.py. Each stdin line is
- *   <character> <expression> <t> [<overlay> <overlay_t>] [scene:<scene>]
+ *   <character> <expression> <t> [<overlay> <overlay_t>] [scene:<scene>] [skin:<skin>]
  * (the scene runs on the same clock as the expression)
  * and gets one frame on stdout, BOOPIE_PX x BOOPIE_PX x 3 bytes of RGB. A
  * line "time" instead prints the mean milliseconds a frame takes. */
@@ -46,6 +46,12 @@ int main(void)
             printf("%.3f\n", (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC / n);
             continue;
         }
+        char skin[32] = "";
+        char *kp = strstr(line, "skin:");
+        if (kp) {
+            sscanf(kp + 5, "%31s", skin);
+            *kp = '\0';
+        }
         char scene[32] = "";
         char *sp = strstr(line, "scene:");
         if (sp) {
@@ -81,6 +87,7 @@ int main(void)
                 return 1;
             }
         }
+        boopie_pixel_set_skin(skin[0] ? boopie_skin_from_key(skin) : -1);
         boopie_pixel_set_character((boopie_char_t)c, BOOPIE_COLOUR_DEFAULT);
         boopie_pixel_render(&p);
         fwrite(boopie_pixel_rgb(), 1, BOOPIE_PX * BOOPIE_PX * 3, stdout);

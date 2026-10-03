@@ -6,7 +6,8 @@
 sheets, so UI changes can be checked from CI without a board: Muse's own
 character in every state (contact-sheet.png), every character in a few
 (avatars.png), the pet expressions and overlays on Boopie and Muse (pets.png),
-and both in every background (scenes.png).
+both in every background (scenes.png), and each skin beside its
+character without it (skins.png).
 
   python3 tools/boopie/sim_shots.py --binary build/simulator/muse_simulator --out shots
 
@@ -111,6 +112,22 @@ def render_scenes(binary: Path, out: Path) -> list[Path]:
                 for avatar in ("muse", "boopie") for scene in SCENES]
 
 
+SKINS = [("boopie", "boopie_starry"), ("codex", "codex_terminal")]
+
+
+def render_skins(binary: Path, out: Path) -> list[Path]:
+    """Each skin, and its character without it, in a few states."""
+    pngs = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for avatar, skin in SKINS:
+            for name, face, extra, advance in AVATAR_STATES:
+                for worn in (None, skin):
+                    env = {"BOOPIE_AVATAR": avatar, **({"BOOPIE_SKIN": worn} if worn else {})}
+                    pngs.append(shoot(binary, Path(tmp), out / f"skin-{worn or avatar}-{name}.png",
+                                      [f"face={face}", *extra], env, advance))
+    return pngs
+
+
 def render_pets(binary: Path, out: Path) -> list[Path]:
     with tempfile.TemporaryDirectory() as tmp:
         return [shoot(binary, Path(tmp), out / f"pet-{avatar}-{name}.png", ["face=idle"],
@@ -147,7 +164,10 @@ def main() -> int:
     contact_sheet(pets, args.out / "pets.png", cols=6)
     scenes = render_scenes(args.binary, args.out)
     contact_sheet(scenes, args.out / "scenes.png", cols=len(SCENES))
-    print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes)} screenshots in {args.out}", file=sys.stderr)
+    skins = render_skins(args.binary, args.out)
+    contact_sheet(skins, args.out / "skins.png", cols=4)
+    print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes) + len(skins)} screenshots in {args.out}",
+          file=sys.stderr)
     return 0
 
 

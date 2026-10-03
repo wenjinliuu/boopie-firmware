@@ -65,9 +65,12 @@ static bool s_muse_composed;   /* the last Muse frame went through boopie_pixel_
 static bool s_loaded;
 static void ensure_loaded(void);
 static void save(void);
+static void apply(void);
 static int s_avatar = BOOPIE_AVATAR_MUSE;
 static uint32_t s_colour[BOOPIE_AVATAR_COUNT];
 static boopie_scene_t s_scene = BOOPIE_SCENE_DEFAULT;
+static int s_worn[BOOPIE_AVATAR_COUNT];   /* the skin each character wears, or -1 */
+static uint32_t s_owned;                  /* bit per skin index */
 
 /* The pet, ticked from the frames, and what it shows while idle. */
 static boopie_pet_t s_pet_state;
@@ -142,6 +145,66 @@ void boopie_avatar_set_scene(boopie_scene_t scene)
     save();
 }
 
+int boopie_avatar_skin(void)
+{
+    ensure_loaded();
+    return s_worn[s_avatar];
+}
+
+bool boopie_avatar_owns(int skin)
+{
+    ensure_loaded();
+    return skin >= 0 && skin < boopie_skin_count() && (s_owned >> skin & 1u);
+}
+
+bool boopie_avatar_wear(int skin, const char **error)
+{
+    ensure_loaded();
+    if (skin >= 0 && (int)boopie_skin_character(skin) + 1 != s_avatar) {
+        *error = "that skin is for another character";
+        return false;
+    }
+    if (skin >= 0 && !boopie_avatar_owns(skin)) {
+        *error = "that skin isn't bought yet";
+        return false;
+    }
+    s_worn[s_avatar] = skin < 0 ? -1 : skin;
+    apply();
+    save();
+    return true;
+}
+
+bool boopie_avatar_buy(int skin, const char **error)
+{
+    ensure_loaded();
+    if (skin < 0 || skin >= boopie_skin_count()) {
+        *error = "no such skin";
+        return false;
+    }
+    if (!boopie_avatar_owns(skin)) {
+        uint32_t price = (uint32_t)boopie_skin_price(skin);
+        if (s_pet_state.stars < price) {
+            *error = "not enough stars";
+            return false;
+        }
+        s_pet_state.stars -= price;
+        s_owned |= 1u << skin;
+    }
+    s_worn[boopie_skin_character(skin) + 1] = skin;
+    apply();
+    save();
+    return true;
+}
+
+/* The background shown: the one chosen, else the worn skin's own. */
+static boopie_scene_t shown_scene(void)
+{
+    if (s_scene == BOOPIE_SCENE_DEFAULT && s_avatar != BOOPIE_AVATAR_MUSE && s_worn[s_avatar] >= 0) {
+        return boopie_skin_scene(s_worn[s_avatar]);
+    }
+    return s_scene;
+}
+
 bool boopie_avatar_recolourable(int avatar)
 {
     return avatar > BOOPIE_AVATAR_MUSE && avatar < BOOPIE_AVATAR_COUNT;
@@ -150,6 +213,7 @@ bool boopie_avatar_recolourable(int avatar)
 static void apply(void)
 {
     if (s_avatar != BOOPIE_AVATAR_MUSE) {
+        boopie_pixel_set_skin(s_worn[s_avatar]);
         boopie_pixel_set_character((boopie_char_t)(s_avatar - 1), s_colour[s_avatar]);
     }
 }
@@ -176,6 +240,16 @@ static void load(void)
         char ck[16];
         snprintf(ck, sizeof ck, "c_%s", boopie_avatar_key(i));
         nvs_get_u32(h, ck, &s_colour[i]);
+    }
+    nvs_get_u32(h, "owned", &s_owned);
+    for (int i = 1; i < BOOPIE_AVATAR_COUNT; i++) {
+        char wk[16], sk[24];
+        size_t sn = sizeof sk;
+        snprintf(wk, sizeof wk, "w_%s", boopie_avatar_key(i));
+        if (nvs_get_str(h, wk, sk, &sn) == ESP_OK) {
+            int k = boopie_skin_from_key(sk);
+            s_worn[i] = k >= 0 && (s_owned >> k & 1u) ? k : -1;
+        }
     }
     size_t pn = sizeof s_pet_state;
     boopie_pet_t saved;
@@ -205,6 +279,12 @@ static void save(void)
         nvs_set_u32(h, ck, s_colour[i]);
     }
     nvs_set_str(h, "scene", boopie_scene_key(s_scene));
+    nvs_set_u32(h, "owned", s_owned);
+    for (int i = 1; i < BOOPIE_AVATAR_COUNT; i++) {
+        char wk[16];
+        snprintf(wk, sizeof wk, "w_%s", boopie_avatar_key(i));
+        nvs_set_str(h, wk, s_worn[i] >= 0 ? boopie_skin_key(s_worn[i]) : "");
+    }
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_commit(h);
     nvs_close(h);
@@ -233,6 +313,11 @@ static void load(void)
     if (getenv("BOOPIE_PET_HUNGRY")) {   /* hungry from the start, as in the day */
         s_pet_state.hungry = 1;
         s_pet_state.hungry_since = (int64_t)time(NULL);
+    }
+    int skin = boopie_skin_from_key(getenv("BOOPIE_SKIN"));
+    if (skin >= 0) {   /* owned and worn by its character */
+        s_owned |= 1u << skin;
+        s_worn[boopie_skin_character(skin) + 1] = skin;
     }
     int sc = scene_from_key(getenv("BOOPIE_SCENE"));
     if (sc >= 0) {
@@ -267,6 +352,7 @@ static void ensure_loaded(void)
 #endif
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         s_colour[i] = BOOPIE_COLOUR_DEFAULT;
+        s_worn[i] = -1;
     }
     boopie_pet_init(&s_pet_state);
     load();
@@ -337,9 +423,20 @@ void boopie_avatar_set_overlay(boopie_overlay_t overlay, bool on)
 }
 
 bool boopie_avatar_command(const char *avatar, const char *colour, const char *pet, const char *reaction,
-                           const char *scene, bool on, const char **error)
+                           const char *scene, const char *skin, bool on, const char **error)
 {
-    int a = -1, sc = -1;
+    int a = -1, sc = -1, sk = -2;
+    if (skin) {
+        sk = strcmp(skin, "none") == 0 ? -1 : boopie_skin_from_key(skin);
+        if (sk == -1 && strcmp(skin, "none") != 0) {
+            *error = "unknown skin";
+            return false;
+        }
+        if (sk >= 0 && !boopie_avatar_owns(sk)) {
+            *error = "that skin isn't bought yet";
+            return false;
+        }
+    }
     if (scene && (sc = scene_from_key(scene)) < 0) {
         *error = "unknown background";
         return false;
@@ -394,6 +491,12 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
     }
     if (sc >= 0) {
         boopie_avatar_set_scene((boopie_scene_t)sc);
+    }
+    if (sk >= 0 && (int)boopie_skin_character(sk) + 1 != boopie_avatar_current()) {
+        boopie_avatar_select((int)boopie_skin_character(sk) + 1);   /* wearing it means showing that character */
+    }
+    if (sk != -2) {
+        return boopie_avatar_wear(sk, error);
     }
     return true;
 }
@@ -638,7 +741,7 @@ void muse_pixel_render(const muse_pose_t *p)
     }
     s_shown_overlays = on;
     bp.overlays = on;
-    bp.scene = p->mode == MUSE_MODE_OFF ? BOOPIE_SCENE_DEFAULT : s_scene;
+    bp.scene = p->mode == MUSE_MODE_OFF ? BOOPIE_SCENE_DEFAULT : shown_scene();
     bp.scene_t = p->t;
     if (s_avatar == BOOPIE_AVATAR_MUSE) {
         /* Muse's own renderer draws the expression, a pet one included, and

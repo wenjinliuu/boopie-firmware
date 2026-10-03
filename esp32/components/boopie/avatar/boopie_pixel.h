@@ -70,6 +70,24 @@ uint32_t boopie_char_default_colour(boopie_char_t c);
 #define BOOPIE_COLOUR_DEFAULT 0xffffffffu
 void boopie_pixel_set_character(boopie_char_t c, uint32_t colour);
 
+/*
+ * Skins: a character restyled (colours, patterns, a background), bought with
+ * stars. Indexed 0 ... boopie_skin_count() - 1, in a fixed order (only ever
+ * appended), so the index is what's kept of what's owned.
+ */
+int boopie_skin_count(void);
+const char *boopie_skin_key(int skin);          /* "boopie_starry" */
+const char *boopie_skin_name(int skin);         /* "星空" */
+boopie_char_t boopie_skin_character(int skin);  /* the character it's for */
+int boopie_skin_price(int skin);                /* stars */
+bool boopie_skin_collector(int skin);           /* 典藏 */
+boopie_scene_t boopie_skin_scene(int skin);     /* the background it brings */
+int boopie_skin_from_key(const char *key);      /* or -1 */
+
+/* Wear a skin (-1 for none) from the next boopie_pixel_set_character(); one
+ * for another character is ignored. */
+void boopie_pixel_set_skin(int skin);
+
 /* The accent of an expression (glow, rim light, sparkles, the UI round it),
  * 0xRRGGBB. The core ones are Muse's official accents. */
 uint32_t boopie_pixel_accent(boopie_expr_t e);

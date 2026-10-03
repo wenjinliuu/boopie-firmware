@@ -1340,6 +1340,8 @@ static char *build_register_json(void) {
         "Effect over any expression: surprise, blush, confetti or hearts. Turned on, or off with on=false."));
     cJSON_AddItemToObject(avatar_optional, "background", string_param(
         "Idle background: default, stars, fireflies, snow, petals, bubbles, matrix, neon_grid or glitch."));
+    cJSON_AddItemToObject(avatar_optional, "skin", string_param(
+        "A skin the user has bought, by id (boopie_starry, codex_terminal), or none."));
     cJSON *avatar_on = cJSON_CreateObject();
     cJSON_AddStringToObject(avatar_on, "type", "boolean");
     cJSON_AddStringToObject(avatar_on, "description", "With reaction: on (default) or off.");

@@ -1876,9 +1876,11 @@ static cJSON *on_ws_command(
         char *pet = json_strdup_string(params, "expression");
         char *reaction = json_strdup_string(params, "reaction");
         char *scene = json_strdup_string(params, "background");
+        char *skin = json_strdup_string(params, "skin");
         const char *error = NULL;
-        bool ok = boopie_avatar_command(avatar, colour, pet, reaction, scene, !cJSON_IsFalse(on), &error);
+        bool ok = boopie_avatar_command(avatar, colour, pet, reaction, scene, skin, !cJSON_IsFalse(on), &error);
         free(scene);
+        free(skin);
         free(avatar);
         free(colour);
         free(pet);
@@ -1889,6 +1891,8 @@ static cJSON *on_ws_command(
         cJSON_AddStringToObject(result, "avatar", boopie_avatar_key(boopie_avatar_current()));
         cJSON_AddStringToObject(result, "expression", boopie_expr_name(boopie_avatar_pet()));
         cJSON_AddStringToObject(result, "background", boopie_scene_key(boopie_avatar_scene()));
+        int worn = boopie_avatar_skin();
+        cJSON_AddStringToObject(result, "skin", worn >= 0 ? boopie_skin_key(worn) : "none");
         return result;
     }
 #endif

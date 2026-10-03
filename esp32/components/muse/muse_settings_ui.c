@@ -1253,11 +1253,25 @@ static lv_obj_t *s_colour_checks[AVATAR_COLOUR_COUNT];
 static lv_obj_t *s_colour_box, *s_colour_default_swatch;
 static lv_obj_t *s_scene_checks[BOOPIE_SCENE_COUNT];
 static lv_obj_t *s_pet_line;
+#define SKIN_ROWS_MAX 32
+static lv_obj_t *s_skin_box, *s_skin_none_check, *s_skin_rows[SKIN_ROWS_MAX], *s_skin_checks[SKIN_ROWS_MAX];
 static int s_avatar_shown = -1;
 
 static void on_avatar_choice(lv_event_t *e)
 {
     boopie_avatar_select((int)(intptr_t)lv_event_get_user_data(e));
+}
+
+/* A skin row: wear it if owned, else buy it (if there are stars enough). */
+static void on_skin_choice(lv_event_t *e)
+{
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    const char *error = NULL;
+    if (i < 0 || boopie_avatar_owns(i)) {
+        boopie_avatar_wear(i, &error);
+    } else {
+        boopie_avatar_buy(i, &error);
+    }
 }
 
 static void on_scene_choice(lv_event_t *e)
@@ -1324,6 +1338,14 @@ static void build_avatar_page(lv_obj_t *tile)
             s_colour_default_swatch = sw;
         }
     }
+    s_skin_box = column(list);
+    note(s_skin_box, "Skin 皮肤");
+    row(s_skin_box, NULL, "原样 Default", &s_skin_none_check, on_skin_choice, (void *)(intptr_t)-1);
+    for (int i = 0; i < boopie_skin_count() && i < SKIN_ROWS_MAX; i++) {
+        char name[48];
+        snprintf(name, sizeof name, "%s%s", boopie_skin_name(i), boopie_skin_collector(i) ? " · 典藏" : "");
+        s_skin_rows[i] = row(s_skin_box, NULL, name, &s_skin_checks[i], on_skin_choice, (void *)(intptr_t)i);
+    }
     note(list, "Background 背景");
     for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
         row(list, NULL, boopie_scene_name((boopie_scene_t)i), &s_scene_checks[i], on_scene_choice, (void *)(intptr_t)i);
@@ -1344,6 +1366,44 @@ static void tick_avatar(void)
     snprintf(line, sizeof line, "Lv %d  ·  %u/%u  ·  ★ %u", pet.level,
              (unsigned)pet.xp_into, (unsigned)pet.xp_need, (unsigned)pet.stars);
     set_text(s_pet_line, line);
+    /* Skins: this character's only; none yet for Muse's own. */
+    bool any = false;
+    int worn = boopie_avatar_skin();
+    for (int i = 0; i < boopie_skin_count() && i < SKIN_ROWS_MAX; i++) {
+        bool mine = (int)boopie_skin_character(i) + 1 == cur;
+        any |= mine;
+        if (mine == lv_obj_has_flag(s_skin_rows[i], LV_OBJ_FLAG_HIDDEN)) {
+            if (mine) {
+                lv_obj_remove_flag(s_skin_rows[i], LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_add_flag(s_skin_rows[i], LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+        if (!mine) {
+            continue;
+        }
+        char v[24];
+        if (i == worn) {
+            snprintf(v, sizeof v, "%s", LV_SYMBOL_OK);
+        } else if (boopie_avatar_owns(i)) {
+            v[0] = '\0';
+        } else {
+            snprintf(v, sizeof v, "★ %d", boopie_skin_price(i));
+        }
+        set_text(s_skin_checks[i], v);
+        lv_obj_set_style_text_color(s_skin_checks[i], lv_color_hex(
+            i == worn || pet.stars >= (uint32_t)boopie_skin_price(i) || boopie_avatar_owns(i) ? COLOR_ACCENT : COLOR_DIM), 0);
+    }
+    set_text(s_skin_none_check, worn < 0 ? LV_SYMBOL_OK : "");
+    lv_obj_set_style_text_color(s_skin_none_check, lv_color_hex(COLOR_ACCENT), 0);
+    if (any == lv_obj_has_flag(s_skin_box, LV_OBJ_FLAG_HIDDEN)) {
+        if (any) {
+            lv_obj_remove_flag(s_skin_box, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(s_skin_box, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
     boopie_scene_t scene = boopie_avatar_scene();
     for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
         lock_or_tick(s_scene_checks[i], i == (int)scene, BOOPIE_UNLOCK_SCENE, i);

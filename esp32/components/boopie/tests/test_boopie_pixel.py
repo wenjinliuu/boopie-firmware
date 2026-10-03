@@ -64,9 +64,9 @@ class BoopiePixelTest(unittest.TestCase):
                              check=True).stdout
         return np.frombuffer(out, np.uint8).reshape(-1, N, N, 3)
 
-    def compare(self, jobs, scene: str | None = None) -> None:
+    def compare(self, jobs, scene: str | None = None, skin: str | None = None) -> None:
         """jobs: (rig class, expression, t, overlay or None) each."""
-        tail = f" scene:{scene}\n" if scene else "\n"
+        tail = (f" scene:{scene}" if scene else "") + (f" skin:{skin}" if skin else "") + "\n"
         lines = [f"{R.key} {e} {t!r} {o} {t!r}{tail}" if o else f"{R.key} {e} {t!r}{tail}" for R, e, t, o in jobs]
         frames = self.render_c(lines)
         loops = {n: ln for n, ln, _ in ap.EXPRESSIONS}
@@ -78,7 +78,7 @@ class BoopiePixelTest(unittest.TestCase):
                 p = ap.overlay(p, o, t, overlay_loops[o])
             if scene:
                 p.scene = scene
-            want = ap.render(R(), p)
+            want = ap.render(R(skin=ap.SKINS[skin] if skin else None), p)
             diff = float((want != got).any(-1).mean())
             diffs.append(diff)
             self.assertLessEqual(diff, MAX_FRAME_DIFF, f"{R.key} {o or e} at {t:.3f} s: {diff:.2%} differ")
@@ -110,6 +110,15 @@ class BoopiePixelTest(unittest.TestCase):
             jobs = [(R, "idle", i / ap.FPS, None) for R in (ap.Boopie, ap.Codex) for i in range(0, 36, 3)]
             with self.subTest(scene=scene):
                 self.compare(jobs, scene)
+
+    def test_skins(self) -> None:
+        self.assertEqual(list(ap.SKINS), ["boopie_starry", "codex_terminal"])
+        rigs = {R.key: R for R in ap.CHARACTERS}
+        for key, skin in ap.SKINS.items():
+            jobs = [(rigs[skin.rig], name, i / ap.FPS, None)
+                    for name, length, _ in ap.EXPRESSIONS for i in range(0, round(length * ap.FPS), 4)]
+            with self.subTest(skin=key):
+                self.compare(jobs, skin=key)
 
     def test_characters(self) -> None:
         self.assertEqual([R.key for R in ap.CHARACTERS], ["boopie", "gpt", "codex", "klaude", "whale", "doubao"])

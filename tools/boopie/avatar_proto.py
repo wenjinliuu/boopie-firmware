@@ -365,8 +365,19 @@ class Rig:
     def frame(self, p, cx, base):
         return Frame(p, cx, base, self.size, self.squash_k, self.jump_k)
 
-    def __init__(self, colour=None):
-        self.rp = ramp(colour or self.colour)
+    def __init__(self, colour=None, skin=None):
+        self.skin = skin
+        self.rp = ramp(skin.colour if skin else (colour or self.colour))
+        self.eye_colour, self.cheek = EYE, CHEEK
+        if skin:
+            if skin.glow:
+                self.rp["glow"] = skin.glow
+            if skin.outline:
+                self.rp["out"] = skin.outline
+            self.eye_colour = skin.eye or EYE
+            self.cheek = skin.cheek or CHEEK
+            for k, v in skin.extra.items():
+                setattr(self, k, v)
 
     def draw(self, c: Canvas, p: Pose) -> dict:
         raise NotImplementedError
@@ -374,7 +385,7 @@ class Rig:
     def face(self, c: Canvas, fx, fy, p: Pose):
         for side in (-1, 1):
             eye(c, fx + side * self.eye_gap, fy, p, side)
-        blush(c, fx, fy, p)
+        blush(c, fx, fy, p, colour=self.cheek)
         mouth(c, fx + p.look[0] // 2, fy + 5, p)
 
     def light_colour(self, p: Pose):
@@ -428,6 +439,7 @@ class Codex(Rig):
     size, squash_k, jump_k = 1.08, 0.35, 0.4
     screen = (30, 34, 84)
     glyph = (120, 236, 240)
+    glyph_follows_light = True   # the prompt takes the state light's colour
 
     def draw(self, c, p):
         cx, base = 32, 56
@@ -452,10 +464,10 @@ class Codex(Rig):
         for i, (dx, dy) in enumerate(((-3, -1), (-2, 0), (-3, 1), (0, 0), (1, 0))):   # >- on the chest
             c.put(gx + dx, gy + dy, mix(self.glyph, self.rp["mid"], 0.4))
         face = f.pt(32, 27)
-        return {"slots": {"hat": f.pt(31, 10), "eyes": (face[0] - 0.5, face[1], 4.5 * f.sx), "neck": (*f.pt(32, 38), 16 * f.sx)}, "face": face, "body": f.pt(32, 40), "light": f.pt(44, 14), "show_face": p.scale > 0.6}
+        return {"screen_box": (*f.pt(21, 21), *f.pt(44, 34)), "slots": {"hat": f.pt(31, 10), "eyes": (face[0] - 0.5, face[1], 4.5 * f.sx), "neck": (*f.pt(32, 38), 16 * f.sx)}, "face": face, "body": f.pt(32, 40), "light": f.pt(44, 14), "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
-        col = p.light or self.glyph
+        col = (p.light if self.glyph_follows_light else None) or self.glyph
         col = mix(self.screen, col, max(0.25, min(1.0, p.light_level)))
         L, R = fx - 5, fx + 4
         k = p.eyes
@@ -509,8 +521,8 @@ class GPT(Rig):
     ink = (18, 18, 24)
     hole = (34, 34, 44)
 
-    def __init__(self, colour=None):
-        super().__init__(colour)
+    def __init__(self, colour=None, skin=None):
+        super().__init__(colour, skin)
         self.rp["out"] = self.ink
         self.bands = ramp("f6f6f6")
         self.bands["out"] = self.ink
@@ -626,8 +638,8 @@ class Doubao(Rig):
     hair = "6b4a3e"
     top = "3a3a44"
 
-    def __init__(self, colour=None):
-        super().__init__(colour)
+    def __init__(self, colour=None, skin=None):
+        super().__init__(colour, skin)
         self.hp = ramp(self.hair)
         self.tp = ramp(self.top)
 
@@ -854,6 +866,65 @@ def petal(c, i, t, front):
     col, dark = ((255, 190, 215), (230, 130, 170)) if front else ((170, 110, 140), (120, 70, 100))
     c.put(x, y, col)
     c.put(x + 1, y + a, dark)
+
+
+# ---------------------------------------------------------------- skins
+# A skin restyles one character: its colours (body, eyes, cheeks, state light,
+# and the rig's own, like Codex's screen), patterns over the body and over the
+# face, and the background it brings. Bought with stars; see
+# docs/boopie-character.md.
+@dataclass
+class Skin:
+    key: str
+    rig: str            # the character it's for (Rig.key)
+    name: str
+    rarity: str         # "普通" or "典藏"
+    price: int          # stars
+    scene: str          # its background (SCENES)
+    colour: str         # body colour
+    eye: tuple | None = None
+    cheek: tuple | None = None
+    glow: tuple | None = None
+    outline: tuple | None = None
+    extra: dict = field(default_factory=dict)   # rig attributes it sets
+    body_fx: str = ""   # drawn over the body: "starry"
+    face_fx: str = ""   # drawn over the face: "scanlines"
+
+
+SKINS = {
+    "boopie_starry": Skin("boopie_starry", "boopie", "星空", "典藏", 300, "stars", "2b3170",
+                          eye=(236, 236, 255), cheek=(190, 110, 200), glow=(255, 236, 160),
+                          outline=(118, 118, 214), body_fx="starry"),
+    "codex_terminal": Skin("codex_terminal", "codex", "复古终端", "普通", 150, "matrix", "d6cca8",
+                           cheek=(255, 170, 150), glow=(100, 255, 150),
+                           extra={"screen": (12, 22, 14), "glyph": (100, 255, 150), "glyph_follows_light": False},
+                           face_fx="scanlines"),
+}
+
+
+def skin_body(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
+    if skin.body_fx == "starry":   # stars twinkling inside the body, a few with a cross
+        bx, by = anchors["body"]
+        for i in range(18):
+            x = round(bx + (h01(i, 7) - 0.5) * 28)
+            y = round(by + (h01(i, 8) - 0.5) * 22)
+            if not (0 <= x < N and 0 <= y < N and c.body[y, x]):
+                continue
+            tw = 0.5 + 0.5 * math.sin(pose.t * (1 + h01(i, 9) * 2) + i * 1.3)
+            if tw > 0.3:
+                c.put(x, y, mix((80, 80, 150), (255, 250, 220), tw))
+            if tw > 0.85 and i % 4 == 0:
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    if 0 <= x + dx < N and 0 <= y + dy < N and c.body[y + dy, x + dx]:
+                        c.put(x + dx, y + dy, (150, 150, 220))
+
+
+def skin_face(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
+    if skin.face_fx == "scanlines" and "screen_box" in anchors:   # an old CRT's
+        x0, y0, x1, y1 = (round(v) for v in anchors["screen_box"])
+        for y in range(max(0, y0), min(N, y1)):
+            if y % 2:
+                c.img[y, max(0, x0):min(N, x1)] = (c.img[y, max(0, x0):min(N, x1)] * 0.62).astype(np.uint8)
 
 
 CHARACTERS = [Boopie, GPT, Codex, Klaude, Whale, Doubao]
@@ -1133,6 +1204,7 @@ def sparkles(c: Canvas, cx, cy, t, speed, front, acc, count=6):
 
 def render(rig: Rig, pose: Pose) -> np.ndarray:
     c = Canvas()
+    c.eye = rig.eye_colour
     acc = pose.accent
     t = pose.t
     # background layers, as Muse's: the glow, the ground shadow, sparkles behind
@@ -1144,11 +1216,15 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
     sparkles(c, 32, 40, t, pose.sparkle_speed, False, acc)
     c.rim = mix(acc, WHITE, 0.2)
     anchors = rig.draw(c, pose)
+    if rig.skin:
+        skin_body(c, rig.skin, pose, anchors)
     if pose.rings:
         rings(c, 32, anchors["face"][1] + 2, t, pose.level, pose.rings, acc)
     fx, fy = anchors["face"]
     if anchors.get("show_face", True):
         rig.face(c, round(fx), round(fy), pose)
+        if rig.skin:
+            skin_face(c, rig.skin, pose, anchors)
     for item in pose.wear:
         if "slots" in anchors:
             wear(c, item, anchors["slots"])

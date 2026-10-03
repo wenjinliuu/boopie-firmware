@@ -67,11 +67,20 @@ void boopie_avatar_set_overlay(boopie_overlay_t overlay, bool on);
  * The display.avatar command: any of these may be NULL to leave it as is.
  * avatar is an id ("boopie"); colour is RRGGBB or "default"; pet an
  * expression id ("hungry", "idle" to clear); reaction an overlay id, turned
- * on or off; scene a background id ("stars"). On a bad value returns false
- * with *error set, changing nothing.
+ * on or off; scene a background id ("stars"); skin an owned skin's id, or
+ * "none". On a bad value returns false with *error set, changing nothing.
  */
 bool boopie_avatar_command(const char *avatar, const char *colour, const char *pet, const char *reaction,
-                           const char *scene, bool on, const char **error);
+                           const char *scene, const char *skin, bool on, const char **error);
+
+/* Skins (boopie_skin_*): the one the current character wears (-1 none),
+ * whether one is owned, wear an owned one (-1 takes it off), and buy one with
+ * stars (then wear it). False with *error set when it can't. A skin brings its
+ * background while the background chosen is the default. */
+int boopie_avatar_skin(void);
+bool boopie_avatar_owns(int skin);
+bool boopie_avatar_wear(int skin, const char **error);
+bool boopie_avatar_buy(int skin, const char **error);
 
 /* ---- the pet (pet/boopie_pet.c), kept here with the rest ---- */
 

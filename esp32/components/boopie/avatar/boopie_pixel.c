@@ -1411,7 +1411,16 @@ static void blush(float fx, float fy, const pose_t *p, int dx_cheek, rgb_t colou
 typedef struct {
     float face_x, face_y, body_x, body_y, light_x, light_y;
     bool show_face;
+    bool has_screen;                       /* Codex: its screen, for skins */
+    float screen_x0, screen_y0, screen_x1, screen_y1;
 } anchors_t;
+
+/* The live skin's colours (EYE, CHEEK and Codex's own without one). */
+static rgb_t s_eye_base = { 30, 22, 46 };
+static rgb_t s_cheek = { 255, 122, 152 };
+static rgb_t s_codex_screen = { 30, 34, 84 };
+static rgb_t s_codex_glyph = { 120, 236, 240 };
+static bool s_glyph_follows_light = true;   /* the prompt takes the state light's colour */
 
 typedef struct rig rig_t;
 struct rig {
@@ -1439,7 +1448,7 @@ static void face_default(const rig_t *r, int fx, int fy, const pose_t *p)
     for (int side = -1; side <= 1; side += 2) {
         eye(fx + side * 7, fy, p, side, false);
     }
-    blush(fx, fy, p, 11, CHEEK);
+    blush(fx, fy, p, 11, s_cheek);
     mouth(fx + floordiv(p->lookx, 2), fy + 5, p, s_eye, CHEEK);
 }
 
@@ -1569,8 +1578,6 @@ static void draw_gpt(const rig_t *r, const pose_t *p, anchors_t *a)
 }
 
 /* Codex: a cloud-headed robot whose face is a terminal; its eyes are the prompt, >_ . */
-static const rgb_t CODEX_SCREEN = { 30, 34, 84 };
-static const rgb_t CODEX_GLYPH = { 120, 236, 240 };
 
 static void draw_codex(const rig_t *r, const pose_t *p, anchors_t *a)
 {
@@ -1607,13 +1614,16 @@ static void draw_codex(const rig_t *r, const pose_t *p, anchors_t *a)
     rect(&f, 21, 33, 22, 34, corners);
     rect(&f, 43, 33, 44, 34, corners);
     m_andnot(screen, corners);
-    flat(screen, CODEX_SCREEN);
+    flat(screen, s_codex_screen);
     float gx, gy;
     pt(&f, 32, 45, &gx, &gy);
     static const int8_t CHEST[5][2] = { { -3, -1 }, { -2, 0 }, { -3, 1 }, { 0, 0 }, { 1, 0 } };   /* >- on the chest */
     for (int i = 0; i < 5; i++) {
-        put(gx + CHEST[i][0], gy + CHEST[i][1], mix(CODEX_GLYPH, s_rp.mid, 0.4));
+        put(gx + CHEST[i][0], gy + CHEST[i][1], mix(s_codex_glyph, s_rp.mid, 0.4));
     }
+    a->has_screen = true;
+    pt(&f, 21, 21, &a->screen_x0, &a->screen_y0);
+    pt(&f, 44, 34, &a->screen_x1, &a->screen_y1);
     pt(&f, 32, 27, &a->face_x, &a->face_y);
     pt(&f, 32, 40, &a->body_x, &a->body_y);
     pt(&f, 44, 14, &a->light_x, &a->light_y);
@@ -1635,8 +1645,8 @@ static void glyph(char ch, int x, int y, rgb_t c)
 static void face_codex(const rig_t *r, int fx, int fy, const pose_t *p)
 {
     (void)r;
-    rgb_t col = p->has_light ? p->light : CODEX_GLYPH;
-    col = mix(CODEX_SCREEN, col, fmax(0.25, clamp01(p->light_level)));
+    rgb_t col = p->has_light && s_glyph_follows_light ? p->light : s_codex_glyph;
+    col = mix(s_codex_screen, col, fmax(0.25, clamp01(p->light_level)));
     int L = fx - 5, R = fx + 4;
     if (p->mouth == M_TALK) {               /* the cursor grows with the voice */
         glyph('>', L, fy, col);
@@ -1871,6 +1881,172 @@ uint32_t boopie_char_default_colour(boopie_char_t c)
     return (int)c >= 0 && c < BOOPIE_CHAR_COUNT ? RIGS[c].colour : RIGS[0].colour;
 }
 
+/* ---------------------------------------------------------------- skins */
+
+#define NO_COLOUR 0xffffffffu
+typedef enum { FX_BODY_NONE, FX_BODY_STARRY } body_fx_t;
+typedef enum { FX_FACE_NONE, FX_FACE_SCANLINES } face_fx_t;
+
+/* Only ever append: the index is what NVS keeps of what's owned. */
+typedef struct {
+    const char *key, *name;
+    boopie_char_t character;
+    bool collector;          /* 典藏 */
+    uint16_t price;          /* stars */
+    boopie_scene_t scene;
+    uint32_t colour, eye, cheek, glow, outline, screen, glyph;
+    bool glyph_fixed;        /* Codex's prompt stays its own colour */
+    body_fx_t body_fx;
+    face_fx_t face_fx;
+} skin_t;
+
+static const skin_t SKINS[] = {
+    { "boopie_starry", "星空", BOOPIE_CHAR_BOOPIE, true, 300, BOOPIE_SCENE_STARS,
+      0x2b3170, 0xececff, 0xbe6ec8, 0xffeca0, 0x7676d6, NO_COLOUR, NO_COLOUR, false, FX_BODY_STARRY, FX_FACE_NONE },
+    { "codex_terminal", "复古终端", BOOPIE_CHAR_CODEX, false, 150, BOOPIE_SCENE_MATRIX,
+      0xd6cca8, NO_COLOUR, 0xffaa96, 0x64ff96, NO_COLOUR, 0x0c160e, 0x64ff96, true, FX_BODY_NONE, FX_FACE_SCANLINES },
+};
+#define SKIN_COUNT (int)(sizeof(SKINS) / sizeof(SKINS[0]))
+
+static int s_skin = -1;
+
+int boopie_skin_count(void)
+{
+    return SKIN_COUNT;
+}
+
+static const skin_t *skin_at(int i)
+{
+    return i >= 0 && i < SKIN_COUNT ? &SKINS[i] : NULL;
+}
+
+const char *boopie_skin_key(int i)
+{
+    return skin_at(i) ? SKINS[i].key : NULL;
+}
+
+const char *boopie_skin_name(int i)
+{
+    return skin_at(i) ? SKINS[i].name : NULL;
+}
+
+boopie_char_t boopie_skin_character(int i)
+{
+    return skin_at(i) ? SKINS[i].character : BOOPIE_CHAR_COUNT;
+}
+
+int boopie_skin_price(int i)
+{
+    return skin_at(i) ? SKINS[i].price : 0;
+}
+
+bool boopie_skin_collector(int i)
+{
+    return skin_at(i) && SKINS[i].collector;
+}
+
+boopie_scene_t boopie_skin_scene(int i)
+{
+    return skin_at(i) ? SKINS[i].scene : BOOPIE_SCENE_DEFAULT;
+}
+
+int boopie_skin_from_key(const char *key)
+{
+    for (int i = 0; key && i < SKIN_COUNT; i++) {
+        if (strcmp(SKINS[i].key, key) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Stars twinkling inside the body, a few with a cross (the prototype's skin_body). */
+static void skin_body(const skin_t *sk, const pose_t *pose, const anchors_t *a)
+{
+    if (sk->body_fx != FX_BODY_STARRY) {
+        return;
+    }
+    for (int i = 0; i < 18; i++) {
+        int x = (int)rint(a->body_x + (h01(2, i, 7, 0) - 0.5) * 28);
+        int y = (int)rint(a->body_y + (h01(2, i, 8, 0) - 0.5) * 22);
+        if (x < 0 || x >= N || y < 0 || y >= N || !m_get(s_body, x, y)) {
+            continue;
+        }
+        double tw = 0.5 + 0.5 * sin(pose->t * (1 + h01(2, i, 9, 0) * 2) + i * 1.3);
+        if (tw > 0.3) {
+            put(x, y, mix((rgb_t){ 80, 80, 150 }, (rgb_t){ 255, 250, 220 }, tw));
+        }
+        if (tw > 0.85 && i % 4 == 0) {
+            static const int8_t D[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+            for (int k = 0; k < 4; k++) {
+                int xx = x + D[k][0], yy = y + D[k][1];
+                if (xx >= 0 && xx < N && yy >= 0 && yy < N && m_get(s_body, xx, yy)) {
+                    put(xx, yy, (rgb_t){ 150, 150, 220 });
+                }
+            }
+        }
+    }
+}
+
+/* An old CRT's scanlines over Codex's screen. */
+static void skin_face(const skin_t *sk, const anchors_t *a)
+{
+    if (sk->face_fx != FX_FACE_SCANLINES || !a->has_screen) {
+        return;
+    }
+    int x0 = (int)rint(a->screen_x0), y0 = (int)rint(a->screen_y0);
+    int x1 = (int)rint(a->screen_x1), y1 = (int)rint(a->screen_y1);
+    for (int y = y0 < 0 ? 0 : y0; y < (y1 > N ? N : y1); y++) {
+        if (y % 2 == 0) {
+            continue;
+        }
+        for (int x = x0 < 0 ? 0 : x0; x < (x1 > N ? N : x1); x++) {
+            rgb_t *c = &s_img[y][x];
+            *c = (rgb_t){ (uint8_t)(c->r * 0.62), (uint8_t)(c->g * 0.62), (uint8_t)(c->b * 0.62) };
+        }
+    }
+}
+
+static void apply_colours(boopie_char_t c, uint32_t colour)
+{
+    const skin_t *sk = skin_at(s_skin);
+    if (sk && sk->character != c) {
+        sk = NULL;
+    }
+    s_rp = ramp(sk ? sk->colour : colour == BOOPIE_COLOUR_DEFAULT ? RIGS[c].colour : colour & 0xffffff);
+    s_eye_base = EYE;
+    s_cheek = CHEEK;
+    s_codex_screen = (rgb_t){ 30, 34, 84 };
+    s_codex_glyph = (rgb_t){ 120, 236, 240 };
+    s_glyph_follows_light = true;
+    if (sk) {
+        if (sk->glow != NO_COLOUR) {
+            s_rp.glow = hex(sk->glow);
+        }
+        if (sk->outline != NO_COLOUR) {
+            s_rp.out = hex(sk->outline);
+        }
+        if (sk->eye != NO_COLOUR) {
+            s_eye_base = hex(sk->eye);
+        }
+        if (sk->cheek != NO_COLOUR) {
+            s_cheek = hex(sk->cheek);
+        }
+        if (sk->screen != NO_COLOUR) {
+            s_codex_screen = hex(sk->screen);
+        }
+        if (sk->glyph != NO_COLOUR) {
+            s_codex_glyph = hex(sk->glyph);
+        }
+        s_glyph_follows_light = !sk->glyph_fixed;
+    }
+}
+
+void boopie_pixel_set_skin(int skin)
+{
+    s_skin = skin_at(skin) ? skin : -1;
+}
+
 void boopie_pixel_set_character(boopie_char_t c, uint32_t colour)
 {
     if ((int)c < 0 || c >= BOOPIE_CHAR_COUNT) {
@@ -1878,7 +2054,7 @@ void boopie_pixel_set_character(boopie_char_t c, uint32_t colour)
     }
     s_char = c;
     s_char_set = true;
-    s_rp = ramp(colour == BOOPIE_COLOUR_DEFAULT ? RIGS[c].colour : colour & 0xffffff);
+    apply_colours(c, colour);
     s_rp2 = s_rp3 = s_rp;
     if (c == BOOPIE_CHAR_GPT) {
         s_rp.out = GPT_INK;
@@ -1979,7 +2155,7 @@ static void render(const rig_t *rig, const pose_t *pose)
 {
     memset(s_img, 0, sizeof(s_img));
     m_clear(s_body);
-    s_eye = EYE;
+    s_eye = s_eye_base;
     s_has_shine = true;
     s_shine = WHITE;
     s_has_rim = false;
@@ -1998,11 +2174,21 @@ static void render(const rig_t *rig, const pose_t *pose)
     s_rim = mix(acc, WHITE, 0.2);
     anchors_t an = { 0 };
     rig->draw(rig, pose, &an);
+    const skin_t *sk = skin_at(s_skin);
+    if (sk && sk->character != s_char) {
+        sk = NULL;
+    }
+    if (sk) {
+        skin_body(sk, pose, &an);
+    }
     if (pose->rings > 0) {
         rings(32, an.face_y + 2, t, pose->level, pose->rings, acc);
     }
     if (an.show_face) {
         rig->face(rig, (int)rintf(an.face_x), (int)rintf(an.face_y), pose);
+        if (sk) {
+            skin_face(sk, &an);
+        }
     }
     if (pose->laptop) {
         icon(I_LAPTOP, rintf(an.body_x) - 7, rintf(an.body_y) + 8);
