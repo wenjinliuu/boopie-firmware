@@ -92,6 +92,9 @@ typedef enum {
     BOOPIE_OVERLAY_LOW_BATTERY,   /* an empty battery, blinking red */
     BOOPIE_OVERLAY_CHARGING,      /* a bolt, sparks rising */
 
+    /* The pet. */
+    BOOPIE_OVERLAY_FOOD,          /* a bowl of rice to tap, while it's hungry */
+
     BOOPIE_OVERLAY_COUNT,
 } boopie_overlay_t;
 

@@ -31,7 +31,7 @@ EXTENDED = {
     "dizzy": "error",
 }
 
-OVERLAYS = ["surprise", "blush", "confetti", "hearts", "low_battery", "charging"]
+OVERLAYS = ["surprise", "blush", "confetti", "hearts", "low_battery", "charging", "food"]
 
 
 def run_harness() -> dict:

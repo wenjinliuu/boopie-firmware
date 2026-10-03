@@ -95,7 +95,7 @@ class BoopiePixelTest(unittest.TestCase):
 
     def test_overlays(self) -> None:
         self.assertEqual([n for n, _, _ in ap.OVERLAYS],
-                         ["surprise", "blush", "confetti", "hearts", "low_battery", "charging"])
+                         ["surprise", "blush", "confetti", "hearts", "low_battery", "charging", "food"])
         jobs = [(R, "idle", i / ap.FPS, name)
                 for R in ap.CHARACTERS for name, length, _ in ap.OVERLAYS if name not in UNMATCHED
                 for i in range(0, round(length * ap.FPS), STEP)]

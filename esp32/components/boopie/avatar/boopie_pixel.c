@@ -104,6 +104,7 @@ static const double OVERLAY_LOOP[BOOPIE_OVERLAY_COUNT] = {
     [BOOPIE_OVERLAY_SURPRISE] = 1.2, [BOOPIE_OVERLAY_BLUSH] = 2.4,
     [BOOPIE_OVERLAY_CONFETTI] = 1.6, [BOOPIE_OVERLAY_HEARTS] = 1.2,
     [BOOPIE_OVERLAY_LOW_BATTERY] = 2.0, [BOOPIE_OVERLAY_CHARGING] = 1.6,
+    [BOOPIE_OVERLAY_FOOD] = 1.6,
 };
 
 /* ---------------------------------------------------------------- colour */
@@ -211,7 +212,7 @@ typedef struct {
 
 enum {
     I_HEART, I_Z, I_EXCL, I_DROP, I_DOT, I_NOTE, I_BOWL, I_COOKIE, I_BATTERY, I_BOLT, I_BUBBLE,
-    I_CODE, I_LAPTOP, I_COUNT,
+    I_CODE, I_LAPTOP, I_RICE, I_COUNT,
 };
 
 #define ROWS(...) (const char *const[]){ __VA_ARGS__ }, sizeof((const char *const[]){ __VA_ARGS__ }) / sizeof(char *)
@@ -234,6 +235,10 @@ static const icon_t ICONS[I_COUNT] = {
                         ".############.", "ssssssssssssss", ".kkkkkkkkkkkk."),
                    "#osk", { { 70, 66, 96 }, { 150, 245, 200 }, { 160, 156, 186 } } },
 };
+/* The bowl of rice the food overlay shows. */
+static const icon_t RICE = { ROWS("..o...o...o", ".o...o...o.", "wwwwwwwwwww", "#wwwwwwwww#", ".#########.",
+                                  "..#######..", "...#####..."),
+                             "wo#", { { 250, 248, 236 }, { 170, 170, 190 }, { 240, 140, 60 } } };
 /* The laptop has a fourth colour, its keyboard. */
 static const rgb_t LAPTOP_KEYS = { 110, 106, 136 };
 
@@ -710,6 +715,9 @@ static void overlay(pose_t *p, boopie_overlay_t name, double t, double length)
             p->light_level = fmin(p->light_level, 0.6);
         }
         break;
+    case BOOPIE_OVERLAY_FOOD:   /* a bowl of rice, steaming, bobbing to be tapped */
+        fx_icon(p, FX_ICON, I_RICE, 47, 48 + (int)wave(t, 1.6, 0, 2));
+        break;
     case BOOPIE_OVERLAY_CHARGING:
         fx_icon(p, FX_ICON, I_BOLT, 53, 4 + (int)wave(t, 0.8, 0, 2));
         for (int i = 0; i < 3; i++) {
@@ -876,7 +884,7 @@ static void shaded(const mask_t m, const ramp_t *rp)
 
 static void icon(int which, float x, float y)
 {
-    const icon_t *ic = &ICONS[which];
+    const icon_t *ic = which == I_RICE ? &RICE : &ICONS[which];
     for (int j = 0; j < ic->nrows; j++) {
         for (int i = 0; ic->rows[j][i]; i++) {
             const char *k = strchr(ic->keys, ic->rows[j][i]);

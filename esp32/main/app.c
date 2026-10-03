@@ -1894,15 +1894,11 @@ static cJSON *on_ws_command(
 #endif
 #if CONFIG_MUSE_ENABLED
     /* Boopie: the pet. */
-    if (strcmp(command, "pet.feed") == 0 || strcmp(command, "pet.status") == 0) {
-        bool fed = strcmp(command, "pet.feed") == 0 && boopie_avatar_feed();
+    if (strcmp(command, "pet.status") == 0) {
         boopie_pet_status_t st;
         boopie_avatar_pet_status(&st);
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
-        if (strcmp(command, "pet.feed") == 0) {
-            cJSON_AddBoolToObject(result, "fed", fed);
-        }
         cJSON_AddBoolToObject(result, "hungry", st.hungry);
         cJSON_AddStringToObject(result, "mood", boopie_expr_name(st.mood));
         cJSON_AddNumberToObject(result, "level", st.level);

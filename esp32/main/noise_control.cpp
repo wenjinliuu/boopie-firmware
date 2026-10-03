@@ -1344,10 +1344,6 @@ static char *build_register_json(void) {
     cJSON_AddStringToObject(avatar_on, "type", "boolean");
     cJSON_AddStringToObject(avatar_on, "description", "With reaction: on (default) or off.");
     cJSON_AddItemToObject(avatar_optional, "on", avatar_on);
-    add_command(commands, "pet.feed",
-                "Feed the pet on the screen. It only eats when it's hungry (the "
-                "result says if it ate); it then gains experience.",
-                nullptr, nullptr);
     add_command(commands, "pet.status",
                 "How the pet on the screen is: hungry or not, its mood, level, "
                 "experience and stars.",

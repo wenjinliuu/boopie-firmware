@@ -37,6 +37,7 @@ static const char *const s_overlay[BOOPIE_OVERLAY_COUNT] = {
     [BOOPIE_OVERLAY_HEARTS]      = "hearts",
     [BOOPIE_OVERLAY_LOW_BATTERY] = "low_battery",
     [BOOPIE_OVERLAY_CHARGING]    = "charging",
+    [BOOPIE_OVERLAY_FOOD]        = "food",
 };
 
 _Static_assert(BOOPIE_OVERLAY_COUNT <= 8, "boopie_overlay_set_t holds one bit per overlay");

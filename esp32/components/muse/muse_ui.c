@@ -443,8 +443,15 @@ static void build_button_icons(lv_obj_t *face)
 
 static void on_canvas_clicked(lv_event_t *e)
 {
-    (void)e;
-    if (!boopie_avatar_tap()) {   /* Boopie: a tap feeds the pet when it's hungry */
+    /* Boopie: tapping the food bowl feeds the pet; anywhere else is a poke. */
+    lv_point_t pt = { 0 };
+    lv_area_t a;
+    lv_indev_get_point(lv_indev_active(), &pt);
+    lv_obj_get_coords(lv_event_get_target_obj(e), &a);
+    int w = lv_area_get_width(&a), h = lv_area_get_height(&a);
+    int gx = w > 0 ? (pt.x - a.x1) * BOOPIE_PX / w : -1;
+    int gy = h > 0 ? (pt.y - a.y1) * BOOPIE_PX / h : -1;
+    if (!boopie_avatar_tap(gx, gy)) {
         muse_state_make_happy();
     }
 }

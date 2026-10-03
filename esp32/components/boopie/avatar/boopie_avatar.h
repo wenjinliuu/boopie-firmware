@@ -75,11 +75,10 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
 
 /* ---- the pet (pet/boopie_pet.c), kept here with the rest ---- */
 
-/* The character was tapped: fed if hungry (true; it eats), else a poke. */
-bool boopie_avatar_tap(void);
-
-/* Feed it (the pet.feed command); false if it isn't hungry. */
-bool boopie_avatar_feed(void);
+/* The character's canvas was tapped at grid cell (gx, gy): on the food
+ * bowl while it's hungry, it eats (true); anywhere else it's a poke (false,
+ * and the caller shows Muse's pet reaction). */
+bool boopie_avatar_tap(int gx, int gy);
 
 typedef struct {
     int level;

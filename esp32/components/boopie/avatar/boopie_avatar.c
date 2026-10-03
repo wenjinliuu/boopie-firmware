@@ -230,6 +230,10 @@ static void load(void)
     if (xp) {
         s_pet_state.xp = (uint32_t)strtoul(xp, NULL, 10);
     }
+    if (getenv("BOOPIE_PET_HUNGRY")) {   /* hungry from the start, as in the day */
+        s_pet_state.hungry = 1;
+        s_pet_state.hungry_since = (int64_t)time(NULL);
+    }
     int sc = scene_from_key(getenv("BOOPIE_SCENE"));
     if (sc >= 0) {
         s_scene = (boopie_scene_t)sc;
@@ -457,9 +461,13 @@ static void pet_tick(void)
     }
 }
 
-bool boopie_avatar_tap(void)
+bool boopie_avatar_tap(int gx, int gy)
 {
     ensure_loaded();
+    bool on_food = gx >= BOOPIE_FOOD_X0 && gx <= BOOPIE_FOOD_X1 && gy >= BOOPIE_FOOD_Y0 && gy <= BOOPIE_FOOD_Y1;
+    if (s_pet_state.hungry && !on_food) {
+        return false;   /* a poke; only the bowl feeds it */
+    }
     int64_t now;
     int32_t day;
     int minute;
@@ -473,12 +481,6 @@ bool boopie_avatar_tap(void)
     }
     show_event(&ev);
     return fed;
-}
-
-bool boopie_avatar_feed(void)
-{
-    ensure_loaded();
-    return s_pet_state.hungry ? boopie_avatar_tap() : false;
 }
 
 void boopie_avatar_pet_status(boopie_pet_status_t *out)
@@ -619,6 +621,9 @@ void muse_pixel_render(const muse_pose_t *p)
     }
 
     uint8_t on = s_overlays | device_overlays();
+    if (s_pet_state.hungry && p->mode == MUSE_MODE_IDLE && s_happy_since < 0) {
+        on |= BOOPIE_OVERLAY_BIT(BOOPIE_OVERLAY_FOOD);   /* the bowl to tap */
+    }
     for (int o = 0; o < BOOPIE_OVERLAY_COUNT; o++) {
         if (p->t < s_flash_until[o]) {
             on |= BOOPIE_OVERLAY_BIT(o);

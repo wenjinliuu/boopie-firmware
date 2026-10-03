@@ -80,7 +80,11 @@ EXPRESSIONS = [
 OVERLAYS = [
     ("surprise", 1.2, "惊讶 !"), ("blush", 2.4, "害羞"), ("confetti", 1.6, "庆祝"),
     ("hearts", 1.2, "爱心"), ("low_battery", 2.0, "低电量"), ("charging", 1.6, "充电中"),
+    ("food", 1.6, "饭碗"),
 ]
+
+# Where the food bowl sits (the food overlay): tap inside to feed.
+FOOD_BOX = (44, 42, 61, 59)   # x0, y0, x1, y1, grid cells, inclusive
 
 
 def ramp(hex_colour: str) -> dict:
@@ -113,6 +117,8 @@ ICONS = {
     "bubble": ([".#####.", "#.....#", "#.....#", "#.....#", ".#####.", "..#....", ".#....."],
                {"#": (200, 195, 225)}),
     "code": (["#...#", "#.#.#", "#...#"], {"#": (150, 245, 200)}),
+    "rice": (["..o...o...o", ".o...o...o.", "wwwwwwwwwww", "#wwwwwwwww#", ".#########.", "..#######..", "...#####..."],
+             {"w": (250, 248, 236), "#": (240, 140, 60), "o": (170, 170, 190)}),
     "laptop": (["..##########..", ".############.", ".#####oo#####.", ".############.",
                 ".############.", "ssssssssssssss", ".kkkkkkkkkkkk."],
                {"#": (70, 66, 96), "o": (150, 245, 200), "s": (160, 156, 186), "k": (110, 106, 136)}),
@@ -1063,6 +1069,9 @@ def overlay(p: Pose, name: str, t: float, length: float) -> Pose:
         if int(t * 2) % 2:
             p.fx.append(("icon", "battery", 50, 6))
             p.light, p.light_level = RED, min(p.light_level, 0.6)
+    elif name == "food":   # a bowl of rice, steaming, bobbing to be tapped
+        bob = int(wave(t, 1.6, 0, 2))
+        p.fx.append(("icon", "rice", 47, 48 + bob))
     elif name == "charging":
         p.fx.append(("icon", "bolt", 53, 4 + int(wave(t, 0.8, 0, 2))))
         for i in range(3):
