@@ -5,7 +5,9 @@
 
 #include "boopie_text.h"
 
-/* East Asian Wide and Fullwidth ranges that matter for Chinese text. */
+/* East Asian Wide and Fullwidth ranges that matter for Chinese text.
+ * tools/boopie/gen_pixel_font.py reads this table, so the font and the
+ * layout always agree: keep one range per line. */
 static const struct {
     uint32_t lo, hi;
 } WIDE[] = {
@@ -131,23 +133,4 @@ bool boopie_text_can_break(uint32_t before, uint32_t after)
         return false;   /* inside a Latin word or number */
     }
     return !boopie_text_no_line_start(after) && !boopie_text_no_line_end(before);
-}
-
-static boopie_text_measure_t s_measure;
-static int s_col_px = 1;
-
-void boopie_text_set_measure(boopie_text_measure_t measure, int col_px)
-{
-    s_measure = measure;
-    s_col_px = measure && col_px > 0 ? col_px : 1;
-}
-
-int boopie_text_width(uint32_t cp)
-{
-    return s_measure ? s_measure(cp) : boopie_text_cols(cp);
-}
-
-int boopie_text_col_width(void)
-{
-    return s_col_px;
 }

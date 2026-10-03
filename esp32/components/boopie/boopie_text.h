@@ -13,8 +13,8 @@
  * Text layout rules shared by Chinese and English, for any brain and any
  * screen. Text is laid out on a grid of columns: a Latin letter takes one,
  * a Chinese character or full-width punctuation mark two (East Asian Wide and
- * Fullwidth). A screen drawing a proportional font measures characters
- * itself instead (boopie_text_set_measure).
+ * Fullwidth). boopie_pixel_font draws exactly these widths, so counting
+ * columns is counting pixels.
  */
 
 /* The code point at s and its length in *len (at least 1 on a non-empty
@@ -40,18 +40,3 @@ bool boopie_text_no_line_end(uint32_t cp);
  * words still only break at spaces.
  */
 bool boopie_text_can_break(uint32_t before, uint32_t after);
-
-/*
- * How wide characters are drawn, for wrapping to a page of columns: `measure`
- * gives a character's width in pixels and a column is `col_px` pixels, so a
- * line of N columns holds N * col_px pixels of text. NULL goes back to
- * counting columns (boopie_text_cols). Set once, before text is laid out.
- */
-typedef int (*boopie_text_measure_t)(uint32_t cp);
-void boopie_text_set_measure(boopie_text_measure_t measure, int col_px);
-
-/* The character's width in the measure's units: pixels, or columns. */
-int boopie_text_width(uint32_t cp);
-
-/* A column in those units: col_px, or 1. */
-int boopie_text_col_width(void);

@@ -16,8 +16,8 @@ set(srcs
     "store/boopie_assets.c"
     "sound/boopie_sound.c"
     "boopie_text.c"
-    "font/boopie_ui_metrics.c"
-    "font/boopie_ui_metrics_data.c")
+    "font/boopie_pixel_font.c"
+    "font/boopie_pixel_glyphs.c")
 set(embed)
 if(CONFIG_MUSE_ENABLED)
     # LVGL comes from idf_component.yml, on the same boards as Muse's UI.

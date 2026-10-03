@@ -10,7 +10,7 @@ it spells, most used first.
   python3 tools/boopie/gen_pinyin.py --jieba jieba-0.42.1/jieba/dict.txt
 
 writes esp32/components/boopie/ime/boopie_pinyin_dict.c. Characters are the
-GB2312 hanzi Boopie's UI font draws; how much each is used comes from
+GB2312 hanzi Boopie's pixel font draws; how much each is used comes from
 jieba's word frequencies (each word's count to each of its characters), and
 readings from pypinyin (both MIT). Syllables are listed most used first, so
 the input offers the likelier spelling of a key sequence first; ü is v.
@@ -28,15 +28,14 @@ from pathlib import Path
 from pypinyin import Style, pinyin
 
 ROOT = Path(__file__).resolve().parents[2]
-GLYPHS = ROOT / "esp32" / "components" / "boopie" / "font" / "boopie_ui_metrics_data.c"
+GLYPHS = ROOT / "esp32" / "components" / "boopie" / "font" / "boopie_pixel_glyphs.c"
 OUT = ROOT / "esp32" / "components" / "boopie" / "ime" / "boopie_pinyin_dict.c"
 PER_SYLLABLE = 80   # candidates kept for a syllable: past these nobody pages
 
 
 def font_chars() -> set[int]:
     text = GLYPHS.read_text()
-    table = text[text.index("boopie_ui_cps[]"):]
-    table = table[:table.index("};")]
+    table = text[:text.index("};")]
     return {int(h, 16) for h in re.findall(r"0x([0-9a-f]{4,5})", table)}
 
 

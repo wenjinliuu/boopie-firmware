@@ -103,13 +103,12 @@ jobs:
           persist-credentials: false
 
       # test_noise_core links against the host's PSA Crypto library; the avatar
-      # test runs the Python prototype, which needs NumPy and Pillow; the text
-      # test checks the UI font's tables against the font with fontTools.
+      # test runs the Python prototype, which needs NumPy and Pillow.
       - name: Install host crypto library
         working-directory: .
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends libmbedtls-dev pkg-config python3-numpy python3-pil python3-fonttools
+          apt-get install -y -qq --no-install-recommends libmbedtls-dev pkg-config python3-numpy python3-pil
 
       - name: Boopie tests
         run: python3 -m unittest discover -s components/boopie/tests -p 'test_*.py' -v

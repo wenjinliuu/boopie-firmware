@@ -48,8 +48,6 @@
 #endif
 #include "boopie_avatar.h"
 #include "boopie_font.h"   /* Boopie: Chinese and English reply text */
-#include "boopie_text.h"
-#include "boopie_ui_metrics.h"
 #include "boopie_pages.h"  /* Boopie: the pages round the face */
 #include "boopie_games.h"  /* Boopie: the games, over everything */
 #include "boopie_guide.h"  /* Boopie: the setup guide */
@@ -61,13 +59,10 @@ static const char *TAG = "muse_ui";
 #define METER_SEG_PX 9
 #define METER_GAP_PX 4
 #define RING_RANGE 1000
-#define CAPTION_W 256           /* the width reply captions wrap to */
-/* Boopie: replies and captions in the UI font (Noto Sans SC) at 22 px: a
- * Chinese character 22 px wide, a column half that, and the text wrapped to
- * what each character really measures (boopie_ui_metrics.h). */
-#define REPLY_PX 22
-#define REPLY_COL_PX (REPLY_PX / 2)
-#define REPLY_FONT reply_font()
+#define CAPTION_W 256           /* the width reply captions wrap to: 21 columns of REPLY_FONT */
+/* Boopie: replies and captions in a pixel font with Chinese, like unscii_16
+ * (each pixel a 2 x 2 block) but taller: Latin 12 px wide, Chinese 24. */
+#define REPLY_FONT (&boopie_font_pixel_24)
 #define CAPTION_LINE_SPACE 2
 #define ART_BLANK_ROWS 3        /* Muse's art never reaches the grid's bottom rows */
 #define MINI_CELL_PX 2          /* Muse's grid cells over a reply that's read */
@@ -681,18 +676,6 @@ static void add_hides(answer_layout_t *l, int n)
  * small under the status line, and under it and the speaker button the
  * biggest page of reply text that fits inside the ring.
  */
-/* Boopie: the reply font, and the same font measured from any task. */
-static const lv_font_t *reply_font(void)
-{
-    const lv_font_t *f = boopie_font_ui(REPLY_PX);
-    return f ? f : &lv_font_montserrat_20;
-}
-
-static int reply_measure(uint32_t cp)
-{
-    return boopie_ui_advance(cp, REPLY_PX);
-}
-
 static void build_answer(lv_obj_t *face, int ring_in)
 {
     int spk_r = (SPEAKER_PX + SPEAKER_GROW_PX) / 2;
@@ -703,8 +686,7 @@ static void build_answer(lv_obj_t *face, int ring_in)
         spk_x = -(int)sqrtf((float)(d * d - spk_y * spk_y));
     }
     const lv_font_t *font = REPLY_FONT;
-    int cw = REPLY_COL_PX;
-    boopie_text_set_measure(reply_measure, REPLY_COL_PX);
+    int cw = lv_font_get_glyph_width(font, 'M', ' ');
     int pitch = lv_font_get_line_height(font) + CAPTION_LINE_SPACE;
 
     answer_layout_t *l = &s_answers[ANSWER_HEARD];
