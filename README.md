@@ -11,6 +11,7 @@ Boopie（布比）：一块圆屏小设备上的多应用系统。Muse 是常驻
 - [设计方案](docs/design.html)：项目定位、Muse 官方发布与条款、两块硬件、双大脑架构、形象与表情规范、应用规划、阶段路线、风险和参考资料
 - [代码摸底说明](docs/code-survey.md)：官方固件的界面组织、OTA 来源、token 使用位置、命令注册方式，以及 Boopie 的挂钩点
 - [中英文字系统](docs/text-system.md)：底层同时支持中文和英文：像素字体、按列排版、中文断行
+- [布比形象设定](docs/boopie-character.md)：造型、可换色的配色规则、18 个表情的动画设计
 - [到货操作手册](docs/flashing.md)：备份原厂固件、刷入、配对、验证清单
 
 GitHub 不会直接渲染 HTML，下载后用浏览器打开即可；也可以开启 GitHub Pages，通过网页访问。
