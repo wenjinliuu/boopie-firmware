@@ -327,6 +327,8 @@ typedef struct {
     int nfx;
     fx_t fx[FX_MAX];
     double dim;
+    boopie_scene_t scene;
+    double scene_t;
 } pose_t;
 
 static void side_hands(pose_t *p, float l, float r)
@@ -894,6 +896,256 @@ static void spark(float x, float y, rgb_t c, int r)
         put(x - k, y, c);
         put(x, y + k, c);
         put(x, y - k, c);
+    }
+}
+
+
+/* ---------------------------------------------------------------- scenes */
+
+static const char *const SCENE_KEYS[BOOPIE_SCENE_COUNT] = {
+    "default", "stars", "fireflies", "snow", "petals", "bubbles", "matrix", "neon_grid", "glitch",
+};
+static const char *const SCENE_NAMES[BOOPIE_SCENE_COUNT] = {
+    "默认光晕", "星空", "萤火", "飘雪", "花瓣", "气泡", "代码雨", "霓虹网格", "像素故障",
+};
+
+const char *boopie_scene_key(boopie_scene_t s)
+{
+    return (int)s >= 0 && s < BOOPIE_SCENE_COUNT ? SCENE_KEYS[s] : NULL;
+}
+
+const char *boopie_scene_name(boopie_scene_t s)
+{
+    return (int)s >= 0 && s < BOOPIE_SCENE_COUNT ? SCENE_NAMES[s] : NULL;
+}
+
+/* A stable hash of up to three ints, 0..1 (the prototype's h01). */
+static double h01(int n, int a, int b, int c)
+{
+    const int v[3] = { a, b, c };
+    uint32_t x = 0x9E3779B9u;
+    for (int i = 0; i < n; i++) {
+        x ^= (uint32_t)v[i] * 0x85EBCA6Bu + 0x632BE5ABu;
+        x *= 0x27D4EB2Du;
+        x ^= x >> 15;
+    }
+    return (x & 0xFFFFFF) / 16777216.0;
+}
+
+/* put() for the scenes, whose maths is in double as the prototype's. */
+static void putd(double x, double y, rgb_t c)
+{
+    int xi = (int)rint(x), yi = (int)rint(y);
+    if (xi >= 0 && xi < N && yi >= 0 && yi < N) {
+        s_dst[yi][xi] = c;
+        if (s_dst_mask) {
+            s_dst_mask[yi] |= 1ull << xi;
+        }
+    }
+}
+
+static void firefly(int i, double t)
+{
+    double x = 32 + 26 * sin(t * 0.4 * (1 + h01(2, i, 1, 0)) + i * 2.1);
+    double y = 30 + 20 * sin(t * 0.33 * (1 + h01(2, i, 2, 0)) + i * 1.3);
+    double glow = 0.5 + 0.5 * sin(t * 3 + i * 1.7);
+    putd(x, y, mix((rgb_t){ 80, 90, 30 }, (rgb_t){ 230, 255, 140 }, glow));
+    if (glow > 0.5) {
+        rgb_t h = mix((rgb_t){ 20, 24, 10 }, (rgb_t){ 110, 130, 50 }, glow);
+        putd(x + 1, y, h);
+        putd(x - 1, y, h);
+        putd(x, y + 1, h);
+        putd(x, y - 1, h);
+    }
+}
+
+static void snowflake(int i, double t, bool front)
+{
+    double sp = 5 + h01(2, i, 2, 0) * 6 + (front ? 4 : 0);
+    double y = pymodd(h01(2, i, 3, 0) * 64 + t * sp, 68) - 2;
+    double x = h01(2, i, 1, 0) * 64 + sin(t * 1.3 + i) * 2;
+    putd(x, y, front ? (rgb_t){ 250, 250, 255 } : (rgb_t){ 150, 160, 200 });
+    if (front) {
+        putd(x + 1, y, (rgb_t){ 200, 210, 240 });
+    }
+}
+
+static void petal(int i, double t, bool front)
+{
+    double sp = 7 + h01(2, i, 2, 0) * 6;
+    double y = pymodd(h01(2, i, 3, 0) * 64 + t * sp, 68) - 2;
+    double x = pymodd(h01(2, i, 1, 0) * 70 + t * 5 + sin(t * 1.8 + i) * 3, 70) - 3;
+    int a = pymod((int)(t * 3 + i), 2);
+    putd(x, y, front ? (rgb_t){ 255, 190, 215 } : (rgb_t){ 170, 110, 140 });
+    putd(x + 1, y + a, front ? (rgb_t){ 230, 130, 170 } : (rgb_t){ 120, 70, 100 });
+}
+
+static void scene_back(boopie_scene_t scene, double t)
+{
+    switch (scene) {
+    case BOOPIE_SCENE_STARS: {
+        for (int i = 0; i < 34; i++) {
+            int x = (int)(h01(2, i, 1, 0) * 64), y = (int)(h01(2, i, 2, 0) * 50);
+            double tw = 0.5 + 0.5 * sin(t * (1.5 + h01(2, i, 3, 0) * 2) + i);
+            if (tw > 0.35) {
+                putd(x, y, mix((rgb_t){ 40, 40, 70 }, (rgb_t){ 230, 230, 255 }, tw));
+            }
+            if (tw > 0.9 && i % 5 == 0) {
+                rgb_t c = { 90, 90, 140 };
+                putd(x + 1, y, c);
+                putd(x - 1, y, c);
+                putd(x, y + 1, c);
+                putd(x, y - 1, c);
+            }
+        }
+        double k = pymodd(t, 4.0) / 0.6;   /* a shooting star every 4 s */
+        if (k < 1) {
+            for (int j = 0; j < 6; j++) {
+                putd(50 - k * 30 + j, 4 + k * 12 - j * 0.4, mix(WHITE, (rgb_t){ 60, 60, 110 }, j / 6.0));
+            }
+        }
+        break;
+    }
+    case BOOPIE_SCENE_FIREFLIES:
+        for (int i = 0; i < 9; i++) {
+            if (i % 3) {
+                firefly(i, t);   /* every third flies in front */
+            }
+        }
+        break;
+    case BOOPIE_SCENE_SNOW:
+        for (int i = 0; i < 22; i++) {
+            snowflake(i, t, false);
+        }
+        break;
+    case BOOPIE_SCENE_PETALS:
+        for (int i = 0; i < 12; i++) {
+            petal(i, t, false);
+        }
+        break;
+    case BOOPIE_SCENE_BUBBLES:
+        for (int i = 0; i < 9; i++) {
+            double sp = 6 + h01(2, i, 2, 0) * 6;
+            int r = 1 + (int)(h01(2, i, 4, 0) * 2);
+            double y = 66 - pymodd(h01(2, i, 3, 0) * 70 + t * sp, 72);
+            double x = h01(2, i, 1, 0) * 64 + sin(t * 2 + i) * 1.5;
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dy = -r; dy <= r; dy++) {
+                    double d = hypot(dx, dy);
+                    if (r - 0.5 <= d && d <= r + 0.5) {
+                        putd(x + dx, y + dy, (rgb_t){ 90, 160, 210 });
+                    }
+                }
+            }
+            putd(x - r / 2.0, y - r / 2.0, (rgb_t){ 220, 240, 255 });
+        }
+        break;
+    case BOOPIE_SCENE_MATRIX:
+        for (int i = 0; i < 16; i++) {
+            int x = i * 4 + 1;
+            double sp = 14 + h01(2, i, 2, 0) * 16;
+            int ln = 6 + (int)(h01(2, i, 3, 0) * 8);
+            double head = pymodd(h01(2, i, 1, 0) * 90 + t * sp, 90) - 10;
+            for (int j = 0; j < ln; j++) {
+                int y = (int)head - j;
+                if (y >= 0 && y < 64 && h01(3, i, y, j == 0 ? (int)(t * 6) : 0) > 0.25) {
+                    putd(x, y, j == 0 ? (rgb_t){ 200, 255, 210 }
+                                      : mix((rgb_t){ 30, 200, 90 }, (rgb_t){ 6, 40, 18 }, (double)j / ln));
+                }
+            }
+        }
+        break;
+    case BOOPIE_SCENE_NEON_GRID: {
+        const int horizon = 44;
+        for (int x = 0; x < 64; x++) {   /* a sunset band */
+            for (int y = horizon - 10; y < horizon; y++) {
+                if (BAYER[y % 4][x % 4] < (y - horizon + 10) / 12.0) {
+                    putd(x, y, (rgb_t){ 90, 30, 90 });
+                }
+            }
+        }
+        for (int k = 0; k < 7; k++) {    /* rows rushing toward you */
+            double d = pymodd(k + t * 0.8, 7) / 7;
+            double y = horizon + d * d * 20;
+            for (int x = 0; x < 64; x++) {
+                putd(x, y, d > 0.4 ? (rgb_t){ 200, 60, 200 } : (rgb_t){ 110, 40, 130 });
+            }
+        }
+        for (int k = -8; k <= 8; k++) {  /* rails to the vanishing point */
+            for (int y = horizon; y < 64; y++) {
+                putd(32 + k * 2.2 * (y - horizon) / 6 + k * 0.6, y, (rgb_t){ 130, 50, 160 });
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+static void scene_front(boopie_scene_t scene, double t)
+{
+    if (scene == BOOPIE_SCENE_FIREFLIES) {
+        for (int i = 0; i < 9; i += 3) {
+            firefly(i, t);
+        }
+    } else if (scene == BOOPIE_SCENE_SNOW) {
+        for (int i = 22; i < 30; i++) {
+            snowflake(i, t, true);
+        }
+    } else if (scene == BOOPIE_SCENE_PETALS) {
+        for (int i = 12; i < 16; i++) {
+            petal(i, t, true);
+        }
+    }
+}
+
+/* np.roll of one row by shift, of all three channels or red alone. */
+static void roll_row(int y, int shift, bool red_only)
+{
+    rgb_t row[N];
+    memcpy(row, s_img[y], sizeof(row));
+    for (int x = 0; x < N; x++) {
+        rgb_t from = row[pymod(x - shift, N)];
+        if (red_only) {
+            s_img[y][x].r = from.r;
+        } else {
+            s_img[y][x] = from;
+        }
+    }
+}
+
+static void scene_post(boopie_scene_t scene, double t)
+{
+    if (scene != BOOPIE_SCENE_GLITCH) {
+        return;
+    }
+    for (int y = 1; y < N; y += 2) {     /* scanlines */
+        for (int x = 0; x < N; x++) {
+            rgb_t *c = &s_img[y][x];
+            *c = (rgb_t){ (uint8_t)(c->r * 0.82), (uint8_t)(c->g * 0.82), (uint8_t)(c->b * 0.82) };
+        }
+    }
+    int burst = (int)(t / 1.6);
+    if (pymodd(t, 1.6) >= 0.35) {        /* a burst every 1.6 s */
+        return;
+    }
+    for (int b = 0; b < 3; b++) {
+        int y0 = (int)(h01(3, burst, b, 1) * 56);
+        int hgt = 2 + (int)(h01(3, burst, b, 2) * 6);
+        int shift = (int)((h01(3, burst, b, 3) - 0.5) * 10);
+        for (int y = y0; y < y0 + hgt && y < N; y++) {
+            roll_row(y, shift, false);
+        }
+    }
+    for (int y = 0; y < N; y++) {        /* red split */
+        roll_row(y, 1, true);
+    }
+    for (int k = 0; k < 10; k++) {
+        int x = (int)(h01(3, burst, k, 4) * 64), y = (int)(h01(3, burst, k, 5) * 64);
+        for (int i = x; i < x + 3 && i < N; i++) {
+            s_img[y][i] = k % 2 ? (rgb_t){ 80, 255, 200 } : (rgb_t){ 255, 60, 160 };
+        }
     }
 }
 
@@ -1732,6 +1984,7 @@ static void render(const rig_t *rig, const pose_t *pose)
             put(32 + dx, 59, (rgb_t){ 22, 18, 34 });
         }
     }
+    scene_back(pose->scene, pose->scene_t);
     sparkles(32, 40, t, pose->sparkle_speed, false, acc);
     s_has_rim = true;
     s_rim = mix(acc, WHITE, 0.2);
@@ -1770,6 +2023,7 @@ static void render(const rig_t *rig, const pose_t *pose)
         outline(fr, s_rp.out);
     }
     sparkles(32, 40, t, pose->sparkle_speed, true, acc);
+    scene_front(pose->scene, pose->scene_t);
     for (int i = 0; i < pose->nfx; i++) {
         const fx_t *e = &pose->fx[i];
         switch (e->kind) {
@@ -1782,6 +2036,7 @@ static void render(const rig_t *rig, const pose_t *pose)
         case FX_BICON: icon(e->icon, rintf(an.body_x + e->x), rintf(an.body_y + e->y)); break;
         }
     }
+    scene_post(pose->scene, pose->scene_t);
     if (pose->dim < 1) {
         for (int y = 0; y < N; y++) {
             for (int x = 0; x < N; x++) {
@@ -1810,7 +2065,8 @@ float boopie_overlay_loop(boopie_overlay_t o)
 }
 
 static uint16_t s_565[N * N];
-static uint16_t s_565_dim[N * N];
+static uint16_t s_565_dim[N * N];   /* the block edge shade gives the enlarged pixels a faint grid texture */
+static void to_565_all(void);
 
 static inline uint16_t to565(float r, float g, float b)
 {
@@ -1849,15 +2105,10 @@ void boopie_pixel_render(const boopie_pixel_pose_t *in)
     s_acc[2] += (tgt.b - s_acc[2]) * k;
     s_acc_init = true;
     pose.accent = (rgb_t){ u8r(s_acc[0]), u8r(s_acc[1]), u8r(s_acc[2]) };
+    pose.scene = (int)in->scene >= 0 && in->scene < BOOPIE_SCENE_COUNT ? in->scene : BOOPIE_SCENE_DEFAULT;
+    pose.scene_t = in->scene_t;
     render(&RIGS[s_char], &pose);
-    for (int y = 0; y < N; y++) {
-        for (int x = 0; x < N; x++) {
-            rgb_t c = s_img[y][x];
-            s_565[y * N + x] = to565(c.r, c.g, c.b);
-            /* The block edge shade gives the enlarged pixels a faint grid texture. */
-            s_565_dim[y * N + x] = to565(c.r * 0.72f, c.g * 0.72f, c.b * 0.72f);
-        }
-    }
+    to_565_all();
 }
 
 const uint8_t *boopie_pixel_rgb(void)
@@ -1913,27 +2164,62 @@ void boopie_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, in
     }
 }
 
-/* ---------------------------------------------------------------- overlay layer */
+/* ---------------------------------------------------------------- compose */
 
 static rgb_t s_layer[N][N];
 static mask_t s_layer_mask;
-static uint16_t s_layer_565[N * N], s_layer_565_dim[N * N];
 
-void boopie_overlay_layer_render(boopie_overlay_set_t overlays, const double overlay_t[BOOPIE_OVERLAY_COUNT])
+static void to_565_all(void)
 {
-    static pose_t pose;
+    for (int y = 0; y < N; y++) {
+        for (int x = 0; x < N; x++) {
+            rgb_t c = s_img[y][x];
+            s_565[y * N + x] = to565(c.r, c.g, c.b);
+            s_565_dim[y * N + x] = to565(c.r * 0.72f, c.g * 0.72f, c.b * 0.72f);
+        }
+    }
+}
+
+void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t bg_mask,
+                          const boopie_pixel_pose_t *in)
+{
+    mask_t bg;
+    m_clear(bg);
+    for (int y = 0; y < N; y++) {
+        for (int x = 0; x < N; x++) {
+            uint8_t i = fb[y * N + x];
+            uint16_t c = palette[i];
+            s_img[y][x] = (rgb_t){ (uint8_t)((c >> 11) << 3), (uint8_t)(((c >> 5) & 63) << 2), (uint8_t)((c & 31) << 3) };
+            if (i < 32 && (bg_mask >> i) & 1u) {
+                bg[y] |= 1ull << x;
+            }
+        }
+    }
+    boopie_scene_t scene = (int)in->scene >= 0 && in->scene < BOOPIE_SCENE_COUNT ? in->scene : BOOPIE_SCENE_DEFAULT;
+    /* The background scene shows only where the frame is background. */
+    m_clear(s_layer_mask);
+    s_dst = s_layer;
+    s_dst_mask = s_layer_mask;
+    scene_back(scene, in->scene_t);
+    s_dst = s_img;
+    s_dst_mask = NULL;
+    for (int y = 0; y < N; y++) {
+        for (uint64_t row = s_layer_mask[y] & bg[y]; row; row &= row - 1) {
+            int x = __builtin_ctzll(row);
+            s_img[y][x] = s_layer[y][x];
+        }
+    }
+    scene_front(scene, in->scene_t);
+    static pose_t pose;   /* the overlays draw at fixed places */
     memset(&pose, 0, sizeof(pose));
     pose.light_level = 1;
-    m_clear(s_layer_mask);
     for (int o = 0; o < BOOPIE_OVERLAY_COUNT; o++) {
-        if (overlays & BOOPIE_OVERLAY_BIT(o)) {
-            double ot = overlay_t[o] < 0 ? 0 : overlay_t[o];
+        if (in->overlays & BOOPIE_OVERLAY_BIT(o)) {
+            double ot = in->overlay_t[o] < 0 ? 0 : in->overlay_t[o];
             overlay(&pose, (boopie_overlay_t)o, pymodd(ot, OVERLAY_LOOP[o]), OVERLAY_LOOP[o]);
         }
     }
-    s_dst = s_layer;
-    s_dst_mask = s_layer_mask;
-    for (int i = 0; i < pose.nfx; i++) {   /* the overlays draw at fixed places */
+    for (int i = 0; i < pose.nfx; i++) {
         const fx_t *e = &pose.fx[i];
         if (e->kind == FX_ICON) {
             icon(e->icon, e->x, e->y);
@@ -1941,33 +2227,6 @@ void boopie_overlay_layer_render(boopie_overlay_set_t overlays, const double ove
             put(e->x, e->y, e->c);
         }
     }
-    s_dst = s_img;
-    s_dst_mask = NULL;
-    for (int y = 0; y < N; y++) {
-        for (uint64_t row = s_layer_mask[y]; row; row &= row - 1) {
-            int x = __builtin_ctzll(row);
-            rgb_t c = s_layer[y][x];
-            s_layer_565[y * N + x] = to565(c.r, c.g, c.b);
-            s_layer_565_dim[y * N + x] = to565(c.r * 0.72f, c.g * 0.72f, c.b * 0.72f);
-        }
-    }
-}
-
-void boopie_overlay_layer_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1)
-{
-    for (int y = y0; y <= y1; y++, dst += stride_px) {
-        uint8_t m = s_map[y];
-        int row = m & 0x7f;
-        uint64_t bits = s_layer_mask[row];
-        if (!bits) {
-            continue;
-        }
-        for (int i = 0; i <= x1 - x0; i++) {
-            uint8_t xm = s_map[x0 + i];
-            int x = xm & 0x7f;
-            if ((bits >> x) & 1u) {
-                dst[i] = (m & 0x80) || (xm & 0x80) ? s_layer_565_dim[row * N + x] : s_layer_565[row * N + x];
-            }
-        }
-    }
+    scene_post(scene, in->scene_t);
+    to_565_all();
 }

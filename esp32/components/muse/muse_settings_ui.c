@@ -1251,11 +1251,17 @@ static const struct {
 static lv_obj_t *s_avatar_checks[BOOPIE_AVATAR_COUNT];
 static lv_obj_t *s_colour_checks[AVATAR_COLOUR_COUNT];
 static lv_obj_t *s_colour_box, *s_colour_default_swatch;
+static lv_obj_t *s_scene_checks[BOOPIE_SCENE_COUNT];
 static int s_avatar_shown = -1;
 
 static void on_avatar_choice(lv_event_t *e)
 {
     boopie_avatar_select((int)(intptr_t)lv_event_get_user_data(e));
+}
+
+static void on_scene_choice(lv_event_t *e)
+{
+    boopie_avatar_set_scene((boopie_scene_t)(intptr_t)lv_event_get_user_data(e));
 }
 
 static void on_colour_choice(lv_event_t *e)
@@ -1295,6 +1301,11 @@ static void build_avatar_page(lv_obj_t *tile)
             s_colour_default_swatch = sw;
         }
     }
+    note(list, "Background 背景");
+    for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
+        row(list, NULL, boopie_scene_name((boopie_scene_t)i), &s_scene_checks[i], on_scene_choice, (void *)(intptr_t)i);
+        lv_obj_set_style_text_color(s_scene_checks[i], lv_color_hex(COLOR_ACCENT), 0);
+    }
     note(list, "Brand characters are for personal use. 品牌形象仅供自用。");
 }
 
@@ -1303,6 +1314,10 @@ static void tick_avatar(void)
     int cur = boopie_avatar_current();
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         set_text(s_avatar_checks[i], i == cur ? LV_SYMBOL_OK : "");
+    }
+    boopie_scene_t scene = boopie_avatar_scene();
+    for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
+        set_text(s_scene_checks[i], i == (int)scene ? LV_SYMBOL_OK : "");
     }
     bool colours = boopie_avatar_recolourable(cur);
     if (colours == lv_obj_has_flag(s_colour_box, LV_OBJ_FLAG_HIDDEN)) {

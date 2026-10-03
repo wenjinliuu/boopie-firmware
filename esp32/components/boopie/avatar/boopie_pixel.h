@@ -32,6 +32,25 @@ typedef enum {
     BOOPIE_CHAR_COUNT,
 } boopie_char_t;
 
+/* Idle backgrounds, drawn behind the character, in front of it, or over the
+ * whole frame (glitch). DEFAULT is Muse's own glow and sparkles alone. */
+typedef enum {
+    BOOPIE_SCENE_DEFAULT = 0,
+    BOOPIE_SCENE_STARS,
+    BOOPIE_SCENE_FIREFLIES,
+    BOOPIE_SCENE_SNOW,
+    BOOPIE_SCENE_PETALS,
+    BOOPIE_SCENE_BUBBLES,
+    BOOPIE_SCENE_MATRIX,
+    BOOPIE_SCENE_NEON_GRID,
+    BOOPIE_SCENE_GLITCH,
+    BOOPIE_SCENE_COUNT,
+} boopie_scene_t;
+
+/* Its id ("stars") and display name ("星空"); NULL out of range. */
+const char *boopie_scene_key(boopie_scene_t s);
+const char *boopie_scene_name(boopie_scene_t s);
+
 /* Its id ("boopie", "whale") and display name ("布比"); NULL out of range. */
 const char *boopie_char_key(boopie_char_t c);
 const char *boopie_char_name(boopie_char_t c);
@@ -62,6 +81,8 @@ typedef struct {
     double overlay_t[BOOPIE_OVERLAY_COUNT];  /* seconds each has been on */
     float dt;                /* seconds since the last frame, for easing the
                               * accent; 0 jumps straight to it */
+    boopie_scene_t scene;    /* the background */
+    double scene_t;          /* seconds the background has run */
 } boopie_pixel_pose_t;
 
 /* Render one frame into the grid. */
@@ -75,9 +96,10 @@ void boopie_pixel_set_size(int px);
 void boopie_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);
 
 /*
- * The overlays' icons alone, on a layer of their own, for a character this
- * file doesn't draw (Muse's own): render it each frame, then lay it over the
- * scaled frame, as boopie_pixel_scale() blows it up.
+ * A frame some other renderer drew (Muse's own: palette indices and an RGB565
+ * palette, bit i of bg_mask set for each index that is background) composed
+ * with this file's background scene and overlays, ready for
+ * boopie_pixel_scale(). pose's expression is ignored.
  */
-void boopie_overlay_layer_render(boopie_overlay_set_t overlays, const double overlay_t[BOOPIE_OVERLAY_COUNT]);
-void boopie_overlay_layer_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);
+void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t bg_mask,
+                          const boopie_pixel_pose_t *pose);

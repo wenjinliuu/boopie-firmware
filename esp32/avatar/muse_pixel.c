@@ -1266,3 +1266,14 @@ void muse_pixel_render(const muse_pose_t *p)
     }
     draw_pet_effects(&j, top, eye_y, pt);
 }
+
+/* Boopie: the frame, for composing a background scene and overlays over it
+ * (boopie_pixel_compose): palette indices, the palette, and which indices are
+ * background. */
+bool jolly_pixel_frame(const uint8_t **fb, const uint16_t **palette, uint32_t *bg_mask)
+{
+    *fb = s_fb;
+    *palette = s_pal;
+    *bg_mask = (1u << C_BG) | (1u << C_AURA1) | (1u << C_AURA2) | (1u << C_SHADOW);
+    return true;
+}

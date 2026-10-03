@@ -64,9 +64,10 @@ class BoopiePixelTest(unittest.TestCase):
                              check=True).stdout
         return np.frombuffer(out, np.uint8).reshape(-1, N, N, 3)
 
-    def compare(self, jobs) -> None:
+    def compare(self, jobs, scene: str | None = None) -> None:
         """jobs: (rig class, expression, t, overlay or None) each."""
-        lines = [f"{R.key} {e} {t!r} {o} {t!r}\n" if o else f"{R.key} {e} {t!r}\n" for R, e, t, o in jobs]
+        tail = f" scene:{scene}\n" if scene else "\n"
+        lines = [f"{R.key} {e} {t!r} {o} {t!r}{tail}" if o else f"{R.key} {e} {t!r}{tail}" for R, e, t, o in jobs]
         frames = self.render_c(lines)
         loops = {n: ln for n, ln, _ in ap.EXPRESSIONS}
         overlay_loops = {n: ln for n, ln, _ in ap.OVERLAYS}
@@ -75,6 +76,8 @@ class BoopiePixelTest(unittest.TestCase):
             p = ap.pose_for(e, t, loops[e])
             if o:
                 p = ap.overlay(p, o, t, overlay_loops[o])
+            if scene:
+                p.scene = scene
             want = ap.render(R(), p)
             diff = float((want != got).any(-1).mean())
             diffs.append(diff)
@@ -97,6 +100,16 @@ class BoopiePixelTest(unittest.TestCase):
                 for R in ap.CHARACTERS for name, length, _ in ap.OVERLAYS if name not in UNMATCHED
                 for i in range(0, round(length * ap.FPS), STEP)]
         self.compare(jobs)
+
+    def test_scenes(self) -> None:
+        self.assertEqual(list(ap.SCENES), ["default", "stars", "fireflies", "snow", "petals", "bubbles", "matrix",
+                                           "neon_grid", "glitch"])
+        for scene in ap.SCENES:
+            # The pose loops every 3 s but the scene runs on; t past a loop
+            # differs, so stay inside one.
+            jobs = [(R, "idle", i / ap.FPS, None) for R in (ap.Boopie, ap.Codex) for i in range(0, 36, 3)]
+            with self.subTest(scene=scene):
+                self.compare(jobs, scene)
 
     def test_characters(self) -> None:
         self.assertEqual([R.key for R in ap.CHARACTERS], ["boopie", "gpt", "codex", "klaude", "whale", "doubao"])

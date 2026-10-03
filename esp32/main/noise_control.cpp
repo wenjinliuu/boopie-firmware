@@ -1338,13 +1338,15 @@ static char *build_register_json(void) {
         "Pet expression shown while idle: hungry, eating, sleepy, sad or dizzy; idle clears it."));
     cJSON_AddItemToObject(avatar_optional, "reaction", string_param(
         "Effect over any expression: surprise, blush, confetti or hearts. Turned on, or off with on=false."));
+    cJSON_AddItemToObject(avatar_optional, "background", string_param(
+        "Idle background: default, stars, fireflies, snow, petals, bubbles, matrix, neon_grid or glitch."));
     cJSON *avatar_on = cJSON_CreateObject();
     cJSON_AddStringToObject(avatar_on, "type", "boolean");
     cJSON_AddStringToObject(avatar_on, "description", "With reaction: on (default) or off.");
     cJSON_AddItemToObject(avatar_optional, "on", avatar_on);
     add_command(commands, "display.avatar",
-                "Change the character on screen, its colour, its pet expression "
-                "or a reaction. Without parameters, reports the current ones.",
+                "Change the character on screen, its colour, its background, its "
+                "pet expression or a reaction. Without parameters, reports the current ones.",
                 nullptr, avatar_optional);
 #endif
 

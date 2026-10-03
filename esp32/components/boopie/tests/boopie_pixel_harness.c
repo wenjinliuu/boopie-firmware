@@ -4,10 +4,12 @@
  */
 
 /* Renders frames for test_boopie_pixel.py. Each stdin line is
- *   <character> <expression> <t> [<overlay> <overlay_t>]
+ *   <character> <expression> <t> [<overlay> <overlay_t>] [scene:<scene>]
+ * (the scene runs on the same clock as the expression)
  * and gets one frame on stdout, BOOPIE_PX x BOOPIE_PX x 3 bytes of RGB. A
  * line "time" instead prints the mean milliseconds a frame takes. */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -44,8 +46,14 @@ int main(void)
             printf("%.3f\n", (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC / n);
             continue;
         }
+        char scene[32] = "";
+        char *sp = strstr(line, "scene:");
+        if (sp) {
+            sscanf(sp + 6, "%31s", scene);
+            *sp = '\0';
+        }
         int got = sscanf(line, "%31s %31s %lf %31s %lf", ckey, ekey, &t, okey, &ot);
-        boopie_pixel_pose_t p = { .t = t, .level = -1 };
+        boopie_pixel_pose_t p = { .t = t, .level = -1, .scene_t = t };
         int c = char_from_key(ckey);
         if (got < 3 || c < 0 || !boopie_expr_from_name(ekey, &p.expr)) {
             fprintf(stderr, "bad line: %s", line);
@@ -59,6 +67,19 @@ int main(void)
             }
             p.overlays = BOOPIE_OVERLAY_BIT(o);
             p.overlay_t[o] = ot;
+        }
+        if (scene[0]) {
+            bool found = false;
+            for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
+                if (strcmp(boopie_scene_key((boopie_scene_t)i), scene) == 0) {
+                    p.scene = (boopie_scene_t)i;
+                    found = true;
+                }
+            }
+            if (!found) {
+                fprintf(stderr, "bad scene: %s\n", scene);
+                return 1;
+            }
         }
         boopie_pixel_set_character((boopie_char_t)c, BOOPIE_COLOUR_DEFAULT);
         boopie_pixel_render(&p);

@@ -32,6 +32,10 @@ const char *boopie_avatar_name(int avatar);
 int boopie_avatar_current(void);
 void boopie_avatar_select(int avatar);
 
+/* The idle background, any character; kept in NVS like the rest. */
+boopie_scene_t boopie_avatar_scene(void);
+void boopie_avatar_set_scene(boopie_scene_t scene);
+
 /* Muse's own character keeps its colours. */
 bool boopie_avatar_recolourable(int avatar);
 
@@ -62,7 +66,8 @@ void boopie_avatar_set_overlay(boopie_overlay_t overlay, bool on);
  * The display.avatar command: any of these may be NULL to leave it as is.
  * avatar is an id ("boopie"); colour is RRGGBB or "default"; pet an
  * expression id ("hungry", "idle" to clear); reaction an overlay id, turned
- * on or off. On a bad value returns false with *error set, changing nothing.
+ * on or off; scene a background id ("stars"). On a bad value returns false
+ * with *error set, changing nothing.
  */
 bool boopie_avatar_command(const char *avatar, const char *colour, const char *pet, const char *reaction,
-                           bool on, const char **error);
+                           const char *scene, bool on, const char **error);

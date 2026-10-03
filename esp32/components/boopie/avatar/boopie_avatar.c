@@ -40,11 +40,26 @@ __attribute__((weak)) void jolly_pixel_set_extra(int pet, float pet_t, bool blus
     (void)wide;
 }
 
+/* Its frame, to compose the background and overlays over; a custom avatar
+ * without it is shown as it draws itself. */
+__attribute__((weak)) bool jolly_pixel_frame(const uint8_t **fb, const uint16_t **palette, uint32_t *bg_mask)
+{
+    (void)fb;
+    (void)palette;
+    (void)bg_mask;
+    return false;
+}
+
+static bool s_muse_composed;   /* the last Muse frame went through boopie_pixel_compose */
+
 #define LOW_BATTERY_PCT 15
 
 static bool s_loaded;
+static void ensure_loaded(void);
+static void save(void);
 static int s_avatar = BOOPIE_AVATAR_MUSE;
 static uint32_t s_colour[BOOPIE_AVATAR_COUNT];
+static boopie_scene_t s_scene = BOOPIE_SCENE_DEFAULT;
 static volatile int s_pet = BOOPIE_EXPR_IDLE;
 static volatile uint8_t s_overlays;            /* the reactions set */
 static float s_pet_since = -1;                 /* when the pet expression began, in pose.t */
@@ -83,6 +98,32 @@ static int from_key(const char *key)
     return -1;
 }
 
+static int scene_from_key(const char *key)
+{
+    for (int i = 0; key && i < BOOPIE_SCENE_COUNT; i++) {
+        if (strcmp(boopie_scene_key((boopie_scene_t)i), key) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+boopie_scene_t boopie_avatar_scene(void)
+{
+    ensure_loaded();
+    return s_scene;
+}
+
+void boopie_avatar_set_scene(boopie_scene_t scene)
+{
+    ensure_loaded();
+    if ((int)scene < 0 || scene >= BOOPIE_SCENE_COUNT || scene == s_scene) {
+        return;
+    }
+    s_scene = scene;
+    save();
+}
+
 bool boopie_avatar_recolourable(int avatar)
 {
     return avatar > BOOPIE_AVATAR_MUSE && avatar < BOOPIE_AVATAR_COUNT;
@@ -118,6 +159,11 @@ static void load(void)
         snprintf(ck, sizeof ck, "c_%s", boopie_avatar_key(i));
         nvs_get_u32(h, ck, &s_colour[i]);
     }
+    n = sizeof key;
+    if (nvs_get_str(h, "scene", key, &n) == ESP_OK) {
+        int sc = scene_from_key(key);
+        s_scene = sc >= 0 ? (boopie_scene_t)sc : BOOPIE_SCENE_DEFAULT;
+    }
     nvs_close(h);
     ESP_LOGI(TAG, "avatar %s", boopie_avatar_key(s_avatar));
 }
@@ -135,6 +181,7 @@ static void save(void)
         snprintf(ck, sizeof ck, "c_%s", boopie_avatar_key(i));
         nvs_set_u32(h, ck, s_colour[i]);
     }
+    nvs_set_str(h, "scene", boopie_scene_key(s_scene));
     nvs_commit(h);
     nvs_close(h);
 }
@@ -154,6 +201,10 @@ static void load(void)
     boopie_expr_t e;
     if (boopie_expr_from_name(getenv("BOOPIE_PET"), &e)) {
         s_pet = e;
+    }
+    int sc = scene_from_key(getenv("BOOPIE_SCENE"));
+    if (sc >= 0) {
+        s_scene = (boopie_scene_t)sc;
     }
     boopie_overlay_t o;
     if (boopie_overlay_from_name(getenv("BOOPIE_OVERLAY"), &o)) {
@@ -253,9 +304,13 @@ void boopie_avatar_set_overlay(boopie_overlay_t overlay, bool on)
 }
 
 bool boopie_avatar_command(const char *avatar, const char *colour, const char *pet, const char *reaction,
-                           bool on, const char **error)
+                           const char *scene, bool on, const char **error)
 {
-    int a = -1;
+    int a = -1, sc = -1;
+    if (scene && (sc = scene_from_key(scene)) < 0) {
+        *error = "unknown background";
+        return false;
+    }
     uint32_t rgb = 0;
     boopie_expr_t e = BOOPIE_EXPR_IDLE;
     boopie_overlay_t o = BOOPIE_OVERLAY_COUNT;
@@ -300,6 +355,9 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
     if (reaction) {
         boopie_avatar_set_overlay(o, on);
     }
+    if (sc >= 0) {
+        boopie_avatar_set_scene((boopie_scene_t)sc);
+    }
     return true;
 }
 
@@ -336,8 +394,11 @@ void muse_pixel_set_size(int px)
 void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1)
 {
     if (s_avatar == BOOPIE_AVATAR_MUSE) {
-        jolly_pixel_scale(dst, stride_px, x0, x1, y0, y1);
-        boopie_overlay_layer_scale(dst, stride_px, x0, x1, y0, y1);
+        if (s_muse_composed) {
+            boopie_pixel_scale(dst, stride_px, x0, x1, y0, y1);
+        } else {
+            jolly_pixel_scale(dst, stride_px, x0, x1, y0, y1);
+        }
     } else {
         boopie_pixel_scale(dst, stride_px, x0, x1, y0, y1);
     }
@@ -411,6 +472,8 @@ void muse_pixel_render(const muse_pose_t *p)
     }
     s_shown_overlays = on;
     bp.overlays = on;
+    bp.scene = p->mode == MUSE_MODE_OFF ? BOOPIE_SCENE_DEFAULT : s_scene;
+    bp.scene_t = p->t;
     if (s_avatar == BOOPIE_AVATAR_MUSE) {
         /* Muse's own renderer draws the expression, a pet one included, and
          * the face changes of two overlays; the overlay icons go on a layer
@@ -420,7 +483,13 @@ void muse_pixel_render(const muse_pose_t *p)
                               on & BOOPIE_OVERLAY_BIT(BOOPIE_OVERLAY_BLUSH),
                               on & BOOPIE_OVERLAY_BIT(BOOPIE_OVERLAY_SURPRISE));
         jolly_pixel_render(p);
-        boopie_overlay_layer_render(on, bp.overlay_t);
+        const uint8_t *fb;
+        const uint16_t *palette;
+        uint32_t bg;
+        s_muse_composed = jolly_pixel_frame(&fb, &palette, &bg);
+        if (s_muse_composed) {
+            boopie_pixel_compose(fb, palette, bg, &bp);
+        }
         return;
     }
     boopie_pixel_render(&bp);

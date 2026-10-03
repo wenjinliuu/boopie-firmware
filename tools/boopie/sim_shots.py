@@ -5,7 +5,8 @@
 """Renders each avatar state in the UI simulator and saves PNGs plus contact
 sheets, so UI changes can be checked from CI without a board: Muse's own
 character in every state (contact-sheet.png), every character in a few
-(avatars.png), and the pet expressions and overlays on Boopie and Muse (pets.png).
+(avatars.png), the pet expressions and overlays on Boopie and Muse (pets.png),
+and both in every background (scenes.png).
 
   python3 tools/boopie/sim_shots.py --binary build/simulator/muse_simulator --out shots
 
@@ -57,6 +58,8 @@ PETS = [(e, {"BOOPIE_PET": e}) for e in ("hungry", "eating", "sleepy", "sad", "d
        [(o, {"BOOPIE_OVERLAY": o}) for o in ("surprise", "blush", "confetti", "hearts")] + \
        [("low_battery", {"BATTERY": "9"}), ("charging", {"CHARGING": "1"})]
 
+SCENES = ["default", "stars", "fireflies", "snow", "petals", "bubbles", "matrix", "neon_grid", "glitch"]
+
 COMMON = [
     "battery=72",
     "usb=false",
@@ -101,6 +104,13 @@ def render_avatars(binary: Path, out: Path) -> list[Path]:
     return pngs
 
 
+def render_scenes(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"scene-{avatar}-{scene}.png", ["face=idle"],
+                      {"BOOPIE_AVATAR": avatar, "BOOPIE_SCENE": scene}, 1000)
+                for avatar in ("muse", "boopie") for scene in SCENES]
+
+
 def render_pets(binary: Path, out: Path) -> list[Path]:
     with tempfile.TemporaryDirectory() as tmp:
         return [shoot(binary, Path(tmp), out / f"pet-{avatar}-{name}.png", ["face=idle"],
@@ -135,7 +145,9 @@ def main() -> int:
     contact_sheet(avatars, args.out / "avatars.png", cols=len(AVATAR_STATES))
     pets = render_pets(args.binary, args.out)
     contact_sheet(pets, args.out / "pets.png", cols=6)
-    print(f"{len(pngs) + len(avatars) + len(pets)} screenshots in {args.out}", file=sys.stderr)
+    scenes = render_scenes(args.binary, args.out)
+    contact_sheet(scenes, args.out / "scenes.png", cols=len(SCENES))
+    print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes)} screenshots in {args.out}", file=sys.stderr)
     return 0
 
 
