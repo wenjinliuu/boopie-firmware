@@ -41,6 +41,7 @@
 #include "boopie_font.h"
 #include "boopie_avatar.h"
 #include "boopie_guide.h"
+#include "boopie_setup.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -1467,11 +1468,19 @@ static void on_guide(lv_event_t *e)
     boopie_guide_start();
 }
 
+/* Boopie: phone setup over the board's hotspot. */
+static void on_phone_setup(lv_event_t *e)
+{
+    (void)e;
+    boopie_setup_open(NULL);
+}
+
 static void build_home(lv_obj_t *tile)
 {
     lv_obj_t *list;
     s_home = page(tile, "SETTINGS", false, &list);
     row(list, LV_SYMBOL_WIFI, "Wi-Fi", &s_home_wifi, on_nav, (void *)&WIFI);
+    row(list, LV_SYMBOL_UPLOAD, "Phone 手机设置", NULL, on_phone_setup, NULL);   /* Boopie */
     row(list, LV_SYMBOL_HOME, "Muse", &s_home_hatch, on_nav, (void *)&HATCH);
     row(list, LV_SYMBOL_IMAGE, "Avatar", &s_home_avatar, on_nav, (void *)&AVATAR);   /* Boopie */
     row(list, LV_SYMBOL_BLUETOOTH, "Bluetooth", &s_home_ble, on_nav, (void *)&BLE);

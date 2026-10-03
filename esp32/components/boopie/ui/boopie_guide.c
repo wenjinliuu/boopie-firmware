@@ -12,6 +12,8 @@
 #include "boopie_font.h"
 #include "boopie_input.h"
 #include "boopie_pixel.h"
+#include "boopie_setup.h"
+#include "boopie_setup_web.h"
 #include "muse_ui.h"
 
 #define COLOR_TEXT 0xf2efff
@@ -135,6 +137,24 @@ static void on_wifi(lv_event_t *e)
     muse_ui_open_settings("wifi");
 }
 
+/* Phone setup can set the brain and Muse's token too: if it did, on to the
+ * pet; if not, the brain is next, as from the Wi-Fi page. */
+static void phone_done(uint32_t saved)
+{
+    if (s_root) {
+        s_step = saved & BOOPIE_SETUP_SAVED_BRAIN ? S_PET : S_BRAIN;
+    }
+}
+
+static void on_phone(lv_event_t *e)
+{
+    (void)e;
+    s_away = true;
+    s_step = s_step == S_BRAIN_SETUP ? S_PET : S_BRAIN;
+    lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+    boopie_setup_open(s_step == S_PET ? NULL : phone_done);
+}
+
 static void on_brain(lv_event_t *e)
 {
     boopie_avatar_set_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));
@@ -227,8 +247,9 @@ static void show_step(step_t step)
         button(col, 220, "开始", true, on_next, 0);
         break;
     case S_ONLINE:
-        col = page("先连上网", "选一个 Wi-Fi，输入密码。\n不联网也能先养着我。");
-        button(col, 260, "选 Wi-Fi", true, on_wifi, 0);
+        col = page("先连上网", "用手机扫码，一次填完 Wi-Fi、\n大脑和密钥；或者在我这里选。");
+        button(col, 260, "手机扫码设置", true, on_phone, 0);
+        button(col, 260, "在屏幕上选 Wi-Fi", false, on_wifi, 0);
         button(col, 260, "稍后再说", false, on_next, 0);
         break;
     case S_BRAIN:
@@ -238,7 +259,10 @@ static void show_step(step_t step)
         break;
     case S_BRAIN_SETUP:
         if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
-            col = page("Muse", "需要 Muse token\n和能访问海外的网络。\n稍后在 设置 › Muse 里配对。");
+            col = page("Muse", "需要 Muse token\n和能访问海外的网络。\ntoken 很长，用手机粘贴。");
+            button(col, 220, "手机扫码填写", true, on_phone, 0);
+            button(col, 220, "稍后再说", false, on_next, 0);
+            break;
         } else {
             col = page("小智", "小智的服务器还在准备中。\n接通以后，\n这里会显示激活码。");
         }

@@ -176,7 +176,7 @@ PAGES = [("page-home", []), ("page-apps", ["swipe=right"]), ("page-settings", ["
          ("input-pinyin", ["input=", "tap=233,284", "tap=335,234"]),   # keys 6 then 4: ni, mi ...
          ("input-typed", ["input=", "tap=233,284", "tap=335,234", "tap=86,184"])]
 # The setup guide (BOOPIE_GUIDE): its first page, and choosing the pet.
-GUIDE = [("guide-hello", []),
+GUIDE = [("guide-hello", []), ("guide-online", ["tap=233,386", "advance=200"]),
          ("guide-pet", ["tap=233,386", "advance=200", "tap=233,386", "advance=200", "tap=233,324", "advance=200",
                         "tap=233,386", "advance=200"])]
 
@@ -195,12 +195,25 @@ def render_guide(binary: Path, out: Path) -> list[Path]:
                 for name, steps in GUIDE]
 
 
+# Phone setup: the hotspot's QR code, the page's once a phone has joined, and
+# what the page saved (all five).
+PHONE = [("setup-join", {}), ("setup-open", {"BOOPIE_SETUP_CLIENTS": "1"}),
+         ("setup-saved", {"BOOPIE_SETUP_CLIENTS": "1", "BOOPIE_SETUP_SAVED": "31"})]
+
+
+def render_phone(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", "menu=setup", "advance=300"],
+                      env, 400)
+                for name, env in PHONE]
+
+
 # The settings pages, reached by a scripted finger (466 px screen).
 SETTINGS = [
     ("settings-home", ["swipe=left"]),
     ("settings-wifi", ["swipe=left", "tap=230,113", "advance=600"]),
     ("settings-wifi-password", ["swipe=left", "tap=230,113", "advance=600", "tap=230,459", "advance=600"]),
-    ("settings-avatar", ["swipe=left", "tap=230,249", "advance=600"]),
+    ("settings-avatar", ["swipe=left", "tap=230,317", "advance=600"]),
 ]
 
 
@@ -245,6 +258,7 @@ def main() -> int:
     pages = render_pages(args.binary, args.out)
     pages += render_guide(args.binary, args.out)
     contact_sheet(pages, args.out / "pages.png", cols=len(PAGES))
+    pages += render_phone(args.binary, args.out)
     settings = render_settings(args.binary, args.out)
     contact_sheet(settings, args.out / "settings.png", cols=len(SETTINGS))
     wears = render_accessories(args.binary, args.out)

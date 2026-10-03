@@ -117,3 +117,41 @@ int muse_wifi_scan_results(muse_wifi_ap_t *out, int max, uint32_t *gen)
     }
     return n;
 }
+
+/* Boopie: phone setup's hotspot. BOOPIE_SETUP_CLIENTS (phones joined) and
+ * BOOPIE_SETUP_SAVED (what the page saved, as bits) stand in for a phone. */
+#include <stdlib.h>
+#include "boopie_setup_web.h"
+
+static bool s_setup_on;
+
+bool boopie_setup_web_start(boopie_setup_ap_t *ap)
+{
+    snprintf(ap->ssid, sizeof ap->ssid, "%s", "Boopie-1A2B");
+    snprintf(ap->pass, sizeof ap->pass, "%s", "k7m2p9qa");
+    s_setup_on = true;
+    return true;
+}
+void boopie_setup_web_stop(void) { s_setup_on = false; }
+int boopie_setup_web_clients(void)
+{
+    const char *n = getenv("BOOPIE_SETUP_CLIENTS");
+    return s_setup_on && n ? atoi(n) : 0;
+}
+uint32_t boopie_setup_web_saves(uint32_t *saved)
+{
+    const char *bits = getenv("BOOPIE_SETUP_SAVED");
+    uint32_t b = s_setup_on && bits ? (uint32_t)strtoul(bits, NULL, 0) : 0;
+    if (saved) {
+        *saved = b;
+    }
+    return b ? 1 : 0;
+}
+int boopie_setup_web_idle_s(void) { return 0; }
+size_t boopie_setup_subscription(char *out, size_t cap)
+{
+    if (cap) {
+        out[0] = '\0';
+    }
+    return 0;
+}

@@ -18,6 +18,7 @@
 #include "boopie_pages.h"   /* Boopie: the power menu */
 #include "boopie_games.h"   /* Boopie: the buttons in a game */
 #include "boopie_input.h"   /* Boopie: text entry */
+#include "boopie_setup.h"   /* Boopie: phone setup */
 #include "boopie_sound.h"   /* Boopie: goodbye */
 #include "muse_input.h"
 
@@ -146,6 +147,10 @@ static void aux_single(void)
         boopie_pages_menu_close();
     } else if (boopie_games_active()) {
         boopie_games_key(false);   /* leave the game */
+    } else if (boopie_setup_active()) {
+        muse_board->display_lock(-1);
+        boopie_setup_close();      /* the hotspot goes too */
+        muse_board->display_unlock();
     } else if (boopie_input_active()) {
         muse_board->display_lock(-1);
         boopie_input_cancel();     /* put away the keys */
@@ -312,7 +317,8 @@ static void check_sleep(void)
 {
     muse_ble_status_t ble;
     muse_ble_status(&ble);
-    bool prompt = ble.passkey || muse_link_state() == MUSE_LINK_CONFIRM;
+    /* Boopie: so does phone setup, while a phone reads the screen. */
+    bool prompt = ble.passkey || muse_link_state() == MUSE_LINK_CONFIRM || boopie_setup_active();
     if (prompt) {
         set_asleep(false, "pairing");
         return;

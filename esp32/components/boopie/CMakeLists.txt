@@ -29,7 +29,7 @@ endif()
 
 idf_component_register(
     SRCS ${srcs}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup"
     REQUIRES esp_driver_i2c
     PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs
 )

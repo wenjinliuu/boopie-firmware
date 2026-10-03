@@ -56,6 +56,8 @@
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
 /* Boopie: the smooth Chinese font from the assets pack (BOOPIE_ASSETS). */
+/* Boopie: QR codes for phone setup (ui/boopie_setup.c). */
+#define LV_USE_QRCODE 1
 #define LV_USE_TINY_TTF 1
 #define LV_TINY_TTF_FILE_SUPPORT 0
 #define LV_TINY_TTF_CACHE_GLYPH_CNT 256

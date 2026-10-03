@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boopie 设置</title>
+<style>
+:root{--bg:#0e0b1c;--card:#1a1530;--line:#2e2552;--text:#f2efff;--dim:#8b84a8;--accent:#a47cff;--ok:#7ee0a0;--bad:#ff8a8a}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC",sans-serif}
+main{max-width:520px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:24px;margin:8px 0 4px}
+p.lead{color:var(--dim);margin:0 0 16px}
+section{background:var(--card);border-radius:16px;padding:14px 16px;margin:12px 0}
+h2{font-size:17px;margin:0 0 8px}
+label{display:block;color:var(--dim);font-size:14px;margin:10px 0 4px}
+input,select,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#120f24;color:var(--text);font:inherit}
+textarea{min-height:72px;resize:vertical;font-size:13px;word-break:break-all}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.choice{display:flex;gap:8px}
+.choice label{flex:1;margin:0;padding:10px;border:1px solid var(--line);border-radius:10px;color:var(--text);text-align:center}
+.choice input{display:none}
+.choice label:has(input:checked){border-color:var(--accent);background:#2a2150}
+.note{color:var(--dim);font-size:13px;margin:6px 0 0}
+button{border:0;border-radius:12px;padding:12px 16px;font:inherit;background:var(--line);color:var(--text)}
+button.main{width:100%;background:var(--accent);color:#14102a;font-weight:600;margin-top:8px}
+button.small{flex:0 0 auto;padding:10px 12px}
+#msg{min-height:24px;margin:12px 0 0;text-align:center}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+<h1>Boopie 设置</h1>
+<p class="lead">填好要改的项，点“保存”。留空的不会改。</p>
+
+<section>
+<h2>Wi-Fi</h2>
+<label for="ssid">网络</label>
+<div class="row"><select id="ssid"></select><button class="small" type="button" id="rescan">刷新</button></div>
+<div id="otherbox" hidden><label for="other">网络名称</label><input id="other" maxlength="32" autocomplete="off"></div>
+<label for="pass">密码</label>
+<input id="pass" type="password" maxlength="63" autocomplete="off" placeholder="开放网络留空">
+<p class="note" id="wifinow"></p>
+</section>
+
+<section>
+<h2>大脑</h2>
+<div class="choice">
+<label><input type="radio" name="brain" value="0">小智 · 国内</label>
+<label><input type="radio" name="brain" value="1">Muse · 海外</label>
+</div>
+<p class="note">没选就是小智。</p>
+</section>
+
+<section>
+<h2>Muse</h2>
+<label for="token">Token</label>
+<textarea id="token" maxlength="1023" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+<label for="vm">VM</label>
+<input id="vm" maxlength="63" autocomplete="off" autocapitalize="off">
+<label for="host">服务器</label>
+<input id="host" maxlength="63" autocomplete="off" autocapitalize="off">
+</section>
+
+<section>
+<h2>代理订阅（Shadowsocks）</h2>
+<label for="sub">订阅链接或 ss:// 链接</label>
+<textarea id="sub" maxlength="1023" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+<div class="row" id="subclear" hidden><label style="margin:6px 0 0"><input type="checkbox" id="subdel" style="width:auto"> 删除已保存的订阅</label></div>
+<p class="note">只有 Muse 走代理，小智直连。</p>
+</section>
+
+<section>
+<h2>名字</h2>
+<input id="name" maxlength="24" autocomplete="off" placeholder="最多 8 个字">
+</section>
+
+<button class="main" id="save" type="button">保存</button>
+<p id="msg"></p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let state={};
+function msg(t,ok){const m=$('msg');m.textContent=t;m.className=ok?'ok':'bad'}
+function fill(s){
+  state=s;
+  const sel=$('ssid'),keep=sel.value;
+  sel.innerHTML='';
+  const add=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o)};
+  add('','不改');
+  for(const ap of s.aps){add(ap.s,ap.s+(ap.l?' 🔒':'')+'  '+(ap.r>-60?'▂▄▆':ap.r>-75?'▂▄':'▂'))}
+  add('\u0001','其他网络…');
+  if(keep)sel.value=keep;
+  $('wifinow').textContent=s.wifi?('现在连的是 '+s.wifi):'还没连 Wi-Fi';
+  for(const r of document.getElementsByName('brain'))r.checked=(+r.value===s.brain);
+  $('token').placeholder=s.token?('已保存（'+s.token+' 个字符），留空不改'):'粘贴 Muse token';
+  $('vm').value=s.vm;$('host').value=s.host;
+  $('sub').placeholder=s.sub?'已保存，留空不改':'https://… 或 ss://…';
+  $('subclear').hidden=!s.sub;
+  $('name').value=s.name;
+}
+async function load(){
+  try{const r=await fetch('/api/state');fill(await r.json())}catch(e){msg('连不上 Boopie，确认还连着它的热点',false)}
+}
+$('ssid').onchange=()=>{$('otherbox').hidden=$('ssid').value!=='\u0001'};
+$('rescan').onclick=async()=>{
+  msg('正在找 Wi-Fi…',true);
+  try{await fetch('/api/scan');setTimeout(async()=>{await load();msg('',true)},4000)}catch(e){msg('刷新失败',false)}
+};
+$('save').onclick=async()=>{
+  const f=new URLSearchParams();
+  let ssid=$('ssid').value;
+  if(ssid==='\u0001')ssid=$('other').value.trim();
+  if(ssid){f.set('ssid',ssid);f.set('pass',$('pass').value)}
+  const b=[...document.getElementsByName('brain')].find(r=>r.checked);
+  if(b&&+b.value!==state.brain)f.set('brain',b.value);
+  const tok=$('token').value.trim();if(tok)f.set('token',tok);
+  if($('vm').value.trim()!==state.vm)f.set('vm',$('vm').value.trim());
+  if($('host').value.trim()!==state.host)f.set('host',$('host').value.trim());
+  const sub=$('sub').value.trim();
+  if(sub)f.set('sub',sub);else if($('subdel').checked)f.set('sub','');
+  if($('name').value.trim()!==state.name)f.set('name',$('name').value.trim());
+  if(![...f.keys()].length){msg('没有要改的',false);return}
+  $('save').disabled=true;
+  try{
+    const r=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:f.toString()});
+    const j=await r.json();
+    msg(j.msg,j.ok);
+    if(j.ok){$('token').value='';$('sub').value='';$('pass').value='';$('subdel').checked=false;
+      if(!f.has('ssid'))load()}
+  }catch(e){msg(f.has('ssid')?'已保存。Boopie 正在连 Wi-Fi，热点可能会断开一下':'保存失败，再试一次',f.has('ssid'))}
+  $('save').disabled=false;
+};
+load();
+</script>
+</body>
+</html>

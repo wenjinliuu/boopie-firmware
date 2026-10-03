@@ -51,6 +51,7 @@
 #include "boopie_pages.h"  /* Boopie: the pages round the face */
 #include "boopie_games.h"  /* Boopie: the games, over everything */
 #include "boopie_guide.h"  /* Boopie: the setup guide */
+#include "boopie_setup.h"  /* Boopie: phone setup over the hotspot */
 
 static const char *TAG = "muse_ui";
 
@@ -1194,7 +1195,8 @@ static void update_chrome(float now)
         }
         muse_settings_ui_tick(lv_obj_get_scroll_x(s_tv) > lv_obj_get_x(s_face));
         boopie_pages_tick(active == s_apps || active == s_cards || active == s_pet ? active : NULL);
-        boopie_guide_tick(active == s_face);
+        boopie_setup_tick();
+        boopie_guide_tick(active == s_face && !boopie_setup_active());
     }
 
     /* Joining, the icon blinks: the compact layout has no state label. */
