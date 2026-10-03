@@ -24,9 +24,9 @@
 
 /* Where the food overlay's bowl sits, in grid cells (inclusive): a tap
  * inside feeds the pet. */
-#define BOOPIE_FOOD_X0 44
+#define BOOPIE_FOOD_X0 46
 #define BOOPIE_FOOD_Y0 42
-#define BOOPIE_FOOD_X1 61
+#define BOOPIE_FOOD_X1 63
 #define BOOPIE_FOOD_Y1 59
 
 /* What the food overlay offers: a different one each meal. */

@@ -84,7 +84,7 @@ OVERLAYS = [
 ]
 
 # Where the food bowl sits (the food overlay): tap inside to feed.
-FOOD_BOX = (44, 42, 61, 59)   # x0, y0, x1, y1, grid cells, inclusive
+FOOD_BOX = (46, 42, 63, 59)   # x0, y0, x1, y1, grid cells, inclusive
 # What the pet may be offered (icons), a different one each meal, centred on
 # the rice bowl's place and bottom-aligned with it.
 FOODS = ["rice", "drumstick", "onigiri", "fish", "big_cookie"]
@@ -117,7 +117,7 @@ ICONS = {
     "cookie": ([".###.", "#o##o", "###o#", "#o###", ".###."], {"#": (214, 150, 80), "o": (110, 64, 34)}),
     "battery": (["#######.", "#r....##", "#r....##", "#######."], {"#": (220, 220, 230), "r": RED}),
     "bolt": (["..##", ".##.", "####", ".##.", "##.."], {"#": (255, 230, 90)}),
-    "bubble": ([".#####.", "#.....#", "#.....#", "#.....#", ".#####.", "..#....", ".#....."],
+    "bubble": ([".#####.", "#.....#", "#.....#", "#.....#", ".#####.", "....#..", ".....#."],
                {"#": (200, 195, 225)}),
     "code": (["#...#", "#.#.#", "#...#"], {"#": (150, 245, 200)}),
     "rice": (["..o...o...o", ".o...o...o.", "wwwwwwwwwww", "#wwwwwwwww#", ".#########.", "..#######..", "...#####..."],
@@ -1266,7 +1266,7 @@ def pose_for(name: str, t: float, length: float) -> Pose:
         p.hands = ((-1, 3), ("front", "body", -2, 9))
         p.antenna = 30
         p.light_level = wave(t, 1.2, 0.5, 0.9)
-        p.fx = [("icon", "bubble", 52, 3), ("icon", "bowl", 52, 4)]
+        p.fx = [("icon", "bubble", 6, 9), ("icon", "bowl", 6, 10)]
         if int(t * 2) % 2:     # a rumble by the tummy
             for i in range(3):
                 p.fx.append(("px", 9 - i, 46 + (i % 2), (200, 195, 225)))
@@ -1348,7 +1348,7 @@ def overlay(p: Pose, name: str, t: float, length: float, food: str = "rice") -> 
     elif name == "food":   # something to eat, bobbing to be tapped
         bob = int(wave(t, 1.6, 0, 2))
         rows = ICONS[food][0]
-        p.fx.append(("icon", food, 47 + (11 - len(rows[0])) // 2, 55 - len(rows) + bob))
+        p.fx.append(("icon", food, 49 + (11 - len(rows[0])) // 2, 55 - len(rows) + bob))
     elif name == "charging":
         p.fx.append(("icon", "bolt", 53, 4 + int(wave(t, 0.8, 0, 2))))
         for i in range(3):

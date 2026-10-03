@@ -229,7 +229,7 @@ static const icon_t ICONS[I_COUNT] = {
     [I_COOKIE] = { ROWS(".###.", "#o##o", "###o#", "#o###", ".###."), "#o", { { 214, 150, 80 }, { 110, 64, 34 } } },
     [I_BATTERY] = { ROWS("#######.", "#r....##", "#r....##", "#######."), "#r", { { 220, 220, 230 }, { 255, 84, 96 } } },
     [I_BOLT] = { ROWS("..##", ".##.", "####", ".##.", "##.."), "#", { { 255, 230, 90 } } },
-    [I_BUBBLE] = { ROWS(".#####.", "#.....#", "#.....#", "#.....#", ".#####.", "..#....", ".#....."), "#",
+    [I_BUBBLE] = { ROWS(".#####.", "#.....#", "#.....#", "#.....#", ".#####.", "....#..", ".....#."), "#",
                    { { 200, 195, 225 } } },
     [I_CODE] = { ROWS("#...#", "#.#.#", "#...#"), "#", { { 150, 245, 200 } } },
     [I_LAPTOP] = { ROWS("..##########..", ".############.", ".#####oo#####.", ".############.",
@@ -587,8 +587,10 @@ static void pose_for(pose_t *p, boopie_expr_t name, double t, double length, flo
         p->hands[1] = front(A_BODY, -2, 9);
         p->antenna = 30;
         p->light_level = wave(t, 1.2, 0.5, 0.9);
-        fx_icon(p, FX_ICON, I_BUBBLE, 52, 3);
-        fx_icon(p, FX_ICON, I_BOWL, 52, 4);
+        /* Up to the left, its tail to the head: the right has the mic hint and
+         * the round screen's edge close by. */
+        fx_icon(p, FX_ICON, I_BUBBLE, 6, 9);
+        fx_icon(p, FX_ICON, I_BOWL, 6, 10);
         if ((int)(t * 2) % 2) {    /* a rumble by the tummy */
             for (int i = 0; i < 3; i++) {
                 fx_px(p, FX_PX, 9 - i, 46 + (i % 2), (rgb_t){ 200, 195, 225 });
@@ -738,7 +740,7 @@ static void overlay(pose_t *p, boopie_overlay_t name, double t, double length)
                                    * bottom-aligned on the rice bowl's place */
         const icon_t *ic = &ICONS[s_food_icon];
         int w = (int)strlen(ic->rows[0]);
-        fx_icon(p, FX_ICON, s_food_icon, 47 + (int)floor((11 - w) / 2.0), 55 - ic->nrows + (int)wave(t, 1.6, 0, 2));
+        fx_icon(p, FX_ICON, s_food_icon, 49 + (int)floor((11 - w) / 2.0), 55 - ic->nrows + (int)wave(t, 1.6, 0, 2));
         break;
     }
     case BOOPIE_OVERLAY_CHARGING:
