@@ -13,6 +13,7 @@ set(srcs
     "game/boopie_whack.c"
     "ime/boopie_pinyin.c"
     "ime/boopie_pinyin_dict.c"
+    "store/boopie_assets.c"
     "boopie_text.c"
     "font/boopie_pixel_font.c"
     "font/boopie_pixel_glyphs.c")
@@ -21,11 +22,13 @@ if(CONFIG_MUSE_ENABLED)
     list(APPEND srcs "font/boopie_font.c")
     # The clock (NTP) and the IMU, on the device only.
     list(APPEND srcs "device/boopie_clock.c" "device/boopie_imu.c")
+    # The user data partition (LittleFS, from idf_component.yml).
+    list(APPEND srcs "store/boopie_store.c")
 endif()
 
 idf_component_register(
     SRCS ${srcs}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store"
     REQUIRES esp_driver_i2c
-    PRIV_REQUIRES nvs_flash esp_netif esp_timer
+    PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs
 )

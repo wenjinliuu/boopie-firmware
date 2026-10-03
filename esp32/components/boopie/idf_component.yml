@@ -9,3 +9,6 @@ dependencies:
     public: true
     rules:
       - if: "$CONFIG{MUSE_BOARD_ID} != \"none\""
+  # The user data partition's filesystem (store/boopie_store.c): power-loss
+  # safe, with wear levelling.
+  joltwallet/littlefs: "~1.22"

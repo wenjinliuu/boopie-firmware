@@ -13,6 +13,7 @@
 #include "boopie_font.h"
 #include "boopie_games.h"
 #include "boopie_input.h"
+#include "boopie_store.h"
 #include "muse_board.h"
 #include "muse_input.h"
 #include "muse_settings.h"
@@ -326,7 +327,8 @@ static void on_action(lv_event_t *e)
     case ACT_RESET_SURE:
         menu_close_locked();
 #ifdef ESP_PLATFORM
-        nvs_flash_erase();   /* the pet, Wi-Fi, pairing, every setting */
+        boopie_store_wipe();   /* chat history, pictures, notes */
+        nvs_flash_erase();     /* the pet, Wi-Fi, pairing, every setting */
         esp_restart();
 #endif
         break;

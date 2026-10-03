@@ -35,6 +35,7 @@
 #include "muse_ui.h"
 #include "sim_board.h"
 #include "boopie_games.h"
+#include "boopie_store.h"
 #include "boopie_input.h"
 #include "boopie_pages.h"
 #include "sim_platform.h"
@@ -596,6 +597,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "simulator board initialization failed\n");
         return 1;
     }
+    boopie_store_mount();   /* Boopie: user data in BOOPIE_DATA, or /tmp/boopie-data */
     if (muse_ui_start() != ESP_OK) {
         fprintf(stderr, "UI initialization failed\n");
         return 1;

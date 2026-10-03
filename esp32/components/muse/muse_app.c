@@ -20,7 +20,9 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
+#include "boopie_assets.h"  /* Boopie */
 #include "boopie_clock.h"   /* Boopie */
+#include "boopie_store.h"   /* Boopie */
 #include "muse_audio.h"
 #include "muse_battery.h"
 #include "muse_board.h"
@@ -68,6 +70,8 @@ void muse_app_run(const muse_board_t *board)
     ESP_ERROR_CHECK(board->init());
     ESP_ERROR_CHECK(muse_settings_init());
     boopie_clock_start();   /* Boopie: the time, for the pet */
+    boopie_assets_init();   /* Boopie: fonts, sounds (the firmware's own without them) */
+    boopie_store_mount();   /* Boopie: chat history, pictures, notes */
     muse_settings_set_listener(on_setting);
     muse_state_init();
     muse_battery_init();

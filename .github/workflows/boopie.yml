@@ -70,14 +70,15 @@ jobs:
           mkdir -p "$out/flash"
           cp "$BUILD_DIR/boopie-waveshare-s3-175c-merged.bin" "$out/"
           (cd "$BUILD_DIR" && cp --parents muse-gadget.bin bootloader/bootloader.bin \
-            partition_table/partition-table.bin ota_data_initial.bin flash_args \
+            partition_table/partition-table.bin ota_data_initial.bin boopie_assets.bin flash_args \
             "$out/flash/")
           {
             echo "commit: $GITHUB_SHA"
             echo "board: Waveshare ESP32-S3-Touch-AMOLED-1.75C"
             echo "idf: $(cd "$IDF_PATH" && git describe --tags 2>/dev/null || echo v6.0.1)"
             echo "token: $([ -f "$BUILD_DIR/sdkconfig.token" ] && echo yes || echo no)"
-            echo "merged image: flash at 0x0"
+            echo "merged image: flash at 0x0 (includes the assets partition)"
+            echo "assets: v$(cat "$GITHUB_WORKSPACE/esp32/assets/VERSION")"
           } > "$out/BUILD_INFO.txt"
           cat "$out/BUILD_INFO.txt"
           rm -f "$BUILD_DIR/sdkconfig.token"

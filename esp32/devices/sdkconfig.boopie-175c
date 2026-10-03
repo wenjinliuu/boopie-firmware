@@ -4,3 +4,6 @@
 # Boopie's own settings for the Waveshare 1.75C, loaded last, after
 # sdkconfig.muse-waveshare-s3-175c.
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_boopie_32mb.csv"
+# The last crash, kept in its own partition for debugging (docs/boopie-storage.md).
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
