@@ -114,7 +114,7 @@ class BoopiePixelTest(unittest.TestCase):
     def test_skins(self) -> None:
         # Drafts are designs still under review, not in the firmware yet.
         done = [k for k, sk in ap.SKINS.items() if not sk.draft]
-        self.assertEqual(done, ["boopie_starry"])
+        self.assertEqual(done, [])   # all in review; the firmware keeps its earlier starry until then
         rigs = {R.key: R for R in ap.CHARACTERS}
         for key in done:
             skin = ap.SKINS[key]

@@ -891,13 +891,14 @@ class Skin:
     extra: dict = field(default_factory=dict)   # rig attributes it sets
     body_fx: str = ""   # drawn over the body: "starry", "jelly", "ink", ...
     face_fx: str = ""   # drawn over the face: "scanlines"
+    back_fx: str = ""   # drawn behind the character, over the background: "embers"
     draft: bool = False # still a design under review, not in the firmware
 
 
 SKINS = {
-    "boopie_starry": Skin("boopie_starry", "boopie", "星空", "典藏", 300, "stars", "3a2c8c",
+    "boopie_starry": Skin("boopie_starry", "boopie", "星空", "典藏", 300, "stars", "1f1856",
                           eye=(236, 236, 255), cheek=(214, 120, 210), glow=(255, 236, 160),
-                          outline=(150, 128, 238), body_fx="starry"),
+                          outline=(140, 120, 236), body_fx="starry", draft=True),
     # Drafts, two a character, for review.
     "boopie_jelly": Skin("boopie_jelly", "boopie", "果冻", "普通", 150, "bubbles", "7fe6d4",
                          cheek=(255, 140, 170), outline=(40, 140, 130), body_fx="jelly", draft=True),
@@ -908,18 +909,19 @@ SKINS = {
                     cheek=(200, 120, 120), extra={"bands_colour": "c83a3a"}, body_fx="ink", draft=True),
     "gpt_porcelain": Skin("gpt_porcelain", "gpt", "青花瓷", "普通", 150, "petals", "f4f6fa",
                           cheek=(150, 170, 230), extra={"bands_colour": "3a5bb8"}, body_fx="porcelain", draft=True),
-    "codex_neon": Skin("codex_neon", "codex", "霓虹", "典藏", 300, "neon_grid", "1c1830",
-                       cheek=(255, 60, 200), outline=(0, 240, 255),
+    "codex_neon": Skin("codex_neon", "codex", "霓虹", "典藏", 300, "neon_grid", "120e24",
+                       cheek=(255, 60, 200), outline=(0, 240, 255), body_fx="neon",
                        extra={"screen": (10, 0, 20), "glyph": (255, 70, 210), "glyph_follows_light": False},
                        draft=True),
     "codex_glitch": Skin("codex_glitch", "codex", "赛博故障", "普通", 150, "glitch", "5a3cf0",
                          cheek=(0, 255, 200), outline=(20, 10, 60),
                          extra={"screen": (6, 6, 20), "glyph": (0, 255, 200), "glyph_follows_light": False},
                          body_fx="cyber", draft=True),
-    "klaude_ice": Skin("klaude_ice", "klaude", "冰块", "普通", 150, "snow", "a9dcf2",
+    "klaude_ice": Skin("klaude_ice", "klaude", "冰块", "典藏", 300, "snow", "a9dcf2",
                        eye=(40, 90, 140), cheek=(150, 200, 240), outline=(70, 140, 190), body_fx="ice", draft=True),
-    "klaude_lava": Skin("klaude_lava", "klaude", "熔岩", "典藏", 300, "fireflies", "3b2c2c",
-                        eye=(255, 210, 90), cheek=(255, 120, 60), outline=(110, 50, 40), body_fx="lava", draft=True),
+    "klaude_lava": Skin("klaude_lava", "klaude", "熔岩", "普通", 150, "default", "1c1414",
+                        eye=(255, 236, 120), cheek=(255, 80, 40), outline=(190, 30, 20), body_fx="lava",
+                        back_fx="embers", draft=True),
     "whale_koi": Skin("whale_koi", "whale", "锦鲤", "典藏", 300, "bubbles", "f6f2ec",
                       outline=(150, 70, 50), extra={"belly": ((236, 230, 222), (250, 248, 244))}, body_fx="koi",
                       draft=True),
@@ -981,6 +983,19 @@ def skin_body(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
                         c.put(x, y, (0, 230, 210))
                     elif h01(x, y, int(t * 4)) > 0.97:
                         c.put(x, y, (255, 40, 180))
+    elif fx == "neon":      # a magenta tube inside the cyan one, and a glow outside
+        for y in range(N):
+            for x in range(N):
+                if in_body(c, x, y):
+                    inner = all(in_body(c, x + dx, y + dy) for dx, dy in ((2, 0), (-2, 0), (0, 2), (0, -2)))
+                    edge1 = all(in_body(c, x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+                    if edge1 and not inner:
+                        c.put(x, y, (255, 60, 200))
+                else:
+                    near = any(in_body(c, x + dx, y + dy) for dx in (-3, -2, 2, 3) for dy in (-3, -2, 0, 2, 3))
+                    if near and not any(in_body(c, x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))) \
+                            and BAYER[y % 4][x % 4] < 0.35:
+                        c.put(x, y, (0, 90, 110))
     elif fx == "ice":       # a shine across it, cracks, frost at the edges
         for y in range(N):
             for x in range(N):
@@ -998,19 +1013,20 @@ def skin_body(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
             y += 1
             if in_body(c, x, y):
                 c.put(x, y, (250, 255, 255))
-    elif fx == "lava":      # glowing cracks in dark rock
-        glow = 0.6 + 0.4 * math.sin(t * 2.2)
-        hot, warm = mix((200, 70, 20), (255, 220, 90), glow), (150, 50, 20)
-        for i in range(4):
-            x, y = bx + (h01(i, 20) - 0.5) * 26, by + (h01(i, 21) - 0.5) * 16
-            for k in range(9):
-                x += (h01(i, k, 22) - 0.5) * 2.4
-                y += 0.9
-                xi, yi = round(x), round(y)
-                if in_body(c, xi, yi):
-                    c.put(xi, yi, hot)
-                    if in_body(c, xi + 1, yi):
-                        c.put(xi + 1, yi, warm)
+    elif fx == "lava":      # cooled black plates, molten red seams between them, pulsing
+        fx0, fy0 = anchors["face"]
+        seeds = [(bx + (h01(i, 30) - 0.5) * 30, by + (h01(i, 31) - 0.5) * 22) for i in range(7)]
+        for y in range(N):
+            for x in range(N):
+                if not in_body(c, x, y) or (abs(x - fx0) < 11 and abs(y - fy0) < 4):
+                    continue   # the rock stays dark round the eyes, so they glow
+                d = sorted(math.hypot(x - sx, y - sy) for sx, sy in seeds)
+                gap = d[1] - d[0]
+                heat = 0.75 + 0.25 * math.sin(t * 2.5 + (x + y) * 0.3)
+                if gap < 0.7:
+                    c.put(x, y, mix((210, 30, 10), (255, 210, 60), heat))
+                elif gap < 1.6 and BAYER[y % 4][x % 4] < 0.55:
+                    c.put(x, y, mix((90, 10, 5), (190, 35, 12), heat))
     elif fx == "koi":       # red-orange patches
         for i in range(4):
             px, py = bx + (h01(i, 12) - 0.5) * 24, by + (h01(i, 13) - 0.7) * 16
@@ -1032,28 +1048,65 @@ def skin_body(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
             for x in range(N):
                 if in_body(c, x, y) and tuple(c.img[y, x]) in knit and (x % 3 == 0 or (x % 3 == 1 and y % 2)):
                     c.put(x, y, (200, 186, 158))
-        wear(c, "scarf", {"neck": (nx, ny - 1, 16)})
-    if fx == "starry":      # a nebula, then the stars
+        red, dark = (230, 50, 60), (165, 25, 40)
+        for dy in range(-2, 2):                                # a thick red scarf
+            for dx in range(-10, 11):
+                c.put(nx + dx, ny + dy, dark if (dx + dy) % 4 == 0 else red)
+        for dy in range(2, 9):                                 # its end, hanging
+            for dx in (4, 5, 6):
+                c.put(nx + dx + (dy > 6), ny + dy, dark if dy == 8 or dx == 6 else red)
+    if fx == "starry":      # a galaxy: a milky band, stars of every size, a constellation, a crescent moon
         for y in range(N):
             for x in range(N):
                 if not in_body(c, x, y):
                     continue
-                n = h01(x // 4, y // 3, 23) * 0.6 + 0.4 * math.sin((x - bx) * 0.35 + (y - by) * 0.25)
-                if n > 0.55 and BAYER[y % 4][x % 4] < n - 0.3:
-                    c.put(x, y, (120, 70, 190) if (x // 4 + y // 3) % 2 else (70, 100, 210))
-        # stars twinkling inside the body, a few with a cross
-        for i in range(18):
-            x = round(bx + (h01(i, 7) - 0.5) * 28)
-            y = round(by + (h01(i, 8) - 0.5) * 22)
-            if not (0 <= x < N and 0 <= y < N and c.body[y, x]):
+                k = (y - by) / 10                               # deeper at the top
+                if k < -0.4 and BAYER[y % 4][x % 4] < -k - 0.3:
+                    c.put(x, y, (18, 14, 52))
+                band = abs((x - bx) * 0.55 + (y - by) * 0.9 - 2)  # the milky way, across
+                if band < 4.5:
+                    w = 1 - band / 4.5
+                    if BAYER[y % 4][x % 4] < w * 0.9:
+                        c.put(x, y, (150, 90, 210) if h01(x, y, 40) > 0.5 else (90, 120, 230))
+                    if w > 0.5 and h01(x, y, 41) > 0.9:
+                        c.put(x, y, (240, 230, 255))
+        for i in range(16):                                    # stars
+            x, y = round(bx + (h01(i, 7) - 0.5) * 30), round(by + (h01(i, 8) - 0.5) * 24)
+            if not in_body(c, x, y):
                 continue
-            tw = 0.5 + 0.5 * math.sin(pose.t * (1 + h01(i, 9) * 2) + i * 1.3)
-            if tw > 0.3:
-                c.put(x, y, mix((80, 80, 150), (255, 250, 220), tw))
-            if tw > 0.85 and i % 4 == 0:
+            tw = 0.5 + 0.5 * math.sin(t * (1 + h01(i, 9) * 2) + i * 1.3)
+            col = [(255, 250, 230), (200, 230, 255), (255, 220, 240)][i % 3]
+            c.put(x, y, mix((70, 60, 140), col, tw))
+            if i < 3 and tw > 0.4:                             # three bright ones, four-pointed
                 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    if 0 <= x + dx < N and 0 <= y + dy < N and c.body[y + dy, x + dx]:
-                        c.put(x + dx, y + dy, (150, 150, 220))
+                    if in_body(c, x + dx, y + dy):
+                        c.put(x + dx, y + dy, mix((90, 80, 170), col, tw * 0.8))
+        stars = [(bx - 9, by - 3), (bx - 5, by - 6), (bx + 1, by - 5), (bx + 5, by - 8)]   # a little dipper
+        for (x0, y0), (x1, y1) in zip(stars, stars[1:]):
+            for k in range(1, 8):
+                x, y = round(x0 + (x1 - x0) * k / 8), round(y0 + (y1 - y0) * k / 8)
+                if in_body(c, x, y) and k % 2:
+                    c.put(x, y, (110, 100, 190))
+        for x, y in stars:
+            if in_body(c, round(x), round(y)):
+                c.put(x, y, (255, 255, 255))
+        lx, ly = anchors["light"]                              # the bulb is a crescent moon
+        for dy in range(-3, 4):
+            for dx in range(-3, 4):
+                if (dx - 1.2) ** 2 + (dy + 1.0) ** 2 <= 4.2 and dx * dx + dy * dy <= 6.5:
+                    c.put(lx + dx, ly + dy, (12, 10, 30))
+
+
+def skin_back(c: Canvas, skin: Skin, t: float):
+    if skin.back_fx == "embers":   # sparks rising off the lava
+        for i in range(14):
+            k = (t * (0.25 + h01(i, 50) * 0.3) + h01(i, 51)) % 1
+            x = h01(i, 52) * 64 + math.sin(t * 2 + i) * 2
+            y = 62 - k * 62
+            col = mix((255, 200, 60), (120, 20, 10), k)
+            c.put(x, y, col)
+            if k < 0.3:
+                c.put(x, y + 1, mix((200, 60, 20), (80, 10, 5), k * 3))
 
 
 def skin_face(c: Canvas, skin: Skin, pose: Pose, anchors: dict):
@@ -1350,6 +1403,8 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
         if abs(dx) < 12 - (dx % 2):
             c.put(32 + dx, 59, (22, 18, 34))
     scene_back(c, pose.scene, t, acc)
+    if rig.skin:
+        skin_back(c, rig.skin, t)
     sparkles(c, 32, 40, t, pose.sparkle_speed, False, acc)
     c.rim = mix(acc, WHITE, 0.2)
     anchors = rig.draw(c, pose)
