@@ -173,8 +173,8 @@ class Canvas:
         if self.rim is not None:
             bay = BAYER[np.arange(N)[:, None] % 4, np.arange(N)[None, :] % 4]
             out = (-gx * 0.6 - gy * 0.8) / (np.hypot(gx, gy) + 1e-6)
-            rim = mask & (h < 0.8) & (out > 0.7) & (bay < 0.45)
-            self.img[rim] = mix(rp["light"], self.rim, 0.55)
+            rim = mask & (h < 0.8) & (out > 0.75) & (bay < 0.3)
+            self.img[rim] = mix(rp["mid"], self.rim, 0.35)
         self.body |= mask
 
     def flat(self, mask, colour):
@@ -206,10 +206,14 @@ class Frame:
     """Maps a character's rest coordinates to the screen for one pose:
     squash and scale about the feet, then shift and shear."""
 
-    def __init__(self, p: Pose, cx: float, base: float):
+    def __init__(self, p: Pose, cx: float, base: float, size: float = 1.0, squash_k: float = 1.0,
+                 jump_k: float = 1.0):
+        if p.dy < 0 and jump_k != 1.0:   # tall characters jump lower, clear of the status line
+            p = Pose(**{**p.__dict__, "dy": p.dy * jump_k})
         self.p, self.cx, self.base = p, cx, base
-        self.sx = p.squash * p.scale
-        self.sy = p.scale / p.squash
+        squash = 1 + (p.squash - 1) * squash_k      # tall characters squash less
+        self.sx = squash * p.scale * size
+        self.sy = p.scale / squash * size
         # screen -> rest, for masks
         ys = YS - p.dy
         self.ry = base + (ys - base) / self.sy
@@ -217,6 +221,12 @@ class Frame:
 
     def ellipse(self, cx, cy, rx, ry):
         return ((self.rx - cx) / rx) ** 2 + ((self.ry - cy) / ry) ** 2 <= 1
+
+    def rot_ellipse(self, cx, cy, rx, ry, angle):
+        ca, sa = math.cos(angle), math.sin(angle)
+        u = (self.rx - cx) * ca + (self.ry - cy) * sa
+        v = -(self.rx - cx) * sa + (self.ry - cy) * ca
+        return (u / rx) ** 2 + (v / ry) ** 2 <= 1
 
     def rect(self, x0, y0, x1, y1):
         return (self.rx >= x0) & (self.rx < x1) & (self.ry >= y0) & (self.ry < y1)
@@ -333,6 +343,12 @@ class Rig:
     name = ""
     colour = "ff9ec8"
     eye_gap = 7
+    size = 1.18        # drawn a little bigger than the rest coordinates, to fill the grid like Muse's
+    squash_k = 1.0     # how much of a pose's squash this character takes
+    jump_k = 1.0       # how much of a pose's jump
+
+    def frame(self, p, cx, base):
+        return Frame(p, cx, base, self.size, self.squash_k, self.jump_k)
 
     def __init__(self, colour=None):
         self.rp = ramp(colour or self.colour)
@@ -378,7 +394,7 @@ class Boopie(Rig):
 
     def draw(self, c, p):
         cx, cy, rx, ry = 32, 40, 17, 15
-        f = Frame(p, cx, cy + ry)
+        f = self.frame(p, cx, cy + ry)
         body = f.ellipse(cx, cy, rx, ry)
         if p.feet and p.scale > 0.6:
             body |= f.ellipse(cx - 7, cy + ry - 1, 4, 2.5) | f.ellipse(cx + 7, cy + ry - 1, 4, 2.5)
@@ -394,12 +410,13 @@ class Boopie(Rig):
 class GPT(Rig):
     """GPT: a cloud-headed robot whose face is a terminal; its eyes are the prompt, >_ ."""
     key, name, colour = "gpt", "GPT", "5b86f5"
+    size, squash_k, jump_k = 1.08, 0.35, 0.4
     screen = (30, 34, 84)
     glyph = (120, 236, 240)
 
     def draw(self, c, p):
         cx, base = 32, 56
-        f = Frame(p, cx, base)
+        f = self.frame(p, cx, base)
         head = f.ellipse(32, 27, 17, 12)
         for x, y, r in ((22, 18, 6), (30, 15, 7), (38, 15, 6.5), (44, 20, 5.5), (17, 25, 5), (47, 27, 4.5)):
             head |= f.ellipse(x, y, r, r)
@@ -447,6 +464,119 @@ class GPT(Rig):
                     c.put(fx + side * 9 + dx, fy + 4, CHEEK)
 
 
+# The knot of GPT's logo, 34 x 34: # the bands, . the holes between them.
+KNOT = [
+    "            ######                ",
+    "          ##########              ",
+    "         #####...####             ",
+    "        ###........########       ",
+    "        ##........###########     ",
+    "       ###......#####.....####    ",
+    "     ####.....#####.........###   ",
+    "   ######....####............##   ",
+    "  #######...####.....##......###  ",
+    "  ###..##...##......#####.....##  ",
+    " ###..###...#.....###.#####...##  ",
+    "###...###...#...###.....####..##  ",
+    "###...###...#.######......######  ",
+    "##....###...####..###......#####  ",
+    "##....###...##......###......###  ",
+    "##....###...#........####.....### ",
+    "###...###...#........#..###....## ",
+    " ##....###..#........#...###...###",
+    " ###.....####........#...###....##",
+    "  ###......###......##...###....##",
+    "  #####.....####..####...###....##",
+    "  ######......######.#...###...###",
+    "  ##..####.....###...#...###...###",
+    "  ##...#####.###.....#...###..### ",
+    "  ##.....######.....##...###.#### ",
+    "  ###......##......###...#######  ",
+    "   ##............#####...######   ",
+    "   ###.........#####.....####     ",
+    "    ####.....#####......###       ",
+    "     ###########........###       ",
+    "       ########........###        ",
+    "             ####....####         ",
+    "              ##########          ",
+    "                ######            ",
+]
+
+
+class GPTMono(Rig):
+    """GPT (black and white): its head is the knot of its logo, white bands
+    interlaced round a little face plate; a small white body below."""
+    key, name, colour = "gpt_mono", "GPT 黑白", "e8e8e8"
+    size, squash_k, jump_k = 1.0, 0.35, 0.4
+    ink = (18, 18, 24)
+    hole = (34, 34, 44)
+
+    def draw(self, c, p):
+        cx, base = 32, 57
+        f = self.frame(p, cx, base)
+        body = f.ellipse(32, 47, 8.5, 6.5)
+        if p.feet and p.scale > 0.6:
+            body |= f.ellipse(28, 54, 2.6, 3.0) | f.ellipse(36, 54, 2.6, 3.0)
+        for h in p.hands:
+            if h[0] != "front":
+                body |= f.ellipse(32 + h[0] * 11, 46 + h[1] * 0.8, 2.8, 2.4)
+        c.shaded(body, self.rp)
+        c.outline(body, self.ink)
+        ox, oy = 15, 7
+        gx = np.floor(f.rx - ox).astype(int)
+        gy = np.floor(f.ry - oy).astype(int)
+        ok = (gx >= 0) & (gx < 34) & (gy >= 0) & (gy < 34)
+        cells = np.full((N, N), " ")
+        cells[ok] = np.array([list(r) for r in KNOT])[gy[ok], gx[ok]]
+        bands, holes = cells == "#", cells == "."
+        c.flat(holes, self.hole)
+        rim, c.rim = c.rim, None          # the bands are too thin for a rim light
+        c.shaded(bands, ramp("f6f6f6"))
+        c.rim = rim
+        c.outline(bands | holes, self.ink)
+        plate = f.ellipse(32, 24, 5.2, 4.6)
+        c.flat(plate, (250, 250, 252))
+        c.outline(plate, self.ink)
+        return {"face": f.pt(32, 24), "body": f.pt(32, 43), "light": f.pt(48, 9), "show_face": p.scale > 0.6}
+
+    def face(self, c, fx, fy, p):
+        c.eye = self.ink
+        for side in (-1, 1):                 # small eyes, the plate is small
+            ex = fx + side * 2
+            k = p.eyes
+            if k in ("blink", "half"):
+                c.put(ex, fy, c.eye)
+            elif k in ("happy", "down"):
+                c.put(ex - 1, fy, c.eye)
+                c.put(ex, fy - 1, c.eye)
+                c.put(ex + 1, fy, c.eye)
+            elif k == "x":
+                for d in (-1, 1):
+                    c.put(ex + d, fy + d, c.eye)
+                    c.put(ex + d, fy - d, c.eye)
+                c.put(ex, fy, c.eye)
+            else:
+                lx, ly = p.look if k == "look" else (0, 0)
+                c.put(ex + lx, fy - 1 + ly, c.eye)
+                c.put(ex + lx, fy + ly, c.eye)
+        col = p.light or (120, 120, 140)
+        if p.mouth in ("talk", "o", "chomp"):
+            h = max(1, min(2, p.talk)) if p.mouth == "talk" else 1
+            for dy in range(h):
+                c.put(fx, fy + 2 + dy, col if p.mouth == "talk" else self.ink)
+        elif p.mouth in ("frown", "wavy"):
+            c.put(fx - 1, fy + 3, self.ink)
+            c.put(fx, fy + 2, self.ink)
+            c.put(fx + 1, fy + 3, self.ink)
+        else:
+            c.put(fx - 1, fy + 2, self.ink)
+            c.put(fx, fy + 3, self.ink)
+            c.put(fx + 1, fy + 2, self.ink)
+        if p.blush == "big":
+            for side in (-1, 1):
+                c.put(fx + side * 4, fy + 2, CHEEK)
+
+
 GLYPHS = {
     ">": ["#..", ".#.", "..#", ".#.", "#.."], "<": ["..#", ".#.", "#..", ".#.", "..#"],
     "_": ["...", "...", "...", "...", "###"], "-": ["...", "...", "###", "...", "..."],
@@ -468,7 +598,7 @@ class Klaude(Rig):
 
     def draw(self, c, p):
         cx, base = 32, 51
-        f = Frame(p, cx, base)
+        f = self.frame(p, cx, base)
         body = f.rect(17, 22, 47, 44)
         for h in p.hands:
             if h[0] != "front":
@@ -500,7 +630,7 @@ class Whale(Rig):
 
     def draw(self, c, p):
         cx, cy, rx, ry = 31, 41, 16, 15
-        f = Frame(p, cx, cy + ry)
+        f = self.frame(p, cx, cy + ry)
         a = math.radians(p.antenna - 18)            # the tail swings like Boopie's antenna
         tx, ty = 46 + 3 * math.sin(a), 21 - 1.5 * math.cos(a)
         tail = f.ellipse(44 + 1.5 * math.sin(a), 29, 2.6, 5) | f.ellipse(tx - 3, ty, 3.5, 2) | f.ellipse(tx + 3, ty - 0.5, 3.5, 2)
@@ -528,6 +658,7 @@ class Whale(Rig):
 class Doubao(Rig):
     """豆包: a girl with a brown bob and big eyes, in a black top; her hair clip is the state light."""
     key, name, colour = "doubao", "豆包", "f2c9b4"
+    size, squash_k, jump_k = 1.08, 0.35, 0.4
     hair = "6b4a3e"
     top = "3a3a44"
 
@@ -538,7 +669,7 @@ class Doubao(Rig):
 
     def draw(self, c, p):
         cx, base = 32, 57
-        f = Frame(p, cx, base)
+        f = self.frame(p, cx, base)
         torso = f.ellipse(32, 49, 10, 7) & f.rect(0, 43, 64, 57)
         legs = (f.rect(27, 54, 31, 57) | f.rect(33, 54, 37, 57)) if p.feet and p.scale > 0.6 else np.zeros_like(torso)
         arms = np.zeros_like(torso)
@@ -575,7 +706,7 @@ class Doubao(Rig):
         return self.rp
 
 
-CHARACTERS = [Boopie, GPT, Klaude, Whale, Doubao]
+CHARACTERS = [Boopie, GPT, GPTMono, Klaude, Whale, Doubao]
 
 
 # ---------------------------------------------------------------- the expressions
@@ -674,7 +805,7 @@ def pose_for(name: str, t: float, length: float) -> Pose:
             p.squash = 1.2
         elif k < 0.5:
             s = (k - 0.12) / 0.38
-            p.dy = -6 * math.sin(s * math.pi)
+            p.dy = -4 * math.sin(s * math.pi)
             p.squash = 0.9
             p.feet = s < 0.1 or s > 0.9
         elif k < 0.62:
@@ -753,7 +884,7 @@ def pose_for(name: str, t: float, length: float) -> Pose:
             p.fx.append(("spark", 32 + 13 * math.cos(a), 9 + 3 * math.sin(a), GOLD, 1))
     elif name == "celebrate":
         k = (t / length * 2) % 1
-        p.dy = -5 * math.sin(k * math.pi)
+        p.dy = -4 * math.sin(k * math.pi)
         p.squash = 0.92 if 0.1 < k < 0.9 else 1.15
         p.feet = not (0.15 < k < 0.85)
         p.eyes = "happy"
@@ -956,7 +1087,7 @@ TELLING = {"boot": 0.8, "happy": 0.3, "off": 0.3, "surprised": 0.15, "celebrate"
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--character", default="all", help="boopie, gpt, klaude, whale, doubao or all")
+    ap.add_argument("--character", default="all", help="boopie, gpt, gpt_mono, klaude, whale, doubao or all")
     ap.add_argument("--color", help="body colour, RRGGBB (one character only)")
     ap.add_argument("--scale", type=int, default=4)
     args = ap.parse_args()
