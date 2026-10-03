@@ -50,6 +50,7 @@
 #include "boopie_font.h"   /* Boopie: Chinese and English reply text */
 #include "boopie_pages.h"  /* Boopie: the pages round the face */
 #include "boopie_games.h"  /* Boopie: the games, over everything */
+#include "boopie_guide.h"  /* Boopie: the setup guide */
 
 static const char *TAG = "muse_ui";
 
@@ -1193,6 +1194,7 @@ static void update_chrome(float now)
         }
         muse_settings_ui_tick(lv_obj_get_scroll_x(s_tv) > lv_obj_get_x(s_face));
         boopie_pages_tick(active == s_apps || active == s_cards || active == s_pet ? active : NULL);
+        boopie_guide_tick(active == s_face);
     }
 
     /* Joining, the icon blinks: the compact layout has no state label. */
@@ -1551,6 +1553,9 @@ esp_err_t muse_ui_start(void)
     if (s_settings) {
         muse_settings_ui_build(s_settings);
         boopie_pages_build(s_apps, s_cards, s_pet);
+        if (!boopie_avatar_guided()) {
+            boopie_guide_start();   /* Boopie: the first boot */
+        }
     } else {
         muse_menu_build(lv_screen_active(), s_w, s_h);
     }
@@ -1585,6 +1590,15 @@ bool muse_ui_go_home(void)
     }
     muse_board->display_unlock();
     return away;
+}
+
+void muse_ui_open_settings(const char *page)
+{
+    if (!s_tv || !s_settings) {
+        return;
+    }
+    lv_tileview_set_tile(s_tv, s_settings, LV_ANIM_ON);
+    muse_settings_ui_open(page);
 }
 
 void muse_ui_set_swipe_enabled(bool enabled)

@@ -157,6 +157,10 @@ PAGES = [("page-home", []), ("page-apps", ["swipe=right"]), ("page-settings", ["
          ("game-over", ["game=whack", "tap=233,233", "advance=61000"]),
          ("input-pinyin", ["input=", "tap=233,284", "tap=335,234"]),   # keys 6 then 4: ni, mi ...
          ("input-typed", ["input=", "tap=233,284", "tap=335,234", "tap=86,184"])]
+# The setup guide (BOOPIE_GUIDE): its first page, and choosing the pet.
+GUIDE = [("guide-hello", []),
+         ("guide-pet", ["tap=233,386", "advance=200", "tap=233,386", "advance=200", "tap=233,324", "advance=200",
+                        "tap=233,386", "advance=200"])]
 
 
 def render_pages(binary: Path, out: Path) -> list[Path]:
@@ -164,6 +168,13 @@ def render_pages(binary: Path, out: Path) -> list[Path]:
         return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
                       {"BOOPIE_PET_XP": "900"}, 800)
                 for name, steps in PAGES]
+
+
+def render_guide(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
+                      {"BOOPIE_GUIDE": "1"}, 400)
+                for name, steps in GUIDE]
 
 
 # The settings pages, reached by a scripted finger (466 px screen).
@@ -214,6 +225,7 @@ def main() -> int:
     skins = render_skins(args.binary, args.out)
     contact_sheet(skins, args.out / "skins.png", cols=len(SKIN_STATES) * 2)
     pages = render_pages(args.binary, args.out)
+    pages += render_guide(args.binary, args.out)
     contact_sheet(pages, args.out / "pages.png", cols=len(PAGES))
     settings = render_settings(args.binary, args.out)
     contact_sheet(settings, args.out / "settings.png", cols=len(SETTINGS))

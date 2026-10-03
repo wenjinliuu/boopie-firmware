@@ -88,6 +88,12 @@ static uint32_t s_owned;                  /* bit per skin index */
 static uint32_t s_acc[BOOPIE_AVATAR_COUNT];  /* the accessories each wears, BOOPIE_ACC_BIT()s */
 static char s_name[BOOPIE_PET_NAME_MAX];  /* the pet's name, or "" for its character's */
 static uint32_t s_best[BOOPIE_GAME_COUNT];   /* each game's best score */
+static uint8_t s_brain = BOOPIE_BRAIN_XIAOZHI;
+#ifdef ESP_PLATFORM
+static uint8_t s_guided;                  /* the setup guide's been through */
+#else
+static uint8_t s_guided = 1;              /* the simulator: BOOPIE_GUIDE shows it */
+#endif
 
 /* The pet, ticked from the frames, and what it shows while idle. */
 static boopie_pet_t s_pet_state;
@@ -288,6 +294,8 @@ static void load(void)
     for (int i = 0; i < BOOPIE_GAME_COUNT; i++) {
         nvs_get_u32(h, GAME_KEYS[i], &s_best[i]);
     }
+    nvs_get_u8(h, "brain", &s_brain);
+    nvs_get_u8(h, "guided", &s_guided);
     size_t pn = sizeof s_pet_state;
     boopie_pet_t saved;
     if (nvs_get_blob(h, "pet", &saved, &pn) == ESP_OK) {
@@ -328,6 +336,8 @@ static void save(void)
     for (int i = 0; i < BOOPIE_GAME_COUNT; i++) {
         nvs_set_u32(h, GAME_KEYS[i], s_best[i]);
     }
+    nvs_set_u8(h, "brain", s_brain);
+    nvs_set_u8(h, "guided", s_guided);
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_commit(h);
     nvs_close(h);
@@ -372,6 +382,9 @@ static void load(void)
             s_acc[s_avatar] |= BOOPIE_ACC_BIT(acc);
         }
         wear += len + (wear[len] == ',');
+    }
+    if (getenv("BOOPIE_GUIDE")) {
+        s_guided = 0;
     }
     const char *name = getenv("BOOPIE_NAME");
     if (name) {
@@ -763,6 +776,36 @@ bool boopie_avatar_tap(int gx, int gy)
     }
     show_event(&ev);
     return fed;
+}
+
+boopie_brain_t boopie_avatar_brain(void)
+{
+    ensure_loaded();
+    return s_brain < BOOPIE_BRAIN_COUNT ? (boopie_brain_t)s_brain : BOOPIE_BRAIN_XIAOZHI;
+}
+
+void boopie_avatar_set_brain(boopie_brain_t brain)
+{
+    ensure_loaded();
+    if ((int)brain >= 0 && brain < BOOPIE_BRAIN_COUNT && brain != s_brain) {
+        s_brain = (uint8_t)brain;
+        save();
+    }
+}
+
+bool boopie_avatar_guided(void)
+{
+    ensure_loaded();
+    return s_guided;
+}
+
+void boopie_avatar_set_guided(bool done)
+{
+    ensure_loaded();
+    if (done != (bool)s_guided) {
+        s_guided = done;
+        save();
+    }
 }
 
 void boopie_avatar_game_result(boopie_game_t game, int score, int xp, int stars, boopie_pet_event_t *ev,

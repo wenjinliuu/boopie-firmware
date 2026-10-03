@@ -33,3 +33,7 @@ void muse_settings_ui_tick(bool visible);
 
 /* True when a sub-page is open (the tileview must not steal horizontal swipes). */
 bool muse_settings_ui_in_subpage(void);
+
+/* Boopie: opens a page by name ("wifi", "muse", "avatar", "bluetooth"),
+ * for the setup guide. In the LVGL task. */
+void muse_settings_ui_open(const char *page);

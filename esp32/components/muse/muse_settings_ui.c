@@ -40,6 +40,7 @@
 #include "muse_wifi.h"
 #include "boopie_font.h"
 #include "boopie_avatar.h"
+#include "boopie_guide.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -1459,6 +1460,13 @@ static const page_t BATTERY = { &s_battery, build_battery_page };
 static const page_t POWER = { &s_power, build_power_page };
 static const page_t AVATAR = { &s_avatar, build_avatar_page };   /* Boopie */
 
+/* Boopie: the setup guide, from the top. */
+static void on_guide(lv_event_t *e)
+{
+    (void)e;
+    boopie_guide_start();
+}
+
 static void build_home(lv_obj_t *tile)
 {
     lv_obj_t *list;
@@ -1471,6 +1479,7 @@ static void build_home(lv_obj_t *tile)
     row(list, LV_SYMBOL_EYE_CLOSE, "Sleep", &s_home_sleep, on_nav, (void *)&SLEEP);
     row(list, LV_SYMBOL_BATTERY_FULL, "Battery", &s_home_battery, on_nav, (void *)&BATTERY);
     row(list, LV_SYMBOL_POWER, "Power off", NULL, on_nav, (void *)&POWER);
+    row(list, LV_SYMBOL_LOOP, "Guide 引导", NULL, on_guide, NULL);   /* Boopie: the setup guide again */
     s_about = note(list, "");
 }
 
@@ -1556,4 +1565,22 @@ void muse_settings_ui_tick(bool visible)
 bool muse_settings_ui_in_subpage(void)
 {
     return s_current != s_home;
+}
+
+/* Boopie: the setup guide sends people to a page. */
+void muse_settings_ui_open(const char *name)
+{
+    static const struct {
+        const char *name;
+        const page_t *page;
+    } PAGES[] = { { "wifi", &WIFI }, { "muse", &HATCH }, { "avatar", &AVATAR }, { "bluetooth", &BLE } };
+    for (size_t i = 0; i < sizeof PAGES / sizeof PAGES[0]; i++) {
+        if (strcmp(PAGES[i].name, name) == 0) {
+            if (!*PAGES[i].page->obj) {
+                PAGES[i].page->build(s_tile);
+            }
+            show(*PAGES[i].page->obj);
+            muse_settings_ui_tick(true);
+        }
+    }
 }

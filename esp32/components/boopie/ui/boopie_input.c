@@ -79,6 +79,15 @@ static bool nth_char(const char *s, int n, char out[5])
 
 static void refresh(void);
 
+/* After the event: the rows are rebuilt, the tapped button with them. */
+static void refresh_later(void *arg)
+{
+    (void)arg;
+    if (s_root) {
+        refresh();
+    }
+}
+
 static void clear_keys(void)
 {
     s_keys[0] = '\0';
@@ -90,7 +99,7 @@ static void on_spelling(lv_event_t *e)
 {
     s_spelling = (int)(intptr_t)lv_event_get_user_data(e);
     s_page = 0;
-    refresh();
+    lv_async_call(refresh_later, NULL);
 }
 
 static void on_candidate(lv_event_t *e)
@@ -99,7 +108,7 @@ static void on_candidate(lv_event_t *e)
     lv_obj_t *l = lv_obj_get_child(b, 0);
     lv_textarea_add_text(s_ta, lv_label_get_text(l));
     clear_keys();
-    refresh();
+    lv_async_call(refresh_later, NULL);
 }
 
 static void on_page(lv_event_t *e)
@@ -108,7 +117,7 @@ static void on_page(lv_event_t *e)
     if (s_page < 0) {
         s_page = 0;
     }
-    refresh();
+    lv_async_call(refresh_later, NULL);
 }
 
 /* The spellings for the keys, and the characters of the one chosen (or, in

@@ -3007,8 +3007,28 @@ static const char *const DIGITS[13][5] = {
     { "...", "#.#", ".#.", "#.#", "..." },
 };
 
+static bool s_head_defaults;   /* heads in each character's own colours, not as dressed now */
+
 static rgb_t head_colour(int head, char ch, bool gold)
 {
+    if (s_head_defaults && head < BOOPIE_CHAR_COUNT) {
+        ramp_t own = ramp(RIGS[head].colour);
+        switch (ch) {
+        case 'o': return head == BOOPIE_CHAR_GPT ? GPT_INK : own.out;
+        case 'd': return own.dark;
+        case 'b': return own.mid;
+        case 'l': return own.light;
+        case 'e': return EYE;
+        case 'c': return CHEEK;
+        case 'w': return head == BOOPIE_CHAR_WHALE ? (rgb_t){ 240, 244, 255 } : head == BOOPIE_CHAR_GPT
+                                                                                   ? ramp(0xf6f6f6).light
+                                                                                   : (rgb_t){ 245, 245, 250 };
+        case 's': return (rgb_t){ 30, 34, 84 };
+        case 'g': return (rgb_t){ 120, 236, 240 };
+        case 'h': return ramp(0x6b4a3e).mid;
+        default: break;
+        }
+    }
     ramp_t r = gold ? ramp(0xffd246) : head == BOOPIE_CHAR_COUNT ? ramp(0xe6d7bd) : s_rp;
     switch (ch) {
     case 'o': return r.out;
@@ -3133,4 +3153,29 @@ void boopie_pixel_render_whack(const boopie_whack_t *g, int head)
         draw_glyph(2, 32, 41, 1, (rgb_t){ 255, 210, 70 });
     }
     /* Read back with boopie_pixel_rgb(): the avatar's scaled buffers are left alone. */
+}
+
+void boopie_pixel_head_image(int head, uint16_t *dst, int scale)
+{
+    if (head < 0 || head > BOOPIE_CHAR_COUNT) {
+        head = BOOPIE_CHAR_BOOPIE;
+    }
+    s_head_defaults = true;
+    int w = HEAD_W * scale;
+    for (int j = 0; j < HEAD_H; j++) {
+        for (int i = 0; i < HEAD_W; i++) {
+            char ch = HEADS[head][j][i];
+            uint16_t c = 0;
+            if (ch != '.') {
+                rgb_t rgb = head_colour(head, ch, false);
+                c = to565(rgb.r, rgb.g, rgb.b);
+            }
+            for (int y = 0; y < scale; y++) {
+                for (int x = 0; x < scale; x++) {
+                    dst[(j * scale + y) * w + i * scale + x] = c;
+                }
+            }
+        }
+    }
+    s_head_defaults = false;
 }

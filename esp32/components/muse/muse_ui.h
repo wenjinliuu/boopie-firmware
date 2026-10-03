@@ -38,6 +38,9 @@ void muse_ui_show_face(void);
 /* Boopie: from any task, back to the face if another page is showing; false
  * if the face was showing already. */
 bool muse_ui_go_home(void);
+
+/* Boopie: slides to settings and opens one of its pages (muse_settings_ui_open). */
+void muse_ui_open_settings(const char *page);
 /* Settings sub-pages turn off the tile swipe so they can use horizontal gestures. */
 void muse_ui_set_swipe_enabled(bool enabled);
 /* Temporarily applies a brightness while a slider is dragged. */

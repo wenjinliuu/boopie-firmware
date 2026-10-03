@@ -121,6 +121,14 @@ typedef struct {
 
 void boopie_avatar_pet_status(boopie_pet_status_t *out);
 
+/* Which AI answers (chosen in the setup guide; Xiaozhi until one is), and
+ * whether the guide has been through. Kept in NVS with the rest. */
+typedef enum { BOOPIE_BRAIN_XIAOZHI = 0, BOOPIE_BRAIN_MUSE, BOOPIE_BRAIN_COUNT } boopie_brain_t;
+boopie_brain_t boopie_avatar_brain(void);
+void boopie_avatar_set_brain(boopie_brain_t brain);
+bool boopie_avatar_guided(void);
+void boopie_avatar_set_guided(bool done);
+
 /* A game round ended with `score`: its reward (xp, stars) goes to the pet, up
  * to the day's caps; *ev says what was given, *best is the best score of that
  * game so far (kept in NVS) and *record whether this round set it. */

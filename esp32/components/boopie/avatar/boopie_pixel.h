@@ -187,3 +187,10 @@ void boopie_pixel_set_slots(const float slots[5]);
  * BOOPIE_SKIN_MUSE for Muse's own. */
 struct boopie_whack;
 void boopie_pixel_render_whack(const struct boopie_whack *g, int head);
+
+/* A character's 13 x 10 head (as in the games) in its own colours, `scale`
+ * pixels a cell, RGB565 row by row into dst (13*scale x 10*scale); black
+ * round it. head as boopie_pixel_render_whack(). */
+#define BOOPIE_HEAD_W 13
+#define BOOPIE_HEAD_H 10
+void boopie_pixel_head_image(int head, uint16_t *dst, int scale);
