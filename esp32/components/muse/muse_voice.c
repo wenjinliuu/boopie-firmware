@@ -16,6 +16,7 @@
 
 #include "muse_voice.h"
 #include "boopie_avatar.h"   /* Boopie: which brain */
+#include "boopie_sdk_token.h"
 #include "boopie_sound.h"   /* Boopie: its sounds, played here as the speaker's owner */
 
 #include <math.h>
@@ -461,8 +462,13 @@ static void go_idle(const char *caption)
 /* Boopie: Muse not set up, said for the brain that's chosen. */
 static const char *not_set_up(void)
 {
-    return boopie_avatar_brain() == BOOPIE_BRAIN_MUSE ? "先在 设置 › 大脑 里配好 Muse"
-                                                      : "小智还没接通，设置 › 大脑 里可以改用 Muse";
+    if (boopie_avatar_brain() != BOOPIE_BRAIN_MUSE) {
+        return "小智还没接通，设置 › 大脑 里可以改用 Muse";
+    }
+    char sdk[BOOPIE_SDK_TOKEN_LEN + 1];
+    bool has = boopie_sdk_token(sdk);
+    memset(sdk, 0, sizeof sdk);
+    return has ? "先在 设置 › 大脑 里配好 Muse" : "先填开发者 token：设置 › 手机扫码设置";
 }
 
 /* Why a press can't go to Hatch; voice notes only go there. */

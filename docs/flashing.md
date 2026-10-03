@@ -4,8 +4,9 @@
 
 ## 到货前准备
 
-- [ ] 在 [gadgets.muse.ai](https://gadgets.muse.ai/settings/sdk-tokens) 生成 SDK token，存进仓库 **Settings › Secrets and variables › Actions**，名称 `MUSE_SDK_TOKEN`。token 不进代码、不发聊天
-- [ ] 存好 Secret 后，到 **Actions › Boopie firmware** 点 **Run workflow** 重新编一次，确认运行摘要里没有 “MUSE_SDK_TOKEN is not set” 警告，下载产物 `boopie-waveshare-s3-175c-<提交号>`，里面的 `BUILD_INFO.txt` 应写着 `token: yes`
+- [ ] 在 [gadgets.muse.ai](https://gadgets.muse.ai/settings/sdk-tokens) 生成 SDK token（开发者 token，`mgst_` 开头），先存在自己手机上。它不进代码、不发聊天，也**不再放进固件**：刷好机后在板子的 **设置 › 手机扫码设置** 里粘贴
+- [ ] 到 **Actions › Boopie firmware** 下载最新产物 `boopie-waveshare-s3-175c-<提交号>`
+- [ ] 仓库 Secrets 里以前存的 `MUSE_SDK_TOKEN` 已经用不到了，可以删掉
 - [ ] Windows 上装 [Python 3](https://www.python.org/downloads/)（勾选 “Add python.exe to PATH”），然后在终端执行 `pip install esptool pyserial`
 - [ ] 一根能传数据的 USB-C 线（只能充电的线连不上）
 - [ ] 手机装好 Muse App，打开 **设置 › 设备 › 开发者模式**
@@ -67,12 +68,15 @@ python -m serial.tools.miniterm COM5 115200
 
 整段日志复制下来存成文本，后面要用。看到 `panic`、`abort` 或反复重启，直接把日志发给 Claude。
 
-## 5. 配对
+## 5. 填开发者 token、开 VPN、配对
 
-1. 屏幕上应显示形象，下方暗字显示 `MuseGadget-XXXXXX`。
-2. Muse App：**设置 › 设备 › 添加设备**（右上角 **+**），选这个名字。
-3. 屏幕提示确认时，按一下板子上的按键。
-4. 在 App 里给它配 Wi-Fi。
+1. 主屏左滑到设置，点 **手机扫码设置**，手机扫屏幕上的码连上板子的热点，在弹出的网页里：
+   - 填 Wi-Fi；
+   - 在 **Muse › 开发者 token** 粘贴到货前准备好的 `mgst_` token（保存后板子会重启一下）；
+   - 在 **VPN** 粘贴 Shadowsocks 订阅链接。
+2. 板子 **设置 › VPN**：打开开关，点“更新订阅”，选一个节点（可以先点“测速”）。
+3. Muse App：**设置 › 设备 › 添加设备**（右上角 **+**），选板子的名字（**设置 › 蓝牙** 里能看到）。
+4. 屏幕提示时，按一下板子上面的键确认。设备 token 由配对自动拿到，不用填。
 
 ## 6. 验证清单
 
@@ -89,13 +93,7 @@ python -m serial.tools.miniterm COM5 115200
 | 7 | 电池 | 拔掉 USB 后电量显示正常 | |
 | 8 | 内存 | 第 4 步日志里 `ready:` 那行的两个数字 | |
 
-**关于第 4 项**：固件现在**没有代理功能**，板子直连 `api.muse.ai` 和 `hatch.metaaivm.com`。在国内大概率连不上，可以这样试：
-
-- 路由器本身能科学上网（OpenClash 等透明代理）：直接连家里 Wi-Fi；
-- 用一台开了全局代理并支持“热点共享代理”的安卓手机开热点给板子连；
-- iOS 热点通常不走手机上的 VPN，可以试一下记录结果。
-
-连不上就按设计方案把“可配置代理”提前到阶段 2 的第一项。
+**关于第 4 项**：板子自带 VPN（Shadowsocks），打开后只有 Muse 的连接（`*.muse.ai`、`*.metaaivm.com`）走所选节点，其余直连。连不上时看 **设置 › VPN**：节点能否测速、状态里有没有“Muse 正在走 VPN”；日志里搜 `boopie_vpn`。
 
 ## 7. 做自己的形象（可选）
 

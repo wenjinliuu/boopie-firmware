@@ -17,3 +17,8 @@ CONFIG_LV_USE_QRCODE=y
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
 # The page's server and DNS sit beside Muse's links; the proxy will want more.
 CONFIG_LWIP_MAX_SOCKETS=16
+# The VPN (vpn/boopie_vpn.c): Muse's names resolve to the board's relay, and
+# Shadowsocks nodes may use ChaCha20-Poly1305.
+CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM=y
+CONFIG_MBEDTLS_CHACHA20_C=y
+CONFIG_MBEDTLS_CHACHAPOLY_C=y

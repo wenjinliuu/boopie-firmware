@@ -3,8 +3,8 @@
 
 # Boopie's cloud build: firmware for the Waveshare ESP32-S3-Touch-AMOLED-1.75C,
 # host tests, and screenshots from the UI simulator on the same 466 x 466
-# round screen. The SDK token comes from the MUSE_SDK_TOKEN secret and is never
-# printed or committed; without it the firmware still builds but can't pair.
+# round screen. No Muse SDK token goes into the firmware: whoever sets a board
+# up enters their own (phone setup), so one build serves everyone.
 
 name: Boopie firmware
 
@@ -37,21 +37,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # The token goes in an overlay loaded last, inside the gitignored build
-      # directory, so it never lands in the repository or the log.
-      - name: Inject SDK token
-        env:
-          MUSE_SDK_TOKEN: ${{ secrets.MUSE_SDK_TOKEN }}
-        run: |
-          mkdir -p "$BUILD_DIR"
-          if [ -n "$MUSE_SDK_TOKEN" ]; then
-            printf 'CONFIG_GADGET_SDK_TOKEN="%s"\n' "$MUSE_SDK_TOKEN" > "$BUILD_DIR/sdkconfig.token"
-            echo "DEFAULTS=$DEFAULTS;$BUILD_DIR/sdkconfig.token" >> "$GITHUB_ENV"
-            echo "SDK token: set from MUSE_SDK_TOKEN"
-          else
-            echo "::warning::MUSE_SDK_TOKEN is not set: this firmware builds but can't pair with Muse."
-          fi
-
       # The build fails if the app no longer fits its 4 MB slot.
       - name: Build
         run: |
@@ -63,7 +48,7 @@ jobs:
           idf.py -B "$BUILD_DIR" -DIDF_TARGET=esp32s3 -DSDKCONFIG="$BUILD_DIR/sdkconfig" \
             -DSDKCONFIG_DEFAULTS="$DEFAULTS" size
 
-      # Everything a flash needs, without the token overlay or sdkconfig.
+      # Everything a flash needs, without sdkconfig.
       - name: Collect firmware
         run: |
           out="$GITHUB_WORKSPACE/out"
@@ -76,12 +61,11 @@ jobs:
             echo "commit: $GITHUB_SHA"
             echo "board: Waveshare ESP32-S3-Touch-AMOLED-1.75C"
             echo "idf: $(cd "$IDF_PATH" && git describe --tags 2>/dev/null || echo v6.0.1)"
-            echo "token: $([ -f "$BUILD_DIR/sdkconfig.token" ] && echo yes || echo no)"
+            echo "Muse SDK token: none built in (entered on the board, phone setup)"
             echo "merged image: flash at 0x0 (includes the assets partition)"
             echo "assets: v$(cat "$GITHUB_WORKSPACE/esp32/assets/VERSION")"
           } > "$out/BUILD_INFO.txt"
           cat "$out/BUILD_INFO.txt"
-          rm -f "$BUILD_DIR/sdkconfig.token"
 
       - uses: actions/upload-artifact@v4
         with:

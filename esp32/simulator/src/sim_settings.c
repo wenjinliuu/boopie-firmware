@@ -155,3 +155,53 @@ size_t boopie_setup_subscription(char *out, size_t cap)
     }
     return 0;
 }
+
+/* Boopie: the developer token and the VPN. BOOPIE_SDK set: a token's in;
+ * BOOPIE_VPN set: on, with a few nodes to show. */
+#include "boopie_sdk_token.h"
+#include "boopie_vpn.h"
+
+bool boopie_sdk_token(char *out)
+{
+    out[0] = '\0';
+    if (!getenv("BOOPIE_SDK")) {
+        return false;
+    }
+    snprintf(out, BOOPIE_SDK_TOKEN_LEN + 1, "%s", "mgst_simulatorsimulatorsimulatorsimulatorsimA");
+    return true;
+}
+bool boopie_sdk_token_valid(const char *t) { return t && strlen(t) == BOOPIE_SDK_TOKEN_LEN; }
+bool boopie_sdk_token_set(const char *t) { (void)t; return true; }
+
+static const boopie_vpn_node_t SIM_NODES[] = {
+    { .name = "香港 01", .host = "hk.example", .cipher = "aes-256-gcm", .port = 443, .supported = true },
+    { .name = "日本 02", .host = "jp.example", .cipher = "chacha20-ietf-poly1305", .port = 443, .supported = true },
+    { .name = "美国 03", .host = "us.example", .cipher = "aes-128-gcm", .port = 8388, .supported = true },
+    { .name = "新加坡 2022", .host = "sg.example", .cipher = "2022-blake3-aes-128-gcm", .port = 443, .supported = false },
+};
+static const int SIM_LATENCY[] = { 86, 142, -2, -1 };
+static int s_sim_node;
+
+void boopie_vpn_init(const char *extra_host) { (void)extra_host; }
+bool boopie_vpn_on(void) { return getenv("BOOPIE_VPN") != NULL; }
+void boopie_vpn_set_on(bool on) { (void)on; }
+int boopie_vpn_count(void) { return getenv("BOOPIE_VPN") ? (int)(sizeof SIM_NODES / sizeof SIM_NODES[0]) : 0; }
+bool boopie_vpn_node(int i, boopie_vpn_node_t *out)
+{
+    if (i < 0 || i >= boopie_vpn_count()) {
+        return false;
+    }
+    *out = SIM_NODES[i];
+    return true;
+}
+int boopie_vpn_current(void) { return boopie_vpn_count() ? s_sim_node : -1; }
+void boopie_vpn_select(int i) { s_sim_node = i; }
+int boopie_vpn_latency(int i) { return i >= 0 && i < boopie_vpn_count() ? SIM_LATENCY[i] : -1; }
+boopie_vpn_busy_t boopie_vpn_busy(char *msg, size_t cap)
+{
+    snprintf(msg, cap, "%s", getenv("BOOPIE_VPN") ? "已更新：4 个节点，3 个能用" : "");
+    return BOOPIE_VPN_IDLE;
+}
+void boopie_vpn_update(void) {}
+void boopie_vpn_test(void) {}
+bool boopie_vpn_active(void) { return getenv("BOOPIE_VPN") != NULL; }

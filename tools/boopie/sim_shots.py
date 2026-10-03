@@ -216,14 +216,14 @@ SETTINGS = [
     ("settings-wifi-password", ["swipe=left", "tap=230,113", "advance=600", "tap=230,459", "advance=600"]),
     ("settings-avatar", ["settings=avatar", "advance=600"]),
     *[(f"settings-{page}", [f"settings={page}", "advance=600"])
-      for page in ("brain", "xiaozhi", "muse", "bluetooth", "sound", "sleep", "battery")],
+      for page in ("brain", "xiaozhi", "muse", "vpn", "bluetooth", "sound", "sleep", "battery")],
 ]
 
 
 def render_settings(binary: Path, out: Path) -> list[Path]:
     with tempfile.TemporaryDirectory() as tmp:
         return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
-                      {"BOOPIE_PET_XP": "900"})
+                      {"BOOPIE_PET_XP": "900", "BOOPIE_VPN": "1"})
                 for name, steps in SETTINGS]
 
 

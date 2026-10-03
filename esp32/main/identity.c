@@ -16,6 +16,8 @@
 
 #include "identity.h"
 
+#include "boopie_sdk_token.h"
+
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -58,6 +60,19 @@ const char *identity_node_id(void) { return s_node_id; }
 const char *identity_ble_name(void) { return s_ble_name; }
 const char *identity_mac(void) { return s_mac; }
 const char *identity_device_id(void) { return s_device_id; }
+// Boopie: the token comes from whoever sets the board up (phone setup, kept
+// in NVS: components/boopie/setup/boopie_sdk_token.h), not from the build, so
+// each person uses their own. A build with one set in menuconfig still works
+// for development. Read once: a new one takes a restart, as pairing keeps it.
 const char *identity_sdk_token(void) {
+    static char s_token[BOOPIE_SDK_TOKEN_LEN + 1];
+    static bool s_loaded;
+    if (!s_loaded) {
+        s_loaded = true;
+        boopie_sdk_token(s_token);
+    }
+    if (s_token[0]) {
+        return s_token;
+    }
     return CONFIG_GADGET_SDK_TOKEN[0] ? CONFIG_GADGET_SDK_TOKEN : NULL;
 }

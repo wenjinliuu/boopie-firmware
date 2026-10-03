@@ -259,7 +259,7 @@ static void show_step(step_t step)
         break;
     case S_BRAIN_SETUP:
         if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
-            col = page("Muse", "需要 Muse token\n和能访问海外的网络。\ntoken 很长，用手机粘贴。");
+            col = page("Muse", "需要你自己的开发者 token\n（gadgets.muse.ai 生成）\n和 VPN。用手机扫码粘贴。");
             button(col, 220, "手机扫码填写", true, on_phone, 0);
             button(col, 220, "稍后再说", false, on_next, 0);
             break;

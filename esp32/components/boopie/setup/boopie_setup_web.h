@@ -13,8 +13,8 @@
  * Phone setup over the board's own hotspot (docs/boopie-interaction.md): the
  * radio goes AP+STA, an AP "Boopie-XXXX" with a fresh random password comes
  * up, a DNS server answers every name with the board so the phone pops the
- * page up, and a small web page sets Wi-Fi, the brain, Muse's token, the proxy
- * subscription and the pet's name. Long secrets are pasted on the phone and
+ * page up, and a small web page sets Wi-Fi, the brain, the Muse developer
+ * token, the VPN subscription and the pet's name. Long secrets are pasted on the phone and
  * never shown back: the page only says whether they're set.
  *
  * Start and stop from any one task (the UI's); the server runs in its own.
@@ -31,7 +31,7 @@ typedef struct {
 enum {
     BOOPIE_SETUP_SAVED_WIFI = 1 << 0,
     BOOPIE_SETUP_SAVED_BRAIN = 1 << 1,
-    BOOPIE_SETUP_SAVED_MUSE = 1 << 2,
+    BOOPIE_SETUP_SAVED_MUSE = 1 << 2,   /* the developer token: it restarts */
     BOOPIE_SETUP_SAVED_PROXY = 1 << 3,
     BOOPIE_SETUP_SAVED_NAME = 1 << 4,
 };

@@ -24,6 +24,7 @@
 #include "boopie_clock.h"   /* Boopie */
 #include "boopie_sound.h"   /* Boopie */
 #include "boopie_store.h"   /* Boopie */
+#include "boopie_vpn.h"     /* Boopie */
 #include "muse_audio.h"
 #include "muse_battery.h"
 #include "muse_board.h"
@@ -73,6 +74,12 @@ void muse_app_run(const muse_board_t *board)
     boopie_clock_start();   /* Boopie: the time, for the pet */
     boopie_assets_init();   /* Boopie: fonts, sounds (the firmware's own without them) */
     boopie_store_mount();   /* Boopie: chat history, pictures, notes */
+    {
+        /* Boopie: the VPN, with Muse's server if it's been moved off the default. */
+        char host[MUSE_HOST_MAX + 1];
+        muse_settings_hatch_host(host);
+        boopie_vpn_init(host);
+    }
     muse_settings_set_listener(on_setting);
     muse_state_init();
     muse_battery_init();

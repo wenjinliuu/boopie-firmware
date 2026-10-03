@@ -45,7 +45,7 @@ git merge upstream/main
 
 ## 约定
 
-- Muse SDK token 只存放在仓库 Secrets，名称 `MUSE_SDK_TOKEN`，不写进代码。没有配置时也能编译，但固件无法配对
+- 固件里不带任何 Muse SDK token（开发者 token）。谁用这块板子，谁就在 **设置 › 手机扫码设置** 里粘贴自己在 gadgets.muse.ai 生成的 token，存在板子上；没填就用不了 Muse。同一份固件可以给任何人用
 - 本项目不是 Meta 的产品，也未获得 Meta 背书
 
 官方原 README 见 [muse-gadget-sdk](https://github.com/facebookincubator/muse-gadget-sdk#readme)。许可证：官方代码按 [LICENSE](LICENSE)（Apache 2.0），第三方文件保留各自许可；`esp32/avatar/` 里的默认形象 Jollybot 不在 Apache 协议覆盖范围内。

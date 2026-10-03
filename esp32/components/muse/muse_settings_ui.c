@@ -43,6 +43,8 @@
 #include "boopie_guide.h"
 #include "boopie_setup.h"
 #include "boopie_heads.h"
+#include "boopie_sdk_token.h"
+#include "boopie_vpn.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -95,6 +97,7 @@ static char s_join_ssid[MUSE_SSID_MAX + 1];
 /* Hatch page. */
 static lv_obj_t *s_hatch_status, *s_hatch_host, *s_hatch_vm, *s_hatch_token;
 static lv_obj_t *s_muse_howto;   /* Boopie: getting Muse on */
+static lv_obj_t *s_sdk_value;    /* Boopie: whether the developer token's in */
 static lv_obj_t *s_link_status, *s_link_reset_lbl;
 static int64_t s_link_reset_armed_us;
 
@@ -862,13 +865,6 @@ static const char *link_state_text(muse_link_state_t st)
 static void on_hatch_host_done(const char *text) { muse_settings_set_hatch_host(text); }
 static void on_hatch_vm_done(const char *text) { muse_settings_set_hatch_vm(text); }
 
-static void on_hatch_token_done(const char *text)
-{
-    if (text[0]) {
-        muse_settings_set_hatch_token(text, false);
-    }
-}
-
 static void on_hatch_host(lv_event_t *e)
 {
     (void)e;
@@ -885,10 +881,11 @@ static void on_hatch_vm(lv_event_t *e)
     open_text("VM ID", vm, false, MUSE_VM_MAX, "可不填", on_hatch_vm_done, s_hatch);
 }
 
-static void on_hatch_token(lv_event_t *e)
+/* Boopie: the developer token is pasted on the phone. */
+static void on_sdk_token(lv_event_t *e)
 {
     (void)e;
-    open_text("设备 token", "", true, MUSE_TOKEN_MAX, "留空不改；长的用手机扫码粘贴", on_hatch_token_done, s_hatch);
+    boopie_setup_open(NULL);
 }
 
 static void on_hatch_test(lv_event_t *e)
@@ -918,6 +915,10 @@ static void build_hatch_page(lv_obj_t *tile)
     s_link_reset_armed_us = 0;
     s_link_status = note(list, "");
     s_hatch_status = note(list, "");
+    /* Boopie: the developer token, entered by whoever sets it up, and the
+     * device token, which pairing fetches: neither is typed here. */
+    row(list, NULL, "开发者 token", &s_sdk_value, on_sdk_token, NULL);
+    s_hatch_token = info_row(list, "设备 token");
     button(list, "测试连接", COLOR_ACCENT, on_hatch_test, NULL);
     /* Boopie: how to get Muse on, step by step (docs/boopie-interaction.md). */
     s_muse_howto = note(list, "");
@@ -925,9 +926,7 @@ static void build_hatch_page(lv_obj_t *tile)
     note(list, "高级");
     row(list, NULL, "服务器", &s_hatch_host, on_hatch_host, NULL);
     row(list, NULL, "VM ID", &s_hatch_vm, on_hatch_vm, NULL);
-    row(list, NULL, "设备 token", &s_hatch_token, on_hatch_token, NULL);
-    note(list, "设备 token 一般不用填：用 App 配对后自动获得。已有 token 时，用 设置 › 手机扫码设置 粘贴更方便，"
-               "它会代替 App 配对。VM ID 用来在多台 VM 里选一台。");
+    note(list, "VM ID 用来在多台 VM 里选一台，一般不用改。");
     button(list, "重置配对", COLOR_DANGER, on_link_reset, &s_link_reset_lbl);
     note(list, "重置会忘掉 Wi-Fi 和 App 配对，然后重启。");
 }
@@ -940,14 +939,16 @@ static void tick_hatch(void)
     set_text(s_link_status, link);
     muse_ble_status_t ble;
     muse_ble_status(&ble);
-    char howto[480];
+    char howto[720];
     snprintf(howto, sizeof(howto),
              "怎样接入 Muse\n"
-             "1. 手机装好 Muse App 并登录。板子要能访问海外网络，需要时先导入代理订阅。\n"
-             "2. App 里打开 设置 › 设备 › 开发者模式。\n"
-             "3. 设置 › 设备 › 右上角 + 添加设备，选 %s。\n"
-             "4. 屏幕提示按键时，按一下上面的键确认。\n"
-             "5. 这里显示\"已配对\"、\"已连上\"就好了。",
+             "1. 开发者 token：在 gadgets.muse.ai 登录，Account › SDK tokens 生成一个，"
+             "用 设置 › 手机扫码设置 粘贴。点上面\"开发者 token\"也能打开。\n"
+             "2. 板子要能访问海外网络：设置 › VPN 打开。\n"
+             "3. 手机装好 Muse App 并登录，打开 设置 › 设备 › 开发者模式。\n"
+             "4. 设置 › 设备 › 右上角 + 添加设备，选 %s。\n"
+             "5. 屏幕提示按键时，按一下上面的键确认。设备 token 会自动拿到。\n"
+             "6. 这里显示\"已配对\"、\"已连上\"就好了。",
              ble.name[0] ? ble.name : "这块板子");
     set_text(s_muse_howto, howto);
     if (s_link_reset_armed_us && esp_timer_get_time() - s_link_reset_armed_us >= 5000000) {
@@ -968,9 +969,12 @@ static void tick_hatch(void)
     muse_settings_hatch_vm(vm);
     set_text(s_hatch_host, host);
     set_text(s_hatch_vm, vm[0] ? vm : "未设置");
-    size_t n = muse_settings_hatch_token_len();
-    snprintf(buf, sizeof(buf), n ? "已设置（%u 字符）" : "未设置", (unsigned)n);
-    set_text(s_hatch_token, buf);
+    set_text(s_hatch_token, muse_settings_hatch_token_len() ? "已获取" : "配对后自动获取");
+    char sdk[BOOPIE_SDK_TOKEN_LEN + 1];
+    bool has_sdk = boopie_sdk_token(sdk);
+    memset(sdk, 0, sizeof sdk);
+    set_text(s_sdk_value, has_sdk ? "已填写" : "未填写");
+    lv_obj_set_style_text_color(s_sdk_value, lv_color_hex(has_sdk ? COLOR_OK : COLOR_WARN), 0);
 }
 
 /* ---------- Bluetooth ---------- */
@@ -1587,6 +1591,112 @@ static void tick_brain(void)
 
 static const page_t BRAIN = { &s_brain, build_brain_page };
 
+/* ---------- VPN (Boopie) ---------- */
+
+static lv_obj_t *s_vpn, *s_home_vpn, *s_vpn_sw, *s_vpn_status, *s_vpn_msg, *s_vpn_list;
+static uint32_t s_vpn_shown;   /* what the node list shows, to redraw only on change */
+
+static void on_vpn_sw(lv_event_t *e)
+{
+    boopie_vpn_set_on(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+}
+
+static void on_vpn_update(lv_event_t *e)
+{
+    (void)e;
+    boopie_vpn_update();
+}
+
+static void on_vpn_test(lv_event_t *e)
+{
+    (void)e;
+    boopie_vpn_test();
+}
+
+static void on_vpn_node(lv_event_t *e)
+{
+    boopie_vpn_select((int)(intptr_t)lv_event_get_user_data(e));
+    s_vpn_shown = 0;   /* redraw the ticks */
+}
+
+static void build_vpn_page(lv_obj_t *tile)
+{
+    lv_obj_t *list;
+    s_vpn = page(tile, "VPN", true, &list);
+    s_vpn_sw = switch_row(list, "VPN", boopie_vpn_on(), on_vpn_sw);
+    s_vpn_status = note(list, "");
+    button(list, LV_SYMBOL_REFRESH "  更新订阅", COLOR_ACCENT, on_vpn_update, NULL);
+    button(list, LV_SYMBOL_LOOP "  测速", COLOR_ACCENT, on_vpn_test, NULL);
+    s_vpn_msg = note(list, "");
+    note(list, "节点");
+    s_vpn_list = column(list);
+    note(list, "订阅在 设置 › 手机扫码设置 里导入。只有 Muse 走 VPN，小智、校时直连。支持 Shadowsocks"
+               "（aes-gcm、chacha20），不支持插件和 2022 加密。");
+    s_vpn_shown = 0;
+}
+
+static void tick_vpn(void)
+{
+    bool on = boopie_vpn_on();
+    if (on != lv_obj_has_state(s_vpn_sw, LV_STATE_CHECKED)) {
+        lv_obj_set_state(s_vpn_sw, LV_STATE_CHECKED, on);
+    }
+    int n = boopie_vpn_count(), cur = boopie_vpn_current();
+    boopie_vpn_node_t node;
+    char buf[96];
+    if (!on) {
+        strlcpy(buf, "已关", sizeof buf);
+    } else if (cur >= 0 && boopie_vpn_node(cur, &node)) {
+        snprintf(buf, sizeof buf, "已开：%s%s", node.name, boopie_vpn_active() ? "\nMuse 正在走 VPN" : "");
+    } else {
+        strlcpy(buf, n ? "已开：先选一个节点" : "已开：还没有节点，先导入订阅", sizeof buf);
+    }
+    set_text(s_vpn_status, buf);
+    lv_obj_set_style_text_color(s_vpn_status, lv_color_hex(on && cur >= 0 ? COLOR_OK : COLOR_DIM), 0);
+    boopie_vpn_busy(buf, sizeof buf);
+    set_text(s_vpn_msg, buf);
+
+    /* The list, redrawn when the nodes, the choice or a speed changes. */
+    uint32_t sig = 2166136261u;
+    sig = (sig ^ (uint32_t)n) * 16777619u;
+    sig = (sig ^ (uint32_t)(cur + 1)) * 16777619u;
+    for (int i = 0; i < n; i++) {
+        sig = (sig ^ (uint32_t)(boopie_vpn_latency(i) + 3)) * 16777619u;
+    }
+    if (sig == s_vpn_shown) {
+        return;
+    }
+    s_vpn_shown = sig;
+    lv_obj_clean(s_vpn_list);
+    if (!n) {
+        note(s_vpn_list, "还没有节点");
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        if (!boopie_vpn_node(i, &node)) {
+            continue;
+        }
+        lv_obj_t *value;
+        lv_obj_t *r = row(s_vpn_list, i == cur ? LV_SYMBOL_OK : NULL, node.name, &value, on_vpn_node, (void *)(intptr_t)i);
+        (void)r;
+        int ms = boopie_vpn_latency(i);
+        if (!node.supported) {
+            strlcpy(buf, "不支持", sizeof buf);
+        } else if (ms == -2) {
+            strlcpy(buf, "连不上", sizeof buf);
+        } else if (ms >= 0) {
+            snprintf(buf, sizeof buf, "%d ms", ms);
+        } else {
+            buf[0] = '\0';
+        }
+        set_text(value, buf);
+        lv_obj_set_style_text_color(value, lv_color_hex(!node.supported || ms == -2 ? COLOR_WARN
+                                                        : ms >= 0 && ms < 300 ? COLOR_OK : COLOR_DIM), 0);
+    }
+}
+
+static const page_t VPN = { &s_vpn, build_vpn_page };
+
 /* Boopie: the setup guide, from the top. */
 static void on_guide(lv_event_t *e)
 {
@@ -1609,6 +1719,7 @@ static void build_home(lv_obj_t *tile)
     row(list, LV_SYMBOL_UPLOAD, "手机扫码设置", NULL, on_phone_setup, NULL);   /* Boopie */
     row(list, LV_SYMBOL_HOME, "大脑", &s_home_brain, on_nav, (void *)&BRAIN);      /* Boopie */
     row(list, LV_SYMBOL_IMAGE, "伙伴", &s_home_avatar, on_nav, (void *)&AVATAR);    /* Boopie */
+    row(list, LV_SYMBOL_SHUFFLE, "VPN", &s_home_vpn, on_nav, (void *)&VPN);         /* Boopie */
     row(list, LV_SYMBOL_BLUETOOTH, "蓝牙", &s_home_ble, on_nav, (void *)&BLE);
     row(list, LV_SYMBOL_VOLUME_MAX, "声音", &s_home_sound, on_nav, (void *)&SOUND);
     row(list, LV_SYMBOL_EYE_CLOSE, "显示与熄屏", &s_home_sleep, on_nav, (void *)&SLEEP);
@@ -1626,6 +1737,7 @@ static void tick_home(void)
     set_text(s_home_wifi, w.state == MUSE_WIFI_CONNECTED ? w.ssid : WIFI_VALUES[w.state]);
 
     set_text(s_home_brain, boopie_avatar_brain() == BOOPIE_BRAIN_MUSE ? "Muse" : "小智");
+    set_text(s_home_vpn, boopie_vpn_on() ? "已开" : "已关");
 
     muse_ble_status_t b;
     muse_ble_status(&b);
@@ -1694,6 +1806,8 @@ void muse_settings_ui_tick(bool visible)
         tick_avatar();   /* Boopie */
     } else if (s_current == s_brain) {
         tick_brain();    /* Boopie */
+    } else if (s_current == s_vpn) {
+        tick_vpn();      /* Boopie */
     }
 }
 
@@ -1710,7 +1824,7 @@ void muse_settings_ui_open(const char *name)
         const page_t *page;
     } PAGES[] = { { "wifi", &WIFI }, { "muse", &HATCH }, { "avatar", &AVATAR }, { "bluetooth", &BLE },
                   { "sound", &SOUND }, { "sleep", &SLEEP }, { "battery", &BATTERY }, { "power", &POWER },
-                  { "brain", &BRAIN }, { "xiaozhi", &XIAOZHI } };
+                  { "brain", &BRAIN }, { "xiaozhi", &XIAOZHI }, { "vpn", &VPN } };
     for (size_t i = 0; i < sizeof PAGES / sizeof PAGES[0]; i++) {
         if (strcmp(PAGES[i].name, name) == 0) {
             if (!*PAGES[i].page->obj) {

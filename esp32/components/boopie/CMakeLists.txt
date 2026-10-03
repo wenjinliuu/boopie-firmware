@@ -17,7 +17,10 @@ set(srcs
     "sound/boopie_sound.c"
     "boopie_text.c"
     "font/boopie_pixel_font.c"
-    "font/boopie_pixel_glyphs.c")
+    "font/boopie_pixel_glyphs.c"
+    "setup/boopie_sdk_token.c"
+    "vpn/boopie_ss.c"
+    "vpn/boopie_vpn_nodes.c")
 set(embed)
 if(CONFIG_MUSE_ENABLED)
     # LVGL comes from idf_component.yml, on the same boards as Muse's UI.
@@ -28,12 +31,20 @@ if(CONFIG_MUSE_ENABLED)
     list(APPEND srcs "device/boopie_clock.c" "device/boopie_imu.c")
     # The user data partition (LittleFS, from idf_component.yml).
     list(APPEND srcs "store/boopie_store.c")
+    # The VPN: the relay, the subscription and the resolve hook.
+    list(APPEND srcs "vpn/boopie_vpn.c")
 endif()
 
 idf_component_register(
     SRCS ${srcs}
     EMBED_FILES ${embed}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup" "vpn"
     REQUIRES esp_driver_i2c
-    PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs
+    PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs mbedtls esp_http_client lwip
 )
+
+if(CONFIG_MUSE_ENABLED)
+    # lwip calls the VPN's resolve hook (CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM);
+    # nothing else in the firmware refers to it, so it's asked for here.
+    target_link_libraries(${COMPONENT_LIB} INTERFACE "-u lwip_hook_netconn_external_resolve")
+endif()

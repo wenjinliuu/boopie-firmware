@@ -16,6 +16,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_random.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -24,6 +25,7 @@
 #include "nvs.h"
 
 #include "boopie_avatar.h"
+#include "boopie_sdk_token.h"
 #include "muse_settings.h"
 #include "muse_wifi.h"
 
@@ -35,7 +37,7 @@ extern const char setup_html_end[] asm("_binary_setup_html_end");
 #define NVS_NS "boopie_net"
 #define NVS_SUB "sub"
 #define SUB_MAX 1023
-#define BODY_MAX 6144        /* the token and a subscription, URL-encoded */
+#define BODY_MAX 6144        /* a subscription and the rest, URL-encoded */
 #define MAX_APS 20
 
 static httpd_handle_t s_http;
@@ -243,9 +245,9 @@ static esp_err_t on_state(httpd_req_t *req)
 
     muse_wifi_status_t w;
     muse_wifi_status(&w);
-    char host[MUSE_HOST_MAX + 1], vm[MUSE_VM_MAX + 1], line[64];
-    muse_settings_hatch_host(host);
-    muse_settings_hatch_vm(vm);
+    char line[96], sdk[BOOPIE_SDK_TOKEN_LEN + 1];
+    bool has_sdk = boopie_sdk_token(sdk);
+    memset(sdk, 0, sizeof sdk);
     bool has_sub = false;
     nvs_handle_t h;
     size_t sub_len = 0;
@@ -256,12 +258,12 @@ static esp_err_t on_state(httpd_req_t *req)
 
     send_text(req, "{\"wifi\":");
     send_str(req, w.state == MUSE_WIFI_CONNECTED ? w.ssid : "");
-    snprintf(line, sizeof line, ",\"brain\":%d,\"token\":%u,\"sub\":%s,\"host\":", (int)boopie_avatar_brain(),
-             (unsigned)muse_settings_hatch_token_len(), has_sub ? "true" : "false");
+    /* Secrets never go back to the phone: only whether they're there. The
+     * device token comes with pairing; the page just says if it has. */
+    snprintf(line, sizeof line, ",\"brain\":%d,\"sdk\":%s,\"paired\":%s,\"sub\":%s", (int)boopie_avatar_brain(),
+             has_sdk ? "true" : "false", muse_settings_hatch_token_len() ? "true" : "false",
+             has_sub ? "true" : "false");
     send_text(req, line);
-    send_str(req, host);
-    send_text(req, ",\"vm\":");
-    send_str(req, vm);
     send_text(req, ",\"name\":");
     send_str(req, boopie_avatar_has_own_name() ? boopie_avatar_pet_name() : "");
     send_text(req, ",\"aps\":[");
@@ -290,6 +292,13 @@ static esp_err_t on_scan(httpd_req_t *req)
 /* Joining a network can move the hotspot to the router's channel and drop the
  * phone, so it waits until the answer has gone out. */
 static char s_join_ssid[MUSE_SSID_MAX + 1], s_join_pass[MUSE_PASS_MAX + 1];
+
+static void restart_task(void *arg)
+{
+    (void)arg;
+    vTaskDelay(pdMS_TO_TICKS(4000));
+    esp_restart();
+}
 
 static void join_task(void *arg)
 {
@@ -360,14 +369,10 @@ static esp_err_t on_save(httpd_req_t *req)
             error = "不认识这个大脑";
         }
     }
-    if (!error && has(body, "token") && !field(body, "token", val, MUSE_TOKEN_MAX + 1)) {
-        error = "Token 太长了";
-    }
-    if (!error && has(body, "vm") && !field(body, "vm", val, MUSE_VM_MAX + 1)) {
-        error = "VM 名字太长";
-    }
-    if (!error && has(body, "host") && !field(body, "host", val, MUSE_HOST_MAX + 1)) {
-        error = "服务器地址太长";
+    char sdk[BOOPIE_SDK_TOKEN_LEN + 2] = "";
+    bool has_sdk = !error && has(body, "sdk");
+    if (has_sdk && (!field(body, "sdk", sdk, sizeof sdk) || (*sdk && !boopie_sdk_token_valid(sdk)))) {
+        error = "开发者 token 不对：应是 mgst_ 开头的 48 个字符，重新复制一次";
     }
     if (!error && field(body, "sub", val, SUB_MAX + 1)) {
         if (*val && strncmp(val, "https://", 8) != 0 && strncmp(val, "http://", 7) != 0
@@ -400,19 +405,11 @@ static esp_err_t on_save(httpd_req_t *req)
             boopie_avatar_set_brain((boopie_brain_t)brain);
             saved |= BOOPIE_SETUP_SAVED_BRAIN;
         }
-        if (field(body, "host", val, MUSE_HOST_MAX + 1)) {
-            muse_settings_set_hatch_host(val);
-            saved |= BOOPIE_SETUP_SAVED_MUSE;
-        }
-        if (field(body, "vm", val, MUSE_VM_MAX + 1)) {
-            muse_settings_set_hatch_vm(val);
-            saved |= BOOPIE_SETUP_SAVED_MUSE;
-        }
-        if (field(body, "token", val, MUSE_TOKEN_MAX + 1)) {
-            if (muse_settings_set_hatch_token(val, false) == ESP_OK) {
+        if (has_sdk) {
+            if (boopie_sdk_token_set(sdk)) {
                 saved |= BOOPIE_SETUP_SAVED_MUSE;
             } else {
-                error = "Token 没存上";
+                error = "开发者 token 没存上";
             }
         }
         if (!error && field(body, "sub", val, SUB_MAX + 1)) {
@@ -439,6 +436,12 @@ static esp_err_t on_save(httpd_req_t *req)
         }
     }
     memset(pass, 0, sizeof pass);
+    memset(sdk, 0, sizeof sdk);
+    if (saved & BOOPIE_SETUP_SAVED_MUSE) {
+        /* Pairing reads the developer token once, at start: restart once the
+         * answer is out (and the Wi-Fi, if any, saved). */
+        xTaskCreate(restart_task, "boopie_restart", 2048, NULL, 3, NULL);
+    }
     if (saved) {
         atomic_fetch_or(&s_saved, saved);
         atomic_fetch_add(&s_saves, 1);
@@ -447,6 +450,9 @@ static esp_err_t on_save(httpd_req_t *req)
         char line[96];
         snprintf(line, sizeof line, "%s%s", saved ? "前面的项存上了，但是" : "", error);
         return answer(req, false, line);
+    }
+    if (saved & BOOPIE_SETUP_SAVED_MUSE) {
+        return answer(req, true, "已保存。Boopie 马上重启一下，开发者 token 就生效了");
     }
     return answer(req, true, has_ssid ? "已保存。Boopie 正在连 Wi-Fi，热点可能会断开一下" : "已保存");
 }

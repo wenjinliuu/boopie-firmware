@@ -52,6 +52,7 @@
 #include "boopie_games.h"  /* Boopie: the games, over everything */
 #include "boopie_guide.h"  /* Boopie: the setup guide */
 #include "boopie_setup.h"  /* Boopie: phone setup over the hotspot */
+#include "boopie_vpn.h"    /* Boopie: the VPN mark in the status line */
 
 static const char *TAG = "muse_ui";
 
@@ -119,6 +120,7 @@ static lv_obj_t *s_state_lbl;
 static lv_obj_t *s_name_lbl;    /* this gadget's own name, to tell it from the next one */
 static lv_obj_t *s_power_lbl;
 static lv_obj_t *s_time_lbl;      /* Boopie: the time, in the status line */
+static lv_obj_t *s_vpn_lbl;       /* Boopie: "VPN" while it's on */
 static lv_obj_t *s_batt_icon;     /* Boopie: the battery as an icon beside its % */
 static lv_obj_t *s_caption_lbl;
 static lv_obj_t *s_reply_lbl;   /* full layout: the reply's page while answering */
@@ -879,6 +881,7 @@ static void build_screen(void)
     s_wifi_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     s_ble_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     /* Boopie: Wi-Fi, a phone if one's connected, the time, the battery. */
+    s_vpn_lbl = make_label(status, &lv_font_unscii_8, COLOR_ACCENT);   /* Boopie: the VPN, while on */
     s_time_lbl = make_label(status, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, COLOR_DIM);
     s_batt_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     s_power_lbl = make_label(status, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, 0xff6b6b);
@@ -1356,6 +1359,10 @@ static void update_power(float now)
         lv_obj_set_style_text_color(s_batt_icon,
                                     lv_color_hex(p.battery_pct >= 0 && p.battery_pct <= 20 && !p.charging ? 0xff6b6b
                                                  : COLOR_DIM), 0);
+    }
+    const char *vpn = boopie_vpn_on() ? "VPN" : "";
+    if (strcmp(vpn, lv_label_get_text(s_vpn_lbl)) != 0) {
+        lv_label_set_text(s_vpn_lbl, vpn);
     }
     const char *clock = boopie_pages_clock();
     if (strcmp(clock ? clock : "", lv_label_get_text(s_time_lbl)) != 0) {

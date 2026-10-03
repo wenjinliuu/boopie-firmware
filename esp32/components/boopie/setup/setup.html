@@ -57,7 +57,7 @@ code{background:#120f24;padding:1px 5px;border-radius:5px}
 <label><input type="radio" name="brain" value="0">小智 · 国内</label>
 <label><input type="radio" name="brain" value="1">Muse · 海外</label>
 </div>
-<p class="note">没选就是小智。小智用国内服务器，不用代理；Muse 需要 App 配对和海外网络。</p>
+<p class="note">没选就是小智。小智用国内服务器，不用 VPN；Muse 需要开发者 token、App 配对和海外网络。</p>
 <details>
 <summary>怎样接入小智</summary>
 <p class="note">小智接入还在开发中，接通后是这样：</p>
@@ -73,31 +73,37 @@ code{background:#120f24;padding:1px 5px;border-radius:5px}
 
 <section>
 <h2>Muse</h2>
-<details open>
+<label for="sdk">开发者 token</label>
+<input id="sdk" maxlength="48" autocomplete="off" autocapitalize="off" spellcheck="false">
+<p class="note" id="sdknow"></p>
+<details>
+<summary>开发者 token 在哪里拿</summary>
+<ol>
+<li>浏览器打开 <code>gadgets.muse.ai</code>，用你的 Muse 账号登录。</li>
+<li>点 Account › SDK tokens，生成一个 token。</li>
+<li>复制那串 <code>mgst_</code> 开头的字符，粘贴到上面，保存。</li>
+</ol>
+<p class="note">每个人用自己账号的 token。保存后 Boopie 会重启一下。</p>
+</details>
+<details>
 <summary>怎样接入 Muse</summary>
 <ol>
-<li>手机装好 Muse App 并登录。板子要能访问海外网络：需要时在下面“代理订阅”里导入订阅。</li>
-<li>App 里打开 设置 › 设备 › 开发者模式。</li>
+<li>先填好上面的开发者 token。</li>
+<li>板子要能访问海外网络：在下面的 VPN 里导入订阅，再在板子 设置 › VPN 里打开。</li>
+<li>手机装好 Muse App 并登录，打开 设置 › 设备 › 开发者模式。</li>
 <li>设置 › 设备 › 右上角 <b>+</b> 添加设备，选板子的名字（板子 设置 › 蓝牙 里能看到）。</li>
-<li>板子屏幕提示时，按一下板子上面的键确认。</li>
-<li>板子 设置 › 大脑 › Muse 接入与设置 显示“已配对”“已连上”就好了。</li>
+<li>板子屏幕提示时，按一下板子上面的键确认。配对是自动的，设备 token 会自己拿到，不用填。</li>
 </ol>
-<p class="note">用 App 配对就不用填下面的 token。下面三项是高级选项：已有设备 token 时粘贴在这里，它会代替 App 配对；VM 用来在多台 VM 里选一台；服务器一般不用改。</p>
+<p class="note" id="pairednow"></p>
 </details>
-<label for="token">Token</label>
-<textarea id="token" maxlength="1023" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-<label for="vm">VM</label>
-<input id="vm" maxlength="63" autocomplete="off" autocapitalize="off">
-<label for="host">服务器</label>
-<input id="host" maxlength="63" autocomplete="off" autocapitalize="off">
 </section>
 
 <section>
-<h2>代理订阅（Shadowsocks）</h2>
-<label for="sub">订阅链接或 ss:// 链接</label>
+<h2>VPN</h2>
+<label for="sub">订阅链接（Shadowsocks）或 ss:// 链接</label>
 <textarea id="sub" maxlength="1023" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
 <div class="row" id="subclear" hidden><label style="margin:6px 0 0"><input type="checkbox" id="subdel" style="width:auto"> 删除已保存的订阅</label></div>
-<p class="note">只有 Muse 走代理，小智直连。</p>
+<p class="note">导入后在板子 设置 › VPN 里打开、选节点。只有 Muse 走 VPN，小智直连。</p>
 </section>
 
 <section>
@@ -123,8 +129,9 @@ function fill(s){
   if(keep)sel.value=keep;
   $('wifinow').textContent=s.wifi?('现在连的是 '+s.wifi):'还没连 Wi-Fi';
   for(const r of document.getElementsByName('brain'))r.checked=(+r.value===s.brain);
-  $('token').placeholder=s.token?('已保存（'+s.token+' 个字符），留空不改'):'粘贴 Muse token';
-  $('vm').value=s.vm;$('host').value=s.host;
+  $('sdk').placeholder=s.sdk?'已填写，留空不改':'mgst_ 开头，48 个字符';
+  $('sdknow').textContent=s.sdk?'已填写开发者 token':'还没填：不填就用不了 Muse';
+  $('pairednow').textContent=s.paired?'这块板子已经配对过 Muse':'这块板子还没配对';
   $('sub').placeholder=s.sub?'已保存，留空不改':'https://… 或 ss://…';
   $('subclear').hidden=!s.sub;
   $('name').value=s.name;
@@ -144,9 +151,8 @@ $('save').onclick=async()=>{
   if(ssid){f.set('ssid',ssid);f.set('pass',$('pass').value)}
   const b=[...document.getElementsByName('brain')].find(r=>r.checked);
   if(b&&+b.value!==state.brain)f.set('brain',b.value);
-  const tok=$('token').value.trim();if(tok)f.set('token',tok);
-  if($('vm').value.trim()!==state.vm)f.set('vm',$('vm').value.trim());
-  if($('host').value.trim()!==state.host)f.set('host',$('host').value.trim());
+  const sdk=$('sdk').value.trim();
+  if(sdk){if(!/^mgst_[A-Za-z0-9_-]{43}$/.test(sdk)){msg('开发者 token 应是 mgst_ 开头的 48 个字符',false);return}f.set('sdk',sdk)}
   const sub=$('sub').value.trim();
   if(sub)f.set('sub',sub);else if($('subdel').checked)f.set('sub','');
   if($('name').value.trim()!==state.name)f.set('name',$('name').value.trim());
@@ -156,7 +162,7 @@ $('save').onclick=async()=>{
     const r=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:f.toString()});
     const j=await r.json();
     msg(j.msg,j.ok);
-    if(j.ok){$('token').value='';$('sub').value='';$('pass').value='';$('subdel').checked=false;
+    if(j.ok){$('sdk').value='';$('sub').value='';$('pass').value='';$('subdel').checked=false;
       if(!f.has('ssid'))load()}
   }catch(e){msg(f.has('ssid')?'已保存。Boopie 正在连 Wi-Fi，热点可能会断开一下':'保存失败，再试一次',f.has('ssid'))}
   $('save').disabled=false;
