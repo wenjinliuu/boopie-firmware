@@ -38,6 +38,7 @@
 #include "muse_ui.h"
 #include "muse_voice.h"
 #include "muse_wifi.h"
+#include "boopie_font.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -124,7 +125,7 @@ static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *font, uint32_t color, 
 {
     char shown[SHOWN_MAX];
     lv_obj_t *l = lv_label_create(parent);
-    lv_obj_set_style_text_font(l, font, 0);
+    lv_obj_set_style_text_font(l, boopie_font_with_cjk(font), 0);   /* Boopie: Chinese names */
     lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
     lv_label_set_text(l, muse_text_showable(text, shown, sizeof(shown)));
     return l;

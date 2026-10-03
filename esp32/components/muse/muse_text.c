@@ -16,6 +16,7 @@
 
 #include "muse_text.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -193,14 +194,22 @@ int muse_text_ascii(const char *s, size_t *len, char out[4])
     return (int)strlen(out);
 }
 
-void muse_text_to_ascii(char *s, size_t cap)
+/* Boopie: Chinese quotes and dashes, which Boopie's reply font draws. */
+static bool reply_font_has(const char *s)
+{
+    size_t len;
+    int32_t cp = decode((const unsigned char *)s, &len);
+    return cp == 0x2014 || cp == 0x2015 || cp == 0x2018 || cp == 0x2019 || cp == 0x201C || cp == 0x201D;
+}
+
+static void to_ascii(char *s, size_t cap, bool keep_reply_font)
 {
     size_t n = strlen(s);
     for (char *p = s; *p;) {
         size_t len;
         char a[4];
         int alen = muse_text_ascii(p, &len, a);
-        if (alen < 0) {
+        if (alen < 0 || (keep_reply_font && reply_font_has(p))) {
             p += len;
             continue;
         }
@@ -213,6 +222,16 @@ void muse_text_to_ascii(char *s, size_t cap)
         n = n - len + alen;
         p += alen;
     }
+}
+
+void muse_text_to_ascii(char *s, size_t cap)
+{
+    to_ascii(s, cap, false);
+}
+
+void muse_text_to_reply(char *s, size_t cap)
+{
+    to_ascii(s, cap, true);
 }
 
 const char *muse_text_showable(const char *text, char *buf, size_t cap)

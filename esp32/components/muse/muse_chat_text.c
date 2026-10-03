@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "boopie_text.h"   /* Boopie: Chinese line breaking */
 #include "muse_state.h"
 #include "muse_text.h"
 
@@ -97,9 +98,11 @@ void muse_hatch_tail_words(const char *src, char *out, size_t cap)
 }
 
 /*
- * The next line of `text` wrapped to `cols` characters as the caption shows
+ * The next line of `text` wrapped to `cols` columns as the caption shows
  * them (an ellipsis as three dots, muse_text.h), splitting only words longer
- * than a line.
+ * than a line. Boopie: a Chinese character takes two columns, and a line may
+ * break between Chinese characters, but not before closing punctuation or
+ * after opening punctuation (boopie_text.h).
  */
 static bool next_line(const char **text, int cols, const char **start, size_t *len)
 {
@@ -108,20 +111,27 @@ static bool next_line(const char **text, int cols, const char **start, size_t *l
         p++;
     }
     const char *end = p, *brk = NULL;
+    uint32_t prev = 0;
     int n = 0;
     while (*end && *end != '\n') {
-        size_t bytes;
+        size_t bytes, cp_len;
         char shown[4];
         int w = muse_text_ascii(end, &bytes, shown);
-        w = w < 0 ? 1 : w;
+        uint32_t cp = boopie_text_decode(end, &cp_len);
+        w = w < 0 ? boopie_text_cols(cp) : w;
+        bool can_break = n && boopie_text_can_break(prev, cp);
         if (n + w > cols && n) {
+            if (can_break) {
+                brk = end;
+            }
             break;
         }
-        if (*end == ' ') {
+        if (*end == ' ' || can_break) {
             brk = end;
         }
         n += w;
         end += bytes;
+        prev = cp;
     }
     if (*end && *end != ' ' && *end != '\n' && brk) {
         end = brk;   /* don't split a word */

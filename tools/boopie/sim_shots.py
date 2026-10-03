@@ -22,17 +22,20 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-# (name, extra scenario lines). The caption on "speaking" checks how Chinese
-# text renders: the stock fonts have no CJK glyphs yet.
+# (file name, face, extra scenario lines).
 SHOTS = [
-    ("boot", []),
-    ("idle", []),
-    ("listening", ["level=0.6", "progress=0.4"]),
-    ("thinking", ["progress=0.5"]),
-    ("speaking", ["level=0.5", "progress=0.6", "caption=Hi, I'm Boopie! 你好，我是布比"]),
-    ("happy", []),
-    ("error", ["caption=CAN'T REACH MUSE"]),
-    ("off", []),
+    ("boot", "boot", []),
+    ("idle", "idle", []),
+    ("listening", "listening", ["level=0.6", "progress=0.4"]),
+    ("thinking", "thinking", ["progress=0.5"]),
+    ("speaking", "speaking", ["level=0.5", "progress=0.6", "caption=Hi, I'm Boopie! Nice to meet you."]),
+    ("speaking-zh", "speaking", ["level=0.5", "progress=0.6",
+                                 "caption=你好，我是布比！今天天气晴，最高气温25℃，适合出去走走。"]),
+    ("speaking-mixed", "speaking", ["level=0.5", "progress=0.6",
+                                    "caption=我会说中文，也会说 English。“布比”——你的小伙伴……"]),
+    ("happy", "happy", []),
+    ("error", "error", ["caption=CAN'T REACH MUSE"]),
+    ("off", "off", []),
 ]
 
 COMMON = [
@@ -49,9 +52,10 @@ def render(binary: Path, out: Path) -> list[Path]:
     env = dict(os.environ, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy")
     pngs = []
     with tempfile.TemporaryDirectory() as tmp:
-        for name, extra in SHOTS:
+        for name, face, extra in SHOTS:
             scenario = Path(tmp) / f"{name}.txt"
-            scenario.write_text("\n".join([f"face={name}", *COMMON, *extra, "advance=600"]) + "\n")
+            scenario.write_text("\n".join([f"face={face}", *COMMON, *extra, "advance=600"]) + "\n",
+                                encoding="utf-8")
             ppm = Path(tmp) / f"{name}.ppm"
             subprocess.run([str(binary), "--headless", "--scenario", str(scenario),
                             "--run-ms", "300", "--screenshot", str(ppm)],
@@ -62,7 +66,7 @@ def render(binary: Path, out: Path) -> list[Path]:
     return pngs
 
 
-def contact_sheet(pngs: list[Path], dest: Path, cols: int = 4) -> None:
+def contact_sheet(pngs: list[Path], dest: Path, cols: int = 5) -> None:
     ims = [Image.open(p) for p in pngs]
     w, h = ims[0].size
     pad, label = 10, 24

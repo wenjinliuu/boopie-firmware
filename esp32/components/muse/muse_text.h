@@ -37,6 +37,10 @@ int muse_text_ascii(const char *s, size_t *len, char out[4]);
  * the text ends there. */
 void muse_text_to_ascii(char *s, size_t cap);
 
+/* Boopie: muse_text_to_ascii(), but keeps the quotes and dashes Chinese text
+ * uses (“” ‘’ ——), which the reply font draws. For reply captions. */
+void muse_text_to_reply(char *s, size_t cap);
+
 /* text, or if it needs stand-ins and fits in cap bytes, a copy with them in buf. */
 const char *muse_text_showable(const char *text, char *buf, size_t cap);
 

@@ -84,7 +84,7 @@
 
 ## 七、新发现的问题
 
-1. **没有中文字体**。固件只编了 Montserrat 和 unscii（`devices/sdkconfig.muse`），中文显示成方框，模拟器截图已确认。国内大脑回中文、宠物界面写中文都要先解决：用 LVGL 字体转换器做常用 3500 字的子集位图字体，或者把 TTF 放进 Flash 用 `tiny_ttf` 实时渲染。属于阶段 3 的前置工作。
+1. **没有中文字体**（已解决，见[中英文字系统](text-system.md)）。官方固件只编了 Montserrat 和 unscii，中文显示成方框。现在中英文支持做在最底层，不依赖接哪个大脑。
 2. **32 MB Flash 只用了一半**。1.75C 有 32 MB Flash，但沿用的 `partitions_muse.csv` 按 16 MB 规划，实际只分到约 8.2 MB。剩下的空间够放中文字体、高清形象序列帧和形象包。后面要加一张 Boopie 自己的分区表（加一个资源分区），注意**不能动现有分区的偏移**，否则 OTA 升级后分区表对不上。
 3. **陀螺仪 QMI8658 确实没用**。1.75C 的板子文件里没有任何 IMU 代码，“布比接零食”要从驱动开始写（可参考微雪官方示例仓库里的 QMI8658 例程）。
 4. **官方带了 UI 模拟器**。`simulator/` 能在电脑上跑真实界面代码并截图。Boopie 给它加了 1.75C 档位（`-DMUSE_SIM_WAVESHARE_175C=ON`，466×466，按键提示位置和真实板子一致），CI 每次都会生成截图。宠物主界面、表情、小游戏的界面部分到货前就能开发和预览。
@@ -97,6 +97,7 @@
 | 单元测试 | `components/boopie/tests/` | 对照设计方案的表格逐项检查，CI 自动跑 |
 | 云端编译 | `.github/workflows/boopie.yml` | 1.75C 固件（合并整包 + 分段文件）、Boopie 与官方的主机测试、模拟器截图 |
 | 模拟器 1.75C 档位 | `simulator/` | 见上 |
-| 截图脚本 | `../tools/boopie/sim_shots.py` | 渲染 8 种状态并拼成总览图 |
+| 截图脚本 | `../tools/boopie/sim_shots.py` | 渲染各状态（含中文、中英混排字幕）并拼成总览图 |
+| 中英文字系统 | `components/boopie/boopie_text.[ch]`、`components/boopie/font/` | 见[中英文字系统](text-system.md) |
 
-对上游文件的改动只有三处，都很小：`simulator/CMakeLists.txt` 和 `simulator/src/sim_board.c`（1.75C 档位），以及把官方两个工作流改成手动触发。
+对上游文件的改动都集中在少数几处，每处都标了 `Boopie:` 注释：`simulator/`（1.75C 档位、编入中文字体）、官方两个工作流改成手动触发，以及文字系统的挂钩点（`muse_ui.c`、`muse_chat_text.c`、`muse_text.[ch]`、`muse_state.c`、`muse_settings_ui.c`、`components/muse/CMakeLists.txt`、`tests/test_muse_serial_chat.py`）。

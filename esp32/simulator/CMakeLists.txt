@@ -148,6 +148,7 @@ else()
 endif()
 
 set(MUSE_COMPONENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/muse")
+set(BOOPIE_COMPONENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../components/boopie")
 
 add_executable(muse_simulator
     src/main.c
@@ -158,6 +159,10 @@ add_executable(muse_simulator
     "${MUSE_COMPONENT_DIR}/muse_state.c"
     "${MUSE_COMPONENT_DIR}/muse_text.c"
     "${MUSE_COMPONENT_DIR}/../../avatar/muse_pixel.c"
+    # Boopie: the Chinese and English text font.
+    "${BOOPIE_COMPONENT_DIR}/font/boopie_font.c"
+    "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_font.c"
+    "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_glyphs.c"
 )
 
 target_include_directories(muse_simulator PRIVATE
@@ -165,6 +170,7 @@ target_include_directories(muse_simulator PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${MUSE_COMPONENT_DIR}"
+    "${BOOPIE_COMPONENT_DIR}/font"
 )
 
 target_link_libraries(muse_simulator PRIVATE

@@ -89,6 +89,8 @@ set(muse_priv_requires
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
     esp_driver_pcnt)
 list(APPEND muse_priv_requires camera)
+# Boopie: fonts and line breaking for Chinese text.
+list(APPEND muse_priv_requires boopie)
 
 idf_component_register(
     SRCS ${srcs}

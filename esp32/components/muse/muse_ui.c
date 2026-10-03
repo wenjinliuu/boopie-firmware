@@ -46,6 +46,7 @@
 #if CONFIG_MUSE_WATCHER_CAMERA
 #include "boards/watcher_camera.h"
 #endif
+#include "boopie_font.h"   /* Boopie: Chinese and English reply text */
 
 static const char *TAG = "muse_ui";
 
@@ -53,7 +54,10 @@ static const char *TAG = "muse_ui";
 #define METER_SEG_PX 9
 #define METER_GAP_PX 4
 #define RING_RANGE 1000
-#define CAPTION_W 256           /* 16 columns of unscii_16, the width reply captions wrap to */
+#define CAPTION_W 256           /* the width reply captions wrap to: 21 columns of REPLY_FONT */
+/* Boopie: replies and captions in a pixel font with Chinese, like unscii_16
+ * (each pixel a 2 x 2 block) but taller: Latin 12 px wide, Chinese 24. */
+#define REPLY_FONT (&boopie_font_pixel_24)
 #define CAPTION_LINE_SPACE 2
 #define ART_BLANK_ROWS 3        /* Muse's art never reaches the grid's bottom rows */
 #define MINI_CELL_PX 2          /* Muse's grid cells over a reply that's read */
@@ -665,7 +669,7 @@ static void build_answer(lv_obj_t *face, int ring_in)
         int d = ring_in - spk_r - 4;   /* just inside the ring, even when swollen */
         spk_x = -(int)sqrtf((float)(d * d - spk_y * spk_y));
     }
-    const lv_font_t *font = &lv_font_unscii_16;
+    const lv_font_t *font = REPLY_FONT;
     int cw = lv_font_get_glyph_width(font, 'M', ' ');
     int pitch = lv_font_get_line_height(font) + CAPTION_LINE_SPACE;
 
@@ -815,7 +819,7 @@ static void build_screen(void)
      * whose blank bottom rows can tuck in behind the meter.
      */
     int ring_in = (s_w < s_h ? s_w : s_h) / 2 - 10;   /* the ring's inner edge */
-    int cap_h = 2 * lv_font_get_line_height(&lv_font_unscii_16) + CAPTION_LINE_SPACE;
+    int cap_h = 2 * lv_font_get_line_height(REPLY_FONT) + CAPTION_LINE_SPACE;
     int cap_bottom = 179;                              /* a 466 px circle's; fine for rectangles */
     if (muse_board->round) {
         cap_bottom = (int)sqrtf((float)(ring_in * ring_in - CAPTION_W * CAPTION_W / 4)) - 3;
@@ -869,7 +873,7 @@ static void build_screen(void)
      * these rows, so there's nowhere to put this without covering the face. */
     lv_obj_set_flag(s_name_lbl, LV_OBJ_FLAG_HIDDEN, s_small && !s_tall);
 
-    s_caption_lbl = make_label(face, font_pick(&lv_font_unscii_16, &lv_font_unscii_8), COLOR_CAPTION);
+    s_caption_lbl = make_label(face, font_pick(REPLY_FONT, boopie_font_with_cjk(&lv_font_unscii_8)), COLOR_CAPTION);
     if (s_small) {
         /* Two lines over the bottom of the face, on a dark band so they stay
          * legible. A tall screen has room to keep them above the mic icon. */

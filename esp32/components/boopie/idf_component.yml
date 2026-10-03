@@ -1,0 +1,11 @@
+# Copyright (c) 2026 Boopie contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# LVGL for font/boopie_font.c, on the boards with Muse's UI (the same rule as
+# components/muse/idf_component.yml, so both get the same LVGL).
+dependencies:
+  lvgl/lvgl:
+    version: "9.5.0"
+    public: true
+    rules:
+      - if: "$CONFIG{MUSE_BOARD_ID} != \"none\""
