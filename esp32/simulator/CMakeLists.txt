@@ -163,6 +163,7 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_avatar.c"
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_pixel.c"
     "${BOOPIE_COMPONENT_DIR}/boopie_expr.c"
+    "${BOOPIE_COMPONENT_DIR}/pet/boopie_pet.c"
     # Boopie: the Chinese and English text font.
     "${BOOPIE_COMPONENT_DIR}/font/boopie_font.c"
     "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_font.c"
@@ -176,6 +177,7 @@ target_include_directories(muse_simulator PRIVATE
     "${MUSE_COMPONENT_DIR}"
     "${BOOPIE_COMPONENT_DIR}/font"
     "${BOOPIE_COMPONENT_DIR}/avatar"
+    "${BOOPIE_COMPONENT_DIR}/pet"
     "${BOOPIE_COMPONENT_DIR}"
 )
 

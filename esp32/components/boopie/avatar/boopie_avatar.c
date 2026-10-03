@@ -9,16 +9,24 @@
  * components/muse/CMakeLists.txt and the simulator's.
  */
 
+#ifndef ESP_PLATFORM
+#define _POSIX_C_SOURCE 200809L   /* localtime_r in the simulator's strict C11 */
+#endif
+
 #include "boopie_avatar.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "boopie_pet.h"
 #include "muse_pixel.h"
 #include "muse_state.h"
 
+#include <time.h>
+
 #ifdef ESP_PLATFORM
+#include "boopie_clock.h"
 #include "boopie_imu.h"
 #include "esp_log.h"
 #include "nvs.h"
@@ -60,9 +68,19 @@ static void save(void);
 static int s_avatar = BOOPIE_AVATAR_MUSE;
 static uint32_t s_colour[BOOPIE_AVATAR_COUNT];
 static boopie_scene_t s_scene = BOOPIE_SCENE_DEFAULT;
+
+/* The pet, ticked from the frames, and what it shows while idle. */
+static boopie_pet_t s_pet_state;
+static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
+static bool s_pet_resumed, s_pet_dirty;
+static float s_pet_ticked = -100, s_pet_saved = -1;
+static muse_mode_t s_last_mode = MUSE_MODE_COUNT;
+static float s_flash_until[BOOPIE_OVERLAY_COUNT];   /* overlays shown for a moment */
+static float s_now;                                  /* pose.t of the last frame */
 static volatile int s_pet = BOOPIE_EXPR_IDLE;
 static volatile uint8_t s_overlays;            /* the reactions set */
 static float s_pet_since = -1;                 /* when the pet expression began, in pose.t */
+static boopie_expr_t s_pet_was = BOOPIE_EXPR_IDLE;
 static float s_overlay_since[BOOPIE_OVERLAY_COUNT];
 static uint8_t s_shown_overlays;               /* last frame's, to time new ones from */
 static float s_happy_since = -1;
@@ -159,6 +177,11 @@ static void load(void)
         snprintf(ck, sizeof ck, "c_%s", boopie_avatar_key(i));
         nvs_get_u32(h, ck, &s_colour[i]);
     }
+    size_t pn = sizeof s_pet_state;
+    boopie_pet_t saved;
+    if (nvs_get_blob(h, "pet", &saved, &pn) == ESP_OK && pn == sizeof saved && saved.version == BOOPIE_PET_VERSION) {
+        s_pet_state = saved;
+    }
     n = sizeof key;
     if (nvs_get_str(h, "scene", key, &n) == ESP_OK) {
         int sc = scene_from_key(key);
@@ -182,6 +205,7 @@ static void save(void)
         nvs_set_u32(h, ck, s_colour[i]);
     }
     nvs_set_str(h, "scene", boopie_scene_key(s_scene));
+    nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_commit(h);
     nvs_close(h);
 }
@@ -201,6 +225,10 @@ static void load(void)
     boopie_expr_t e;
     if (boopie_expr_from_name(getenv("BOOPIE_PET"), &e)) {
         s_pet = e;
+    }
+    const char *xp = getenv("BOOPIE_PET_XP");
+    if (xp) {
+        s_pet_state.xp = (uint32_t)strtoul(xp, NULL, 10);
     }
     int sc = scene_from_key(getenv("BOOPIE_SCENE"));
     if (sc >= 0) {
@@ -236,6 +264,7 @@ static void ensure_loaded(void)
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         s_colour[i] = BOOPIE_COLOUR_DEFAULT;
     }
+    boopie_pet_init(&s_pet_state);
     load();
     apply();
 }
@@ -311,6 +340,10 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
         *error = "unknown background";
         return false;
     }
+    if (sc > 0 && !boopie_avatar_unlocked(BOOPIE_UNLOCK_SCENE, sc, NULL)) {
+        *error = "that background unlocks at a higher level";
+        return false;
+    }
     uint32_t rgb = 0;
     boopie_expr_t e = BOOPIE_EXPR_IDLE;
     boopie_overlay_t o = BOOPIE_OVERLAY_COUNT;
@@ -361,6 +394,113 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
     return true;
 }
 
+/* ---- the pet ---- */
+
+/* Local time now, if known: days since 1970 and the minute of the day. */
+static bool local_now(int64_t *now, int32_t *day, int *minute)
+{
+    struct tm tm;
+#ifdef ESP_PLATFORM
+    if (!boopie_clock_local(&tm)) {
+        return false;
+    }
+#else
+    time_t t = time(NULL);
+    localtime_r(&t, &tm);
+#endif
+    *now = (int64_t)time(NULL);
+    /* Days since 1970 by the local date, so a day turns at local midnight. */
+    int y = tm.tm_year + 1900 - 1;
+    *day = 365 * (y - 1969) + (y / 4 - 1969 / 4) - (y / 100 - 1969 / 100) + (y / 400 - 1969 / 400) + tm.tm_yday;
+    *minute = tm.tm_hour * 60 + tm.tm_min;
+    return true;
+}
+
+static void flash_overlay(boopie_overlay_t o, float secs)
+{
+    s_flash_until[o] = s_now + secs;
+}
+
+/* Show what a pet call earned: eating, a level-up. */
+static void show_event(const boopie_pet_event_t *ev)
+{
+    if (ev->fed) {
+        boopie_avatar_react(BOOPIE_EXPR_EATING, 3.0f);
+        flash_overlay(BOOPIE_OVERLAY_HEARTS, 4.5f);
+    }
+    if (ev->levels > 0) {
+        flash_overlay(BOOPIE_OVERLAY_CONFETTI, 4.0f);
+        muse_state_set_caption("升级啦！Lv %d", boopie_pet_level(s_pet_state.xp, NULL, NULL));
+    }
+    if (ev->xp || ev->stars || ev->fed) {
+        s_pet_dirty = true;
+    }
+}
+
+static void pet_tick(void)
+{
+    int64_t now;
+    int32_t day;
+    int minute;
+    bool known = local_now(&now, &day, &minute);
+    if (known && !s_pet_resumed) {
+        boopie_pet_resume(&s_pet_state, now);   /* time powered off doesn't count */
+        s_pet_resumed = true;
+    }
+    boopie_pet_event_t ev = { 0 };
+    s_pet_mood = boopie_pet_tick(&s_pet_state, known, now, day, minute, muse_state_idle_secs(), &ev);
+    show_event(&ev);
+    if (s_pet_dirty || s_now - s_pet_saved > 600) {   /* now and then, and after a change */
+        s_pet_dirty = false;
+        s_pet_saved = s_now;
+        save();
+    }
+}
+
+bool boopie_avatar_tap(void)
+{
+    ensure_loaded();
+    int64_t now;
+    int32_t day;
+    int minute;
+    if (!local_now(&now, &day, &minute)) {
+        now = (int64_t)time(NULL);
+    }
+    boopie_pet_event_t ev = { 0 };
+    bool fed = boopie_pet_tap(&s_pet_state, now, &ev);
+    if (fed) {
+        s_pet_mood = BOOPIE_EXPR_IDLE;
+    }
+    show_event(&ev);
+    return fed;
+}
+
+bool boopie_avatar_feed(void)
+{
+    ensure_loaded();
+    return s_pet_state.hungry ? boopie_avatar_tap() : false;
+}
+
+void boopie_avatar_pet_status(boopie_pet_status_t *out)
+{
+    ensure_loaded();
+    out->level = boopie_pet_level(s_pet_state.xp, &out->xp_into, &out->xp_need);
+    out->xp = s_pet_state.xp;
+    out->stars = s_pet_state.stars;
+    out->hungry = s_pet_state.hungry;
+    out->mood = s_pet_mood;
+}
+
+bool boopie_avatar_unlocked(boopie_unlock_kind_t kind, int index, int *level)
+{
+    ensure_loaded();
+    int need = boopie_pet_unlock_level(kind, index);
+    if (level) {
+        *level = need;
+    }
+    return need > 0 && boopie_pet_level(s_pet_state.xp, NULL, NULL) >= need;
+}
+
 /* ---- muse_pixel.h ---- */
 
 /* What our characters show for a Muse mode: the pet expression while idle. */
@@ -371,6 +511,9 @@ static boopie_expr_t shown(muse_mode_t mode)
     }
     if (mode == MUSE_MODE_IDLE && s_pet != BOOPIE_EXPR_IDLE) {
         return (boopie_expr_t)s_pet;
+    }
+    if (mode == MUSE_MODE_IDLE && s_pet_mood != BOOPIE_EXPR_IDLE) {
+        return s_pet_mood;
     }
     return (boopie_expr_t)mode;
 }
@@ -431,6 +574,17 @@ void muse_pixel_render(const muse_pose_t *p)
 #ifdef ESP_PLATFORM
     boopie_imu_keepalive();
 #endif
+    s_now = p->t;
+    if (p->t - s_pet_ticked >= 2.0f) {
+        s_pet_ticked = p->t;
+        pet_tick();
+    }
+    if (p->mode == MUSE_MODE_SPEAKING && s_last_mode != MUSE_MODE_SPEAKING && s_last_mode != MUSE_MODE_COUNT) {
+        boopie_pet_event_t ev = { 0 };   /* it was spoken to */
+        boopie_pet_talked(&s_pet_state, &ev);
+        show_event(&ev);
+    }
+    s_last_mode = p->mode;
     if (s_react != BOOPIE_EXPR_IDLE) {   /* a new reaction */
         s_reacting = s_react;
         s_react = BOOPIE_EXPR_IDLE;
@@ -447,11 +601,13 @@ void muse_pixel_render(const muse_pose_t *p)
     } else if (p->mode == MUSE_MODE_IDLE && s_reacting != BOOPIE_EXPR_IDLE) {
         bp.expr = (boopie_expr_t)s_reacting;
         bp.t = p->t - s_react_since;
-    } else if (p->mode == MUSE_MODE_IDLE && s_pet != BOOPIE_EXPR_IDLE) {
-        if (s_pet_since < 0) {
+    } else if (p->mode == MUSE_MODE_IDLE && shown(p->mode) != BOOPIE_EXPR_IDLE) {
+        boopie_expr_t pet = shown(p->mode);
+        if (s_pet_since < 0 || pet != s_pet_was) {
             s_pet_since = p->t;
+            s_pet_was = pet;
         }
-        bp.expr = (boopie_expr_t)s_pet;
+        bp.expr = pet;
         float since = p->t - s_pet_since;
         bp.t = since < p->mode_t ? since : p->mode_t;
     } else {
@@ -463,6 +619,11 @@ void muse_pixel_render(const muse_pose_t *p)
     }
 
     uint8_t on = s_overlays | device_overlays();
+    for (int o = 0; o < BOOPIE_OVERLAY_COUNT; o++) {
+        if (p->t < s_flash_until[o]) {
+            on |= BOOPIE_OVERLAY_BIT(o);
+        }
+    }
     for (int o = 0; o < BOOPIE_OVERLAY_COUNT; o++) {
         uint8_t bit = BOOPIE_OVERLAY_BIT(o);
         if ((on & bit) && !(s_shown_overlays & bit)) {

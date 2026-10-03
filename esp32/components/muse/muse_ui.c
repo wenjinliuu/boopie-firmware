@@ -46,6 +46,7 @@
 #if CONFIG_MUSE_WATCHER_CAMERA
 #include "boards/watcher_camera.h"
 #endif
+#include "boopie_avatar.h"
 #include "boopie_font.h"   /* Boopie: Chinese and English reply text */
 
 static const char *TAG = "muse_ui";
@@ -443,7 +444,9 @@ static void build_button_icons(lv_obj_t *face)
 static void on_canvas_clicked(lv_event_t *e)
 {
     (void)e;
-    muse_state_make_happy();
+    if (!boopie_avatar_tap()) {   /* Boopie: a tap feeds the pet when it's hungry */
+        muse_state_make_happy();
+    }
 }
 
 static const lv_font_t *font_pick(const lv_font_t *full, const lv_font_t *compact)

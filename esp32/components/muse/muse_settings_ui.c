@@ -1252,6 +1252,7 @@ static lv_obj_t *s_avatar_checks[BOOPIE_AVATAR_COUNT];
 static lv_obj_t *s_colour_checks[AVATAR_COLOUR_COUNT];
 static lv_obj_t *s_colour_box, *s_colour_default_swatch;
 static lv_obj_t *s_scene_checks[BOOPIE_SCENE_COUNT];
+static lv_obj_t *s_pet_line;
 static int s_avatar_shown = -1;
 
 static void on_avatar_choice(lv_event_t *e)
@@ -1261,12 +1262,33 @@ static void on_avatar_choice(lv_event_t *e)
 
 static void on_scene_choice(lv_event_t *e)
 {
-    boopie_avatar_set_scene((boopie_scene_t)(intptr_t)lv_event_get_user_data(e));
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    if (i == 0 || boopie_avatar_unlocked(BOOPIE_UNLOCK_SCENE, i, NULL)) {
+        boopie_avatar_set_scene((boopie_scene_t)i);
+    }
+}
+
+/* What a row shows on the right: a tick, the level it unlocks at, or nothing. */
+static void lock_or_tick(lv_obj_t *l, bool chosen, boopie_unlock_kind_t kind, int index)
+{
+    int level;
+    if (index > 0 && !(kind == BOOPIE_UNLOCK_COLOUR && index == 1) && !boopie_avatar_unlocked(kind, index, &level)) {
+        char buf[16];
+        snprintf(buf, sizeof buf, "Lv %d", level);
+        set_text(l, buf);
+        lv_obj_set_style_text_color(l, lv_color_hex(COLOR_DIM), 0);
+        return;
+    }
+    lv_obj_set_style_text_color(l, lv_color_hex(COLOR_ACCENT), 0);
+    set_text(l, chosen ? LV_SYMBOL_OK : "");
 }
 
 static void on_colour_choice(lv_event_t *e)
 {
-    boopie_avatar_set_colour(AVATAR_COLOURS[(int)(intptr_t)lv_event_get_user_data(e)].rgb);
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    if (i <= 1 || boopie_avatar_unlocked(BOOPIE_UNLOCK_COLOUR, i, NULL)) {
+        boopie_avatar_set_colour(AVATAR_COLOURS[i].rgb);
+    }
 }
 
 static lv_obj_t *swatch(lv_obj_t *row_obj, uint32_t rgb)
@@ -1285,6 +1307,7 @@ static void build_avatar_page(lv_obj_t *tile)
 {
     lv_obj_t *list;
     s_avatar = page(tile, "AVATAR", true, &list);
+    s_pet_line = note(list, "");
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         row(list, NULL, boopie_avatar_name(i), &s_avatar_checks[i], on_avatar_choice, (void *)(intptr_t)i);
         lv_obj_set_style_text_color(s_avatar_checks[i], lv_color_hex(COLOR_ACCENT), 0);
@@ -1315,9 +1338,15 @@ static void tick_avatar(void)
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         set_text(s_avatar_checks[i], i == cur ? LV_SYMBOL_OK : "");
     }
+    boopie_pet_status_t pet;
+    boopie_avatar_pet_status(&pet);
+    char line[64];
+    snprintf(line, sizeof line, "Lv %d  ·  %u/%u  ·  ★ %u", pet.level,
+             (unsigned)pet.xp_into, (unsigned)pet.xp_need, (unsigned)pet.stars);
+    set_text(s_pet_line, line);
     boopie_scene_t scene = boopie_avatar_scene();
     for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
-        set_text(s_scene_checks[i], i == (int)scene ? LV_SYMBOL_OK : "");
+        lock_or_tick(s_scene_checks[i], i == (int)scene, BOOPIE_UNLOCK_SCENE, i);
     }
     bool colours = boopie_avatar_recolourable(cur);
     if (colours == lv_obj_has_flag(s_colour_box, LV_OBJ_FLAG_HIDDEN)) {
@@ -1337,7 +1366,7 @@ static void tick_avatar(void)
     }
     uint32_t c = boopie_avatar_colour();
     for (int i = 0; i < AVATAR_COLOUR_COUNT; i++) {
-        set_text(s_colour_checks[i], AVATAR_COLOURS[i].rgb == c ? LV_SYMBOL_OK : "");
+        lock_or_tick(s_colour_checks[i], AVATAR_COLOURS[i].rgb == c, BOOPIE_UNLOCK_COLOUR, i);
     }
 }
 

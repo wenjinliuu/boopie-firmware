@@ -1892,6 +1892,26 @@ static cJSON *on_ws_command(
         return result;
     }
 #endif
+#if CONFIG_MUSE_ENABLED
+    /* Boopie: the pet. */
+    if (strcmp(command, "pet.feed") == 0 || strcmp(command, "pet.status") == 0) {
+        bool fed = strcmp(command, "pet.feed") == 0 && boopie_avatar_feed();
+        boopie_pet_status_t st;
+        boopie_avatar_pet_status(&st);
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        if (strcmp(command, "pet.feed") == 0) {
+            cJSON_AddBoolToObject(result, "fed", fed);
+        }
+        cJSON_AddBoolToObject(result, "hungry", st.hungry);
+        cJSON_AddStringToObject(result, "mood", boopie_expr_name(st.mood));
+        cJSON_AddNumberToObject(result, "level", st.level);
+        cJSON_AddNumberToObject(result, "xp_into_level", st.xp_into);
+        cJSON_AddNumberToObject(result, "xp_for_level", st.xp_need);
+        cJSON_AddNumberToObject(result, "stars", st.stars);
+        return result;
+    }
+#endif
 #if CONFIG_MUSE_WATCHER_CAMERA
     if (strcmp(command, "camera.capture") == 0) {
         watcher_camera_task_args_t *args = calloc(1, sizeof(*args));

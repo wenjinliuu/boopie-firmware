@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "boopie_expr.h"
+#include "boopie_pet.h"
 #include "boopie_pixel.h"
 
 /*
@@ -71,3 +72,24 @@ void boopie_avatar_set_overlay(boopie_overlay_t overlay, bool on);
  */
 bool boopie_avatar_command(const char *avatar, const char *colour, const char *pet, const char *reaction,
                            const char *scene, bool on, const char **error);
+
+/* ---- the pet (pet/boopie_pet.c), kept here with the rest ---- */
+
+/* The character was tapped: fed if hungry (true; it eats), else a poke. */
+bool boopie_avatar_tap(void);
+
+/* Feed it (the pet.feed command); false if it isn't hungry. */
+bool boopie_avatar_feed(void);
+
+typedef struct {
+    int level;
+    uint32_t xp, xp_into, xp_need;   /* all, into this level, this level takes */
+    uint32_t stars;
+    bool hungry;
+    boopie_expr_t mood;              /* IDLE, HUNGRY, SAD or SLEEPY */
+} boopie_pet_status_t;
+
+void boopie_avatar_pet_status(boopie_pet_status_t *out);
+
+/* Item `index` of a kind is unlocked; *level (if given) the level it takes. */
+bool boopie_avatar_unlocked(boopie_unlock_kind_t kind, int index, int *level);
