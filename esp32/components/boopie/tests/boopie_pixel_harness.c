@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2026 Boopie contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* Renders frames for test_boopie_pixel.py. Each stdin line is
+ *   <character> <expression> <t> [<overlay> <overlay_t>]
+ * and gets one frame on stdout, BOOPIE_PX x BOOPIE_PX x 3 bytes of RGB. A
+ * line "time" instead prints the mean milliseconds a frame takes. */
+
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#include "boopie_pixel.h"
+
+static int char_from_key(const char *key)
+{
+    for (int c = 0; c < BOOPIE_CHAR_COUNT; c++) {
+        if (strcmp(boopie_char_key((boopie_char_t)c), key) == 0) {
+            return c;
+        }
+    }
+    return -1;
+}
+
+int main(void)
+{
+    char line[256];
+    while (fgets(line, sizeof line, stdin)) {
+        char ckey[32], ekey[32], okey[32] = "";
+        double t = 0, ot = 0;
+        if (strncmp(line, "time", 4) == 0) {
+            boopie_pixel_pose_t p = { .expr = BOOPIE_EXPR_SPEAKING, .level = -1 };
+            int n = 0;
+            clock_t start = clock();
+            for (int c = 0; c < BOOPIE_CHAR_COUNT; c++) {
+                boopie_pixel_set_character((boopie_char_t)c, BOOPIE_COLOUR_DEFAULT);
+                for (int i = 0; i < 50; i++, n++) {
+                    p.t = i * 0.04;
+                    boopie_pixel_render(&p);
+                }
+            }
+            printf("%.3f\n", (double)(clock() - start) * 1000.0 / CLOCKS_PER_SEC / n);
+            continue;
+        }
+        int got = sscanf(line, "%31s %31s %lf %31s %lf", ckey, ekey, &t, okey, &ot);
+        boopie_pixel_pose_t p = { .t = t, .level = -1 };
+        int c = char_from_key(ckey);
+        if (got < 3 || c < 0 || !boopie_expr_from_name(ekey, &p.expr)) {
+            fprintf(stderr, "bad line: %s", line);
+            return 1;
+        }
+        if (got == 5) {
+            boopie_overlay_t o;
+            if (!boopie_overlay_from_name(okey, &o)) {
+                fprintf(stderr, "bad overlay: %s\n", okey);
+                return 1;
+            }
+            p.overlays = BOOPIE_OVERLAY_BIT(o);
+            p.overlay_t[o] = ot;
+        }
+        boopie_pixel_set_character((boopie_char_t)c, BOOPIE_COLOUR_DEFAULT);
+        boopie_pixel_render(&p);
+        fwrite(boopie_pixel_rgb(), 1, BOOPIE_PX * BOOPIE_PX * 3, stdout);
+    }
+    return 0;
+}

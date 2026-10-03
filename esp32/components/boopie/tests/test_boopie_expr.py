@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Boopie contributors
 # SPDX-License-Identifier: Apache-2.0
 
-"""The expression table (boopie_expr.c) against the spec in docs/design.html.
+"""The expression table (boopie_expr.c) against the spec in docs/boopie-character.md.
 
 Run from esp32/: python3 -m unittest discover -s components/boopie/tests -p 'test_*.py'
 """
@@ -22,20 +22,16 @@ ESP32 = COMPONENT.parent.parent
 
 CORE = ["boot", "idle", "listening", "thinking", "speaking", "error", "off", "happy"]
 
-# Expression -> fallback, from the design doc's "扩展表情" table.
+# Pet expression -> fallback, from docs/boopie-character.md "三、表情".
 EXTENDED = {
     "hungry": "idle",
     "eating": "happy",
     "sleepy": "off",
     "sad": "idle",
-    "surprised": "happy",
     "dizzy": "error",
-    "celebrate": "happy",
-    "shy": "happy",
-    "low_battery": "sleepy",
-    "charging": "idle",
-    "working": "thinking",
 }
+
+OVERLAYS = ["surprise", "blush", "confetti", "hearts", "low_battery", "charging"]
 
 
 def run_harness() -> dict:
@@ -93,8 +89,8 @@ class BoopieExprTest(unittest.TestCase):
     def test_resolve(self) -> None:
         for e in self.data["exprs"]:
             self.assertEqual(e["all"], e["name"])
-        self.assertEqual(self.by_name["low_battery"]["core_only"], "off")
-        self.assertEqual(self.data["low_battery_with_sleepy"], "sleepy")
+        self.assertEqual(self.by_name["sleepy"]["core_only"], "off")
+        self.assertEqual(self.data["partial"], {"eating": "happy", "sleepy": "sleepy"})
         self.assertEqual(self.data["thinking_empty_set"], "thinking")
 
     def test_bad_input(self) -> None:
@@ -105,6 +101,14 @@ class BoopieExprTest(unittest.TestCase):
             "valid_neg": False, "valid_count": False, "name": None,
             "resolve": "idle", "fallback": "idle",
         })
+
+    def test_overlays(self) -> None:
+        self.assertEqual(self.data["overlay_count"], len(OVERLAYS))
+        self.assertEqual([o["name"] for o in self.data["overlays"]], OVERLAYS)
+        for o in self.data["overlays"]:
+            self.assertTrue(o["round_trip"], o["name"])
+        self.assertEqual(self.data["overlay_bad"],
+                         {"unknown_found": False, "untouched": True, "out_of_range": None})
 
 
 if __name__ == "__main__":

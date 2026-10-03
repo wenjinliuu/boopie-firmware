@@ -1,0 +1,75 @@
+/*
+ * Copyright (c) 2026 Boopie contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "boopie_expr.h"
+
+/*
+ * Boopie's pixel characters, drawn the way Muse's official avatar is: a 64 x 64
+ * grid, dithered shading, a state-tinted glow, rim light and sparkles, blown up
+ * with nearest-neighbour blocks. A C port of tools/boopie/avatar_proto.py,
+ * which is the reference: tests/test_boopie_pixel.py renders both and compares.
+ *
+ * One expression engine drives every character; a character only draws its
+ * body and face. Plain C with no IDF dependencies, so it builds on the host.
+ */
+
+#define BOOPIE_PX 64
+
+typedef enum {
+    BOOPIE_CHAR_BOOPIE = 0,
+    BOOPIE_CHAR_GPT,
+    BOOPIE_CHAR_CODEX,
+    BOOPIE_CHAR_KLAUDE,
+    BOOPIE_CHAR_WHALE,
+    BOOPIE_CHAR_DOUBAO,
+    BOOPIE_CHAR_COUNT,
+} boopie_char_t;
+
+/* Its id ("boopie", "whale") and display name ("布比"); NULL out of range. */
+const char *boopie_char_key(boopie_char_t c);
+const char *boopie_char_name(boopie_char_t c);
+
+/* Its own body colour, 0xRRGGBB. */
+uint32_t boopie_char_default_colour(boopie_char_t c);
+
+/* The character drawn from now on, in body colour `colour` (0xRRGGBB), or its
+ * own colour for BOOPIE_COLOUR_DEFAULT. */
+#define BOOPIE_COLOUR_DEFAULT 0xffffffffu
+void boopie_pixel_set_character(boopie_char_t c, uint32_t colour);
+
+/* The accent of an expression (glow, rim light, sparkles, the UI round it),
+ * 0xRRGGBB. The core ones are Muse's official accents. */
+uint32_t boopie_pixel_accent(boopie_expr_t e);
+
+/* How long an expression's loop is, in seconds; BOOT and OFF play once. */
+float boopie_pixel_loop(boopie_expr_t e);
+
+/* An overlay's loop, in seconds. */
+float boopie_overlay_loop(boopie_overlay_t o);
+
+typedef struct {
+    boopie_expr_t expr;
+    double t;                /* seconds in this expression */
+    float level;             /* 0..1 live voice level, or < 0 for a made-up one */
+    boopie_overlay_set_t overlays;
+    double overlay_t[BOOPIE_OVERLAY_COUNT];  /* seconds each has been on */
+    float dt;                /* seconds since the last frame, for easing the
+                              * accent; 0 jumps straight to it */
+} boopie_pixel_pose_t;
+
+/* Render one frame into the grid. */
+void boopie_pixel_render(const boopie_pixel_pose_t *pose);
+
+/* The frame, BOOPIE_PX x BOOPIE_PX RGB, 3 bytes a pixel, row by row. */
+const uint8_t *boopie_pixel_rgb(void);
+
+/* As muse_pixel_set_size() / muse_pixel_scale(). */
+void boopie_pixel_set_size(int px);
+void boopie_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);

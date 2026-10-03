@@ -5,8 +5,7 @@
 
 /* Dumps the expression table for test_boopie_expr.py as JSON:
  * every expression's id, core flag and fallback, and what it resolves to for
- * a style with only the core set, every expression, and each single extended
- * expression. Also checks the Muse mode order at compile time. */
+ * a style with only the core set, every expression, and a partial pet set. Also checks the Muse mode order at compile time. */
 
 #include <stdio.h>
 
@@ -44,18 +43,33 @@ int main(void)
                name_or_null(boopie_expr_resolve(e, BOOPIE_EXPR_SET_CORE)),
                name_or_null(boopie_expr_resolve(e, BOOPIE_EXPR_SET_ALL)));
     }
-    /* sleepy drawn, low_battery not: low_battery -> sleepy. */
-    printf("],\"low_battery_with_sleepy\":\"%s\"",
-           name_or_null(boopie_expr_resolve(BOOPIE_EXPR_LOW_BATTERY,
+    /* sleepy drawn, eating not: eating -> happy; sleepy -> itself. */
+    printf("],\"partial\":{\"eating\":\"%s\",\"sleepy\":\"%s\"}",
+           name_or_null(boopie_expr_resolve(BOOPIE_EXPR_EATING,
+                                            BOOPIE_EXPR_SET_CORE | BOOPIE_EXPR_BIT(BOOPIE_EXPR_SLEEPY))),
+           name_or_null(boopie_expr_resolve(BOOPIE_EXPR_SLEEPY,
                                             BOOPIE_EXPR_SET_CORE | BOOPIE_EXPR_BIT(BOOPIE_EXPR_SLEEPY))));
+    printf(",\"overlay_count\":%d,\"overlays\":[", BOOPIE_OVERLAY_COUNT);
+    for (int i = 0; i < BOOPIE_OVERLAY_COUNT; i++) {
+        boopie_overlay_t o = (boopie_overlay_t)i, back = BOOPIE_OVERLAY_COUNT;
+        const char *n = boopie_overlay_name(o);
+        bool found = boopie_overlay_from_name(n, &back);
+        printf("%s{\"name\":\"%s\",\"round_trip\":%s}", i ? "," : "", n ? n : "(null)",
+               found && back == o ? "true" : "false");
+    }
+    boopie_overlay_t ou = BOOPIE_OVERLAY_HEARTS;
+    bool o_unknown = boopie_overlay_from_name("hungry", &ou);
+    printf("],\"overlay_bad\":{\"unknown_found\":%s,\"untouched\":%s,\"out_of_range\":%s}",
+           o_unknown ? "true" : "false", ou == BOOPIE_OVERLAY_HEARTS ? "true" : "false",
+           boopie_overlay_name(BOOPIE_OVERLAY_COUNT) ? "\"set\"" : "null");
     /* An empty set still draws core expressions as themselves. */
     printf(",\"thinking_empty_set\":\"%s\"", name_or_null(boopie_expr_resolve(BOOPIE_EXPR_THINKING, 0)));
-    boopie_expr_t untouched = BOOPIE_EXPR_SHY;
+    boopie_expr_t untouched = BOOPIE_EXPR_SAD;
     bool unknown = boopie_expr_from_name("grumpy", &untouched);
     bool null_name = boopie_expr_from_name(NULL, &untouched);
     printf(",\"unknown_found\":%s,\"null_found\":%s,\"unknown_untouched\":%s",
            unknown ? "true" : "false", null_name ? "true" : "false",
-           untouched == BOOPIE_EXPR_SHY ? "true" : "false");
+           untouched == BOOPIE_EXPR_SAD ? "true" : "false");
     printf(",\"out_of_range\":{\"valid_neg\":%s,\"valid_count\":%s,\"name\":%s,\"resolve\":\"%s\",\"fallback\":\"%s\"}}\n",
            boopie_expr_valid(-1) ? "true" : "false",
            boopie_expr_valid(BOOPIE_EXPR_COUNT) ? "true" : "false",

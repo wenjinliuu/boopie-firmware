@@ -13,7 +13,7 @@ typedef struct {
     boopie_expr_t fallback;   /* itself for a core expression */
 } expr_info_t;
 
-/* The table in docs/design.html, "表情规范". */
+/* The table in docs/boopie-character.md, "三、表情". */
 static const expr_info_t s_info[BOOPIE_EXPR_COUNT] = {
     [BOOPIE_EXPR_BOOT]        = { "boot",        BOOPIE_EXPR_BOOT },
     [BOOPIE_EXPR_IDLE]        = { "idle",        BOOPIE_EXPR_IDLE },
@@ -27,15 +27,19 @@ static const expr_info_t s_info[BOOPIE_EXPR_COUNT] = {
     [BOOPIE_EXPR_EATING]      = { "eating",      BOOPIE_EXPR_HAPPY },
     [BOOPIE_EXPR_SLEEPY]      = { "sleepy",      BOOPIE_EXPR_OFF },
     [BOOPIE_EXPR_SAD]         = { "sad",         BOOPIE_EXPR_IDLE },
-    [BOOPIE_EXPR_SURPRISED]   = { "surprised",   BOOPIE_EXPR_HAPPY },
     [BOOPIE_EXPR_DIZZY]       = { "dizzy",       BOOPIE_EXPR_ERROR },
-    [BOOPIE_EXPR_CELEBRATE]   = { "celebrate",   BOOPIE_EXPR_HAPPY },
-    [BOOPIE_EXPR_SHY]         = { "shy",         BOOPIE_EXPR_HAPPY },
-    [BOOPIE_EXPR_LOW_BATTERY] = { "low_battery", BOOPIE_EXPR_SLEEPY },
-    [BOOPIE_EXPR_CHARGING]    = { "charging",    BOOPIE_EXPR_IDLE },
-    [BOOPIE_EXPR_WORKING]     = { "working",     BOOPIE_EXPR_THINKING },
 };
 
+static const char *const s_overlay[BOOPIE_OVERLAY_COUNT] = {
+    [BOOPIE_OVERLAY_SURPRISE]    = "surprise",
+    [BOOPIE_OVERLAY_BLUSH]       = "blush",
+    [BOOPIE_OVERLAY_CONFETTI]    = "confetti",
+    [BOOPIE_OVERLAY_HEARTS]      = "hearts",
+    [BOOPIE_OVERLAY_LOW_BATTERY] = "low_battery",
+    [BOOPIE_OVERLAY_CHARGING]    = "charging",
+};
+
+_Static_assert(BOOPIE_OVERLAY_COUNT <= 8, "boopie_overlay_set_t holds one bit per overlay");
 _Static_assert(BOOPIE_EXPR_COUNT <= 32, "boopie_expr_set_t holds one bit per expression");
 
 bool boopie_expr_valid(int expr)
@@ -86,4 +90,23 @@ boopie_expr_t boopie_expr_resolve(boopie_expr_t expr, boopie_expr_set_t supporte
         expr = s_info[expr].fallback;
     }
     return BOOPIE_EXPR_IDLE;
+}
+
+const char *boopie_overlay_name(boopie_overlay_t overlay)
+{
+    return (int)overlay >= 0 && overlay < BOOPIE_OVERLAY_COUNT ? s_overlay[overlay] : NULL;
+}
+
+bool boopie_overlay_from_name(const char *name, boopie_overlay_t *out)
+{
+    if (!name || !out) {
+        return false;
+    }
+    for (int i = 0; i < BOOPIE_OVERLAY_COUNT; i++) {
+        if (strcmp(s_overlay[i], name) == 0) {
+            *out = (boopie_overlay_t)i;
+            return true;
+        }
+    }
+    return false;
 }

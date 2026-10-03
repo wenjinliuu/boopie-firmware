@@ -59,20 +59,27 @@ ACCENT = {
     "thinking": (224, 123, 255), "speaking": (111, 240, 191), "error": (255, 92, 92),
     "off": (124, 114, 208), "happy": (167, 125, 255), "hungry": (255, 170, 80),
     "eating": (255, 190, 110), "sleepy": (124, 114, 208), "sad": (110, 140, 230),
-    "surprised": (167, 125, 255), "dizzy": (255, 200, 120), "celebrate": (167, 125, 255),
-    "shy": (255, 140, 180), "low_battery": (255, 92, 92), "charging": (255, 230, 90),
-    "working": (111, 240, 191),
+    "dizzy": (255, 200, 120),
 }
+
+# Thinking turns into working (typing on a tiny laptop) after this many
+# seconds; the preview loop shows both phases.
+WORKING_AFTER = 2.4
+WORKING_LOOP = 1.2
 
 # Name, seconds per loop, Chinese label. Order and names as boopie_expr.h.
 EXPRESSIONS = [
     ("boot", 2.0, "开机"), ("idle", 3.0, "待机"), ("listening", 1.6, "聆听"),
-    ("thinking", 2.4, "思考"), ("speaking", 1.2, "说话"), ("error", 2.0, "出错"),
+    ("thinking", WORKING_AFTER + 2 * WORKING_LOOP, "思考"), ("speaking", 1.2, "说话"), ("error", 2.0, "出错"),
     ("off", 2.4, "关机"), ("happy", 1.2, "开心"),
     ("hungry", 2.4, "饿了"), ("eating", 1.2, "吃东西"), ("sleepy", 3.0, "犯困"),
-    ("sad", 2.4, "难过"), ("surprised", 1.2, "惊讶"), ("dizzy", 1.6, "晕了"),
-    ("celebrate", 1.6, "庆祝"), ("shy", 2.4, "害羞"), ("low_battery", 2.0, "没电了"),
-    ("charging", 1.6, "充电中"), ("working", 1.2, "工作中"),
+    ("sad", 2.4, "难过"), ("dizzy", 1.6, "晕了"),
+]
+
+# Overlays, as boopie_overlay_t: name, seconds per loop, Chinese label.
+OVERLAYS = [
+    ("surprise", 1.2, "惊讶 !"), ("blush", 2.4, "害羞"), ("confetti", 1.6, "庆祝"),
+    ("hearts", 1.2, "爱心"), ("low_battery", 2.0, "低电量"), ("charging", 1.6, "充电中"),
 ]
 
 
@@ -703,7 +710,21 @@ def pose_for(name: str, t: float, length: float) -> Pose:
             rr = 3 + (r + k * 0.5) % 1 * 6
             for a in range(-40, 41, 20):
                 p.fx.append(("lpx", 2 + rr * math.cos(math.radians(a)), rr * math.sin(math.radians(a)), (110, 190, 255)))
+    elif name == "thinking" and t >= WORKING_AFTER:   # typing away on a tiny laptop, bits of code flying up
+        t = (t - WORKING_AFTER) % WORKING_LOOP
+        tap = int(t / 0.15) % 2
+        p.eyes = "look"
+        p.look = (0, 1)
+        p.mouth = "flat" if int(t / 0.6) % 2 else "w"
+        p.prop = "laptop"
+        p.hands = (("front", "body", -6, 14 - tap), ("front", "body", 6, 13 + tap))
+        p.antenna = 12 + 4 * tap
+        p.light_level = 0.6 + 0.4 * tap
+        for i in range(2):
+            k = (t / WORKING_LOOP + i / 2) % 1
+            p.fx.append(("bicon", "code", -16 + i * 27 + round(k * 3), 4 - k * 22))
     elif name == "thinking":
+        length = WORKING_AFTER
         p.eyes = "look"
         p.look = (-2, -1)
         p.mouth = "flat"
@@ -809,17 +830,6 @@ def pose_for(name: str, t: float, length: float) -> Pose:
         p.light_level = 0.55
         k = t / length
         p.fx = [("ficon", "drop", -9, 1 + int(k * 10))] if k < 0.7 else []
-    elif name == "surprised":
-        k = t / length
-        p.dy = -4 * math.sin(min(1.0, k / 0.35) * math.pi) if k < 0.35 else 0
-        p.squash = 0.92 if k < 0.35 else 1.0
-        p.eyes = "wide"
-        p.mouth = "o"
-        p.antenna = 0
-        p.antenna_len = 11
-        p.hands = ((-1, -4), (1, -4))
-        if int(t * 5) % 2 == 0:
-            p.fx = [("icon", "excl", 8, 12)]
     elif name == "dizzy":
         s = math.sin(2 * math.pi * t / length)
         p.dx = round(2 * s)
@@ -831,62 +841,45 @@ def pose_for(name: str, t: float, length: float) -> Pose:
         for i in range(3):
             a = 2 * math.pi * (t / 0.8 + i / 3)
             p.fx.append(("spark", 32 + 13 * math.cos(a), 9 + 3 * math.sin(a), GOLD, 1))
-    elif name == "celebrate":
-        k = (t / length * 2) % 1
-        p.dy = -4 * math.sin(k * math.pi)
-        p.squash = 0.92 if 0.1 < k < 0.9 else 1.15
-        p.feet = not (0.15 < k < 0.85)
-        p.eyes = "happy"
-        p.mouth = "o"
-        p.hands = ((-1, -6), (1, -6))
-        rr, gg, bb = colorsys.hsv_to_rgb((t / length) % 1, 0.6, 1)
-        p.light = (round(rr * 255), round(gg * 255), round(bb * 255))
+    return p
+
+
+def overlay(p: Pose, name: str, t: float, length: float) -> Pose:
+    """Lays an overlay over a pose: shared by every character, drawn in any expression."""
+    if name == "surprise":
+        k = t / length
+        if k < 0.35:
+            p.dy -= 3 * math.sin(k / 0.35 * math.pi)
+        if p.eyes not in ("blink", "x", "spiral"):
+            p.eyes = "wide"
+        if int(t * 5) % 2 == 0:
+            p.fx.append(("icon", "excl", 8, 12))
+    elif name == "blush":
+        p.blush = "big"
+        if (t % length) > length * 0.6:
+            p.fx.append(("icon", "heart", 50, 10 - int((t % length - length * 0.6) * 8)))
+    elif name == "confetti":
         rng = np.random.default_rng(7)
-        for i in range(14):
+        for _ in range(14):
             x = rng.integers(4, 60)
             y = (rng.integers(0, 64) + t * 30) % 64
             r2, g2, b2 = colorsys.hsv_to_rgb(rng.random(), 0.7, 1)
             p.fx.append(("px", x, y, (round(r2 * 255), round(g2 * 255), round(b2 * 255))))
-    elif name == "shy":
-        s = math.sin(2 * math.pi * t / length)
-        p.dx = round(s)
-        p.eyes = "down"
-        p.mouth = "w"
-        p.blush = "big"
-        p.hands = (("front", "face", -11, 4), ("front", "face", 11, 4))
-        p.antenna = 30 + 10 * s
-        if (t % length) > length * 0.6:
-            p.fx = [("icon", "heart", 50, 10 - int((t % length - length * 0.6) * 8))]
+    elif name == "hearts":
+        k = t / length
+        for i, x0 in enumerate((6, 52)):
+            y = 30 - k * 22 - i * 3
+            if y > 2:
+                p.fx.append(("icon", "heart", x0, y))
     elif name == "low_battery":
-        p.eyes = "half"
-        p.mouth = "flat"
-        p.squash = 1.08
-        p.dy = 1
-        p.antenna = 62
-        p.light_level = 0.6 if int(t * 2) % 2 else 0.15
         if int(t * 2) % 2:
-            p.fx = [("icon", "battery", 50, 6)]
+            p.fx.append(("icon", "battery", 50, 6))
+            p.light, p.light_level = RED, min(p.light_level, 0.6)
     elif name == "charging":
-        p.eyes = "happy"
-        p.mouth = "smile"
-        p.dy = bob
-        p.light_level = wave(t, 0.8, 0.6, 1)
-        p.fx = [("icon", "bolt", 53, 4 + int(wave(t, 0.8, 0, 2)))]
+        p.fx.append(("icon", "bolt", 53, 4 + int(wave(t, 0.8, 0, 2))))
         for i in range(3):
             k = (t / length + i / 3) % 1
             p.fx.append(("px", 8 + i * 24, 54 - k * 36, (255, 230, 90)))
-    elif name == "working":   # typing away on a tiny laptop, bits of code flying up
-        tap = int(t / 0.15) % 2
-        p.eyes = "look"
-        p.look = (0, 1)
-        p.mouth = "flat" if int(t / 0.6) % 2 else "w"
-        p.prop = "laptop"
-        p.hands = (("front", "body", -6, 14 - tap), ("front", "body", 6, 13 + tap))
-        p.antenna = 12 + 4 * tap
-        p.light_level = 0.6 + 0.4 * tap
-        for i in range(2):
-            k = (t / length + i / 2) % 1
-            p.fx.append(("bicon", "code", -16 + i * 27 + round(k * 3), 4 - k * 22))
     return p
 
 
@@ -994,10 +987,17 @@ def render(rig: Rig, pose: Pose) -> np.ndarray:
     return out
 
 
-def frames(rig, name, length, scale):
-    n = max(1, round(length * FPS))
-    return [Image.fromarray(render(rig, pose_for(name, i / FPS, length))).resize((N * scale, N * scale), Image.NEAREST)
-            for i in range(n)]
+def frames(rig, name, length, scale, over=None):
+    """An expression's loop, or with over=(name, length) an overlay's loop on top of idle."""
+    n = max(1, round((over[1] if over else length) * FPS))
+    out = []
+    for i in range(n):
+        t = i / FPS
+        p = pose_for(name, t, length)
+        if over:
+            p = overlay(p, over[0], t, over[1])
+        out.append(Image.fromarray(render(rig, p)).resize((N * scale, N * scale), Image.NEAREST))
+    return out
 
 
 def font(size):
@@ -1030,7 +1030,8 @@ def save_gif(frames_, path):
     frames_[0].save(path, save_all=True, append_images=frames_[1:], duration=1000 // FPS, loop=0)
 
 
-TELLING = {"boot": 0.8, "happy": 0.3, "off": 0.3, "surprised": 0.15, "celebrate": 0.25}
+TELLING = {"boot": 0.8, "happy": 0.3, "off": 0.3, "surprise": 0.15, "confetti": 0.25, "low_battery": 0.8,
+           "blush": 0.8}
 
 
 def main() -> None:
@@ -1053,22 +1054,29 @@ def main() -> None:
             save_gif(fr, out / f"{name}.gif")
             all_frames.append(fr)
         family[rig.key] = (rig, all_frames)
-        labels = [f"{zh} {name}" for name, _, zh in EXPRESSIONS]
+        for name, length, _ in OVERLAYS:
+            fr = frames(rig, "idle", 3.0, args.scale, (name, length))
+            save_gif(fr, out / f"overlay_{name}.gif")
+            all_frames.append(fr)
+        views = EXPRESSIONS + [(n, ln, "+" + zh) for n, ln, zh in OVERLAYS]
+        labels = [f"{zh} {name}" for name, _, zh in views]
         g = grid(all_frames, labels, 5, N * 3, f_title)
         save_gif(g, out / "all.gif")
-        stills = [[fr[int(len(fr) * TELLING.get(name, 0.4))]] for fr, (name, _, _) in zip(all_frames, EXPRESSIONS)]
+        stills = [[fr[int(len(fr) * TELLING.get(name, 0.4))]] for fr, (name, _, _) in zip(all_frames, views)]
         grid(stills, labels, 5, N * 3, f_title)[0].save(out / "sheet.png")
     if len(family) > 1:   # every character, a row each, in a few expressions
-        picks = ["idle", "listening", "thinking", "speaking", "happy", "working", "sleepy", "dizzy"]
-        cells, labels = [], []
+        picks = [("idle", "待机", 0.4), ("listening", "聆听", 0.4), ("thinking", "思考", 0.2),
+                 ("speaking", "说话", 0.4), ("happy", "开心", 0.3), ("thinking", "工作中", 0.8),
+                 ("sleepy", "犯困", 0.4), ("dizzy", "晕了", 0.4)]
+        cells, labels, at = [], [], []
         for key, (rig, all_frames) in family.items():
-            for name in picks:
-                k = [e[0] for e in EXPRESSIONS].index(name)
-                cells.append(all_frames[k])
-                labels.append(f"{rig.name} · {EXPRESSIONS[k][2]}")
+            for name, zh, still in picks:
+                cells.append(all_frames[[e[0] for e in EXPRESSIONS].index(name)])
+                labels.append(f"{rig.name} · {zh}")
+                at.append(still)
         g = grid(cells, labels, len(picks), N * 3, font(16))
         save_gif(g, args.out / "family.gif")
-        stills = [[fr[int(len(fr) * TELLING.get(lab, 0.4))]] for fr, lab in zip(cells, labels)]
+        stills = [[fr[int(len(fr) * k)]] for fr, k in zip(cells, at)]
         grid(stills, labels, len(picks), N * 3, font(16))[0].save(args.out / "family.png")
 
 
