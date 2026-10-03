@@ -5,7 +5,7 @@
 """Renders each avatar state in the UI simulator and saves PNGs plus contact
 sheets, so UI changes can be checked from CI without a board: Muse's own
 character in every state (contact-sheet.png), every character in a few
-(avatars.png), and Boopie's pet expressions and overlays (pets.png).
+(avatars.png), and the pet expressions and overlays on Boopie and Muse (pets.png).
 
   python3 tools/boopie/sim_shots.py --binary build/simulator/muse_simulator --out shots
 
@@ -103,9 +103,9 @@ def render_avatars(binary: Path, out: Path) -> list[Path]:
 
 def render_pets(binary: Path, out: Path) -> list[Path]:
     with tempfile.TemporaryDirectory() as tmp:
-        return [shoot(binary, Path(tmp), out / f"pet-{name}.png", ["face=idle"],
-                      {"BOOPIE_AVATAR": "boopie", **env}, 1000)
-                for name, env in PETS]
+        return [shoot(binary, Path(tmp), out / f"pet-{avatar}-{name}.png", ["face=idle"],
+                      {"BOOPIE_AVATAR": avatar, **env}, 1000)
+                for avatar in ("boopie", "muse") for name, env in PETS]
 
 
 def contact_sheet(pngs: list[Path], dest: Path, cols: int = 5) -> None:

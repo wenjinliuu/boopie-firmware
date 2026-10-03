@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "boopie_clock.h"   /* Boopie */
 #include "muse_input.h"
 
 #include <stdint.h>
@@ -93,6 +94,7 @@ static void power_off(void)
     muse_state_set_mode(MUSE_MODE_OFF);
     muse_state_set_caption("GOODBYE!");
     vTaskDelay(pdMS_TO_TICKS(GOODBYE_MS));
+    boopie_clock_save();   /* Boopie: the clock carries on from here next power-up */
     esp_err_t err = muse_board->power_off();
     /* Only reached if the board couldn't power off. */
     vTaskDelay(pdMS_TO_TICKS(500));

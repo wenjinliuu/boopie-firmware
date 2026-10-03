@@ -2,6 +2,8 @@
 
 #include "muse_pixel.h"
 
+#include "boopie_expr.h"   /* Boopie: the pet expressions */
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,6 +68,33 @@ static const scheme_t SCHEMES[MUSE_MODE_COUNT] = {
     [MUSE_MODE_ERROR]     = { { 0xffd6d6, 0xff6b6b, 0xc7304a, 0x6b1a3a }, 0xff5c5c },
     [MUSE_MODE_OFF]       = { { 0xd8d4ff, 0x8f86d9, 0x5a4fb0, 0x2e2870 }, 0x7c72d0 },
 };
+
+/*
+ * Boopie: Muse's own character draws Boopie's pet expressions too, while idle,
+ * and two overlays that change the face. Set each frame by
+ * components/boopie/avatar/boopie_avatar.c; the overlays' icons are drawn on
+ * top by that file, so only the face changes here.
+ */
+#define BOOPIE_PET_COUNT (BOOPIE_EXPR_COUNT - BOOPIE_EXPR_HUNGRY)
+static const scheme_t PET_SCHEMES[BOOPIE_PET_COUNT] = {
+    [BOOPIE_EXPR_HUNGRY - BOOPIE_EXPR_HUNGRY] = { { 0xfff0dc, 0xffc98a, 0xff9a3c, 0xc25e14 }, 0xffaa50 },
+    [BOOPIE_EXPR_EATING - BOOPIE_EXPR_HUNGRY] = { { 0xfff4e4, 0xffd39a, 0xffaf5a, 0xc97a2a }, 0xffbe6e },
+    [BOOPIE_EXPR_SLEEPY - BOOPIE_EXPR_HUNGRY] = { { 0xd8d4ff, 0x8f86d9, 0x5a4fb0, 0x2e2870 }, 0x7c72d0 },
+    [BOOPIE_EXPR_SAD - BOOPIE_EXPR_HUNGRY] = { { 0xe4ecff, 0xa8c0f5, 0x6e8ce6, 0x3a52a8 }, 0x6e8ce6 },
+    [BOOPIE_EXPR_DIZZY - BOOPIE_EXPR_HUNGRY] = { { 0xfff6dc, 0xffe08a, 0xffc878, 0xc48a2a }, 0xffc878 },
+};
+static int s_pet = BOOPIE_EXPR_IDLE;   /* a pet expression, or IDLE for none */
+static float s_pet_t;                  /* seconds in it */
+static bool s_blush, s_wide;           /* overlays: big blush, surprised eyes */
+static int s_pet_on;                   /* this frame's pet expression, or 0 */
+
+void jolly_pixel_set_extra(int pet, float pet_t, bool blush, bool wide)
+{
+    s_pet = pet >= BOOPIE_EXPR_HUNGRY && pet < BOOPIE_EXPR_COUNT ? pet : BOOPIE_EXPR_IDLE;
+    s_pet_t = pet_t;
+    s_blush = blush;
+    s_wide = wide;
+}
 
 /* Cream fur and a peach face. */
 static const uint32_t FIXED[C_COUNT] = {
@@ -317,6 +346,13 @@ static float eyes_update(const muse_pose_t *p, float dt)
     }
 
     float tgx = e->tgx, tgy = e->tgy;
+    if (s_pet_on == BOOPIE_EXPR_HUNGRY) {   /* Boopie: looking up at the thought of food */
+        tgx = 0.9f;
+        tgy = -0.9f;
+    } else if (s_pet_on == BOOPIE_EXPR_SAD) {
+        tgx = 0;
+        tgy = 0.6f;
+    }
     switch (p->mode) {
     case MUSE_MODE_LISTENING:
         tgx = 0;
@@ -629,6 +665,7 @@ typedef enum {
     EYES_WIDE,
     EYES_HAPPY,
     EYES_X,
+    EYES_SPIRAL,   /* Boopie: dizzy */
 } eye_style_t;
 
 /* The eyes are small glossy black beads. */
@@ -639,6 +676,14 @@ static void draw_eye(float ex, float ey, float openness, eye_style_t style, floa
     if (style == EYES_HAPPY) {
         static const char *const HAPPY[] = { ".##.", "#..#" };
         stamp(HAPPY, 2, iround(ex) - 2, iround(ey), C_IRIS, C_IRIS);
+        return;
+    }
+    if (style == EYES_SPIRAL) {     /* Boopie: a little swirl that turns */
+        static const char *const SWIRL[4][4] = {
+            { "###.", "...#", "#..#", ".##." }, { ".###", "#...", "#..#", ".##." },
+            { ".##.", "#..#", "#...", ".###" }, { ".##.", "#..#", "...#", "###." },
+        };
+        stamp(SWIRL[(int)(s_pet_t * 8) & 3], 4, iround(ex) - 2, iround(ey) - 2, C_IRIS, C_IRIS);
         return;
     }
     if (style == EYES_X) {
@@ -684,6 +729,8 @@ typedef enum {
     MOUTH_TALK,
     MOUTH_GRIN,
     MOUTH_FLAT,
+    MOUTH_FROWN,   /* Boopie: sad */
+    MOUTH_WAVY,    /* Boopie: hungry, dizzy */
 } mouth_t;
 
 static void draw_mouth(int x, int y, mouth_t m, float open)
@@ -724,6 +771,16 @@ static void draw_mouth(int x, int y, mouth_t m, float open)
     case MOUTH_FLAT: {
         static const char *const S[] = { "##" };
         stamp(S, 1, x - 1, y + 1, C_MOUTH, C_MOUTH);
+        break;
+    }
+    case MOUTH_FROWN: {
+        static const char *const S[] = { ".##.", "#..#" };
+        stamp(S, 2, x - 2, y, C_MOUTH, C_MOUTH);
+        break;
+    }
+    case MOUTH_WAVY: {
+        static const char *const S[] = { ".#..#.", "#.##.#" };
+        stamp(S, 2, x - 3, y, C_MOUTH, C_MOUTH);
         break;
     }
     }
@@ -827,6 +884,67 @@ static void draw_alert(int x, int y)
     stamp(BANG, 6, x - 2, y, C_ACC, C_ACC);
 }
 
+/* Boopie: the pet expressions' effects: a thought of food, a cookie, Zzz, a
+ * tear, stars round the head. */
+static void draw_pet_effects(const avatar_t *j, float top, float eye_y, float pt)
+{
+    switch (s_pet_on) {
+    case BOOPIE_EXPR_HUNGRY: {
+        static const char *const BUBBLE[] = { ".#####.", "#.....#", "#.ooo.#", "#..o..#", ".#####.", "..#....", ".#....." };
+        stamp(BUBBLE, 7, iround(j->cx + 13), iround(top - 7), C_G1, C_WHITE);
+        static const char *const PAW[] = { ".###.", "#ooo#", "#ooo#", ".###." };   /* a paw on the tummy */
+        stamp(PAW, 4, iround(j->cx + 2), iround(j->cy + 5), C_OUT2, C_SKIND);
+        if ((int)(pt * 2) % 2) {   /* a rumble by the tummy */
+            px(iround(j->cx - j->a - 4), iround(j->cy + 6), C_G1);
+            px(iround(j->cx - j->a - 5), iround(j->cy + 7), C_G1);
+            px(iround(j->cx - j->a - 4), iround(j->cy + 8), C_G1);
+        }
+        break;
+    }
+    case BOOPIE_EXPR_EATING: {
+        static const char *const COOKIE[] = { ".###.", "#o##o", "###o#", ".###." };
+        int cy = iround(eye_y + 6) + (fracf(pt / 0.6f) < 0.5f ? 0 : 1);
+        stamp(COOKIE, 4, iround(j->fx) - 2, cy, C_G2, C_BROW);
+        static const char *const PAW[] = { ".###.", "#ooo#", "#ooo#", ".###." };   /* holding it */
+        stamp(PAW, 4, iround(j->fx) - 7, cy, C_OUT2, C_SKIND);
+        stamp(PAW, 4, iround(j->fx) + 3, cy, C_OUT2, C_SKIND);
+        float c = fracf(pt / 0.6f);
+        px(iround(j->fx - 4 - c * 2), iround(eye_y + 10 + c * 8), C_G2);
+        px(iround(j->fx + 4 + c * 2), iround(eye_y + 11 + c * 7), C_G2);
+        break;
+    }
+    case BOOPIE_EXPR_SLEEPY: {
+        static const char *const Z[] = { "####", "..#.", ".#..", "####" };
+        for (int i = 0; i < 3; i++) {
+            float k = fracf(pt / 3.0f + i / 3.0f);
+            stamp(Z, 4, iround(j->cx + 14 + k * 7), iround(top + 12 - k * 22), k < 0.5f ? C_G0 : C_G1, C_G1);
+        }
+        break;
+    }
+    case BOOPIE_EXPR_SAD: {
+        float k = fracf(pt / 2.4f);
+        if (k < 0.7f) {
+            static const char *const TEAR[] = { ".#.", "###", ".#." };
+            stamp(TEAR, 3, iround(j->fx - j->fa * 0.48f - 3), iround(eye_y + 2 + k * 8), C_G1, C_G1);
+        }
+        break;
+    }
+    case BOOPIE_EXPR_DIZZY:
+        for (int i = 0; i < 3; i++) {
+            float a = TAU * (pt / 0.8f + i / 3.0f);
+            int x = iround(j->cx + 13 * cosf(a)), y = iround(top - 2 + 3 * sinf(a));
+            px(x, y, C_WHITE);
+            px(x - 1, y, C_G1);
+            px(x + 1, y, C_G1);
+            px(x, y - 1, C_G1);
+            px(x, y + 1, C_G1);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 /* ---------------------------------------------------------------------------
  * Frame
  * ------------------------------------------------------------------------- */
@@ -896,7 +1014,10 @@ void muse_pixel_render(const muse_pose_t *p)
     float level = p->level;
     float t = p->t;
 
-    update_palette(&SCHEMES[mode], dt);
+    /* Boopie: a pet expression shows while idle and not being petted. */
+    s_pet_on = mode == MUSE_MODE_IDLE && p->happy <= 0 && s_pet != BOOPIE_EXPR_IDLE ? s_pet : 0;
+    float pt = s_pet_t;
+    update_palette(s_pet_on ? &PET_SCHEMES[s_pet_on - BOOPIE_EXPR_HUNGRY] : &SCHEMES[mode], dt);
     float blink = eyes_update(p, dt);
 
     memset(s_fb, C_BG, sizeof(s_fb));
@@ -924,6 +1045,27 @@ void muse_pixel_render(const muse_pose_t *p)
     }
     if (happy > 0) {
         hop = fabsf(sinf(t * 9.0f)) * 3.0f * happy;
+    }
+    /* Boopie: the pet expressions' motion. */
+    switch (s_pet_on) {
+    case BOOPIE_EXPR_SLEEPY:
+        bob = sinf(t * 0.9f) * 1.2f + 0.5f;
+        breathe_rate = 0.9f;
+        break;
+    case BOOPIE_EXPR_SAD:
+        bob = 1.6f;
+        break;
+    case BOOPIE_EXPR_DIZZY:
+        lean = sinf(pt * TAU / 1.6f) * 2.5f;
+        break;
+    case BOOPIE_EXPR_EATING:
+        bob = (fracf(pt / 0.6f) < 0.5f ? 0.0f : 0.8f);
+        break;
+    default:
+        break;
+    }
+    if (s_wide && mode == MUSE_MODE_IDLE) {   /* Boopie: surprise, a start */
+        hop += fmaxf(0, sinf(fminf(fracf(t / 1.2f) / 0.35f, 1) * 3.1416f)) * 2.5f;
     }
 
     /* Boot: the avatar pops up from a squash, then opens their eyes. */
@@ -998,6 +1140,13 @@ void muse_pixel_render(const muse_pose_t *p)
             float wig = sinf(t * 14.0f) * 0.25f;
             arms[0] = (limb_t){ j.cx - adx - 1.0f, j.cy - 4.0f, 2.4f + wig };
             arms[1] = (limb_t){ j.cx + adx + 1.0f, j.cy - 4.0f, -2.4f - wig };
+        } else if (s_pet_on == BOOPIE_EXPR_SAD || s_pet_on == BOOPIE_EXPR_SLEEPY) {
+            arms[0] = (limb_t){ j.cx - adx + 0.5f, ay + 1.5f, -0.1f };
+            arms[1] = (limb_t){ j.cx + adx - 0.5f, ay + 1.5f, 0.1f };
+        } else if (s_pet_on == BOOPIE_EXPR_DIZZY) {
+            float flap = sinf(pt * 9.0f) * 0.6f;
+            arms[0] = (limb_t){ j.cx - adx - 0.5f, ay - 2.0f, -0.9f + flap };
+            arms[1] = (limb_t){ j.cx + adx + 0.5f, ay - 2.0f, 0.9f + flap };
         } else {
             arms[0] = (limb_t){ j.cx - adx, ay, -0.3f + sway };
             arms[1] = (limb_t){ j.cx + adx, ay, 0.3f - sway };
@@ -1042,6 +1191,32 @@ void muse_pixel_render(const muse_pose_t *p)
     default:
         break;
     }
+    /* Boopie: the pet expressions' faces. */
+    switch (s_pet_on) {
+    case BOOPIE_EXPR_HUNGRY:
+        mouth = MOUTH_WAVY;
+        break;
+    case BOOPIE_EXPR_EATING:
+        style = EYES_HAPPY;
+        mouth = fracf(pt / 0.6f) < 0.5f ? MOUTH_O : MOUTH_FLAT;
+        break;
+    case BOOPIE_EXPR_SLEEPY:
+        open = 0;
+        mouth = sinf(t * 0.9f) > 0.6f ? MOUTH_O : MOUTH_SMILE;
+        break;
+    case BOOPIE_EXPR_SAD:
+        mouth = MOUTH_FROWN;
+        break;
+    case BOOPIE_EXPR_DIZZY:
+        style = EYES_SPIRAL;
+        mouth = MOUTH_WAVY;
+        break;
+    default:
+        break;
+    }
+    if (s_wide && style == EYES_NORMAL && open > 0.3f) {
+        style = EYES_WIDE;   /* Boopie: surprise */
+    }
     if (happy > 0.2f && mode != MUSE_MODE_ERROR) {
         style = EYES_HAPPY;
         mouth = MOUTH_GRIN;
@@ -1058,9 +1233,16 @@ void muse_pixel_render(const muse_pose_t *p)
     } else if (mode == MUSE_MODE_LISTENING) {
         px(bl - 1, by - 1, C_BROW); px(bl, by - 1, C_BROW);
         px(br - 1, by - 1, C_BROW); px(br, by - 1, C_BROW);
+    } else if (s_pet_on == BOOPIE_EXPR_SAD || s_pet_on == BOOPIE_EXPR_HUNGRY) {
+        /* Boopie: worried brows, high in the middle. */
+        px(bl - 1, by + 1, C_BROW); px(bl, by, C_BROW);
+        px(br - 1, by, C_BROW); px(br, by + 1, C_BROW);
     }
 
     float blush = 0.55f + happy * 0.45f + (mode == MUSE_MODE_SPEAKING ? 0.15f : 0.0f);
+    if (s_blush || s_pet_on == BOOPIE_EXPR_EATING) {
+        blush = 1.0f;   /* Boopie: shy, or munching */
+    }
     draw_blush(iround(j.fx - j.fa * 0.72f), iround(eye_y + 2), blush);
     draw_blush(iround(j.fx + j.fa * 0.72f), iround(eye_y + 2), blush);
 
@@ -1082,5 +1264,5 @@ void muse_pixel_render(const muse_pose_t *p)
     if (mode == MUSE_MODE_ERROR) {
         draw_alert(iround(j.cx + 18), iround(top - 1));
     }
-
+    draw_pet_effects(&j, top, eye_y, pt);
 }

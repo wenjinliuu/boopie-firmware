@@ -31,6 +31,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "boopie_imu.h"   /* Boopie */
 #include "muse_board.h"
 #include "muse_lcd_bands.h"
 #include "muse_mem.h"
@@ -51,6 +52,10 @@ static esp_err_t init(void)
     ESP_RETURN_ON_ERROR(bsp_i2c_init(), TAG, "i2c init");
     ESP_RETURN_ON_ERROR(muse_gpio_button_init_high(&s_pwr, PWR_GPIO), TAG, "pwr button");
     ESP_RETURN_ON_ERROR(muse_gpio_button_init(&s_boot, GPIO_NUM_0), TAG, "boot button");
+    /* Boopie: the QMI8658 IMU, which Muse leaves unused (shake, games). */
+    if (boopie_imu_init(bsp_i2c_get_handle()) != ESP_OK) {
+        ESP_LOGW(TAG, "IMU unavailable");
+    }
     /* PWR turned the board on and may still be held; don't count that as a press. */
     s_pwr.pressed = gpio_get_level(PWR_GPIO) == 1;
     /* GPIO3 gives the key, so the PMU needn't latch it. Its IRQ line isn't

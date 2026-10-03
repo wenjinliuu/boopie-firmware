@@ -19,6 +19,7 @@
 #include "muse_state.h"
 
 #ifdef ESP_PLATFORM
+#include "boopie_imu.h"
 #include "esp_log.h"
 #include "nvs.h"
 #endif
@@ -28,6 +29,16 @@ uint32_t jolly_pixel_accent(muse_mode_t mode);
 void jolly_pixel_render(const muse_pose_t *pose);
 void jolly_pixel_set_size(int px);
 void jolly_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);
+/* Boopie's additions to it: a pet expression, and the overlays that change the
+ * face. A custom avatar (components/muse/avatar/muse_pixel.c) won't have it,
+ * and draws the core expressions only. */
+__attribute__((weak)) void jolly_pixel_set_extra(int pet, float pet_t, bool blush, bool wide)
+{
+    (void)pet;
+    (void)pet_t;
+    (void)blush;
+    (void)wide;
+}
 
 #define LOW_BATTERY_PCT 15
 
@@ -40,6 +51,10 @@ static float s_pet_since = -1;                 /* when the pet expression began,
 static float s_overlay_since[BOOPIE_OVERLAY_COUNT];
 static uint8_t s_shown_overlays;               /* last frame's, to time new ones from */
 static float s_happy_since = -1;
+static volatile int s_react = BOOPIE_EXPR_IDLE;   /* a short reaction asked for */
+static volatile float s_react_secs;
+static int s_reacting = BOOPIE_EXPR_IDLE;         /* the one showing */
+static float s_react_since, s_react_until;
 static float s_last_t = -1;
 
 const char *boopie_avatar_key(int avatar)
@@ -151,12 +166,22 @@ static void save(void)
 }
 #endif
 
+#ifdef ESP_PLATFORM
+static void on_shake(void)
+{
+    boopie_avatar_react(BOOPIE_EXPR_DIZZY, 3.0f);
+}
+#endif
+
 static void ensure_loaded(void)
 {
     if (s_loaded) {
         return;
     }
     s_loaded = true;
+#ifdef ESP_PLATFORM
+    boopie_imu_on_shake(on_shake);   /* shaken: dizzy for a moment */
+#endif
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         s_colour[i] = BOOPIE_COLOUR_DEFAULT;
     }
@@ -202,6 +227,12 @@ void boopie_avatar_set_pet(boopie_expr_t expr)
 {
     s_pet = boopie_expr_valid(expr) && !boopie_expr_is_core(expr) ? expr : BOOPIE_EXPR_IDLE;
     s_pet_since = -1;
+}
+
+void boopie_avatar_react(boopie_expr_t expr, float seconds)
+{
+    s_react_secs = seconds;
+    s_react = boopie_expr_valid(expr) && !boopie_expr_is_core(expr) ? expr : BOOPIE_EXPR_IDLE;
 }
 
 boopie_expr_t boopie_avatar_pet(void)
@@ -277,6 +308,9 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
 /* What our characters show for a Muse mode: the pet expression while idle. */
 static boopie_expr_t shown(muse_mode_t mode)
 {
+    if (mode == MUSE_MODE_IDLE && s_reacting != BOOPIE_EXPR_IDLE) {
+        return (boopie_expr_t)s_reacting;
+    }
     if (mode == MUSE_MODE_IDLE && s_pet != BOOPIE_EXPR_IDLE) {
         return (boopie_expr_t)s_pet;
     }
@@ -286,10 +320,11 @@ static boopie_expr_t shown(muse_mode_t mode)
 uint32_t muse_pixel_accent(muse_mode_t mode)
 {
     ensure_loaded();
-    if (s_avatar == BOOPIE_AVATAR_MUSE) {
+    boopie_expr_t e = shown(mode);
+    if (s_avatar == BOOPIE_AVATAR_MUSE && e == (boopie_expr_t)mode) {
         return jolly_pixel_accent(mode);
     }
-    return boopie_pixel_accent(shown(mode));
+    return boopie_pixel_accent(e);
 }
 
 void muse_pixel_set_size(int px)
@@ -302,6 +337,7 @@ void muse_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int 
 {
     if (s_avatar == BOOPIE_AVATAR_MUSE) {
         jolly_pixel_scale(dst, stride_px, x0, x1, y0, y1);
+        boopie_overlay_layer_scale(dst, stride_px, x0, x1, y0, y1);
     } else {
         boopie_pixel_scale(dst, stride_px, x0, x1, y0, y1);
     }
@@ -331,26 +367,25 @@ void muse_pixel_render(const muse_pose_t *p)
         s_happy_since = -1;
     }
 
-    if (s_avatar == BOOPIE_AVATAR_MUSE) {
-        /* Muse's own character draws the core expressions only: a pet one
-         * shows its fallback, HAPPY as the official pet reaction. */
-        muse_pose_t q = *p;
-        if (p->mode == MUSE_MODE_IDLE && s_pet != BOOPIE_EXPR_IDLE) {
-            boopie_expr_t e = boopie_expr_resolve((boopie_expr_t)s_pet, BOOPIE_EXPR_SET_CORE);
-            if (e == BOOPIE_EXPR_HAPPY) {
-                q.happy = 1;
-            } else if (e != BOOPIE_EXPR_OFF) {   /* OFF would fade the screen out */
-                q.mode = (muse_mode_t)e;
-            }
-        }
-        jolly_pixel_render(&q);
-        return;
+#ifdef ESP_PLATFORM
+    boopie_imu_keepalive();
+#endif
+    if (s_react != BOOPIE_EXPR_IDLE) {   /* a new reaction */
+        s_reacting = s_react;
+        s_react = BOOPIE_EXPR_IDLE;
+        s_react_since = p->t;
+        s_react_until = p->t + s_react_secs;
+    } else if (s_reacting != BOOPIE_EXPR_IDLE && p->t >= s_react_until) {
+        s_reacting = BOOPIE_EXPR_IDLE;
     }
 
     boopie_pixel_pose_t bp = { .level = p->level, .dt = dt };
     if (s_happy_since >= 0) {
         bp.expr = BOOPIE_EXPR_HAPPY;
         bp.t = p->t - s_happy_since;
+    } else if (p->mode == MUSE_MODE_IDLE && s_reacting != BOOPIE_EXPR_IDLE) {
+        bp.expr = (boopie_expr_t)s_reacting;
+        bp.t = p->t - s_react_since;
     } else if (p->mode == MUSE_MODE_IDLE && s_pet != BOOPIE_EXPR_IDLE) {
         if (s_pet_since < 0) {
             s_pet_since = p->t;
@@ -376,5 +411,17 @@ void muse_pixel_render(const muse_pose_t *p)
     }
     s_shown_overlays = on;
     bp.overlays = on;
+    if (s_avatar == BOOPIE_AVATAR_MUSE) {
+        /* Muse's own renderer draws the expression, a pet one included, and
+         * the face changes of two overlays; the overlay icons go on a layer
+         * laid over it as it's scaled. */
+        bool pet = bp.expr >= BOOPIE_EXPR_HUNGRY;
+        jolly_pixel_set_extra(pet ? (int)bp.expr : BOOPIE_EXPR_IDLE, (float)bp.t,
+                              on & BOOPIE_OVERLAY_BIT(BOOPIE_OVERLAY_BLUSH),
+                              on & BOOPIE_OVERLAY_BIT(BOOPIE_OVERLAY_SURPRISE));
+        jolly_pixel_render(p);
+        boopie_overlay_layer_render(on, bp.overlay_t);
+        return;
+    }
     boopie_pixel_render(&bp);
 }

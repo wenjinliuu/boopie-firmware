@@ -735,11 +735,18 @@ static inline float bay(int x, int y)
     return BAYER[y & 3][x & 3];
 }
 
+/* Where put() draws: the frame, or the overlay layer (and its mask). */
+static rgb_t (*s_dst)[N] = s_img;
+static uint64_t *s_dst_mask;
+
 static void put(float x, float y, rgb_t c)
 {
     int xi = (int)rintf(x), yi = (int)rintf(y);
     if (xi >= 0 && xi < N && yi >= 0 && yi < N) {
-        s_img[yi][xi] = c;
+        s_dst[yi][xi] = c;
+        if (s_dst_mask) {
+            s_dst_mask[yi] |= 1ull << xi;
+        }
     }
 }
 
@@ -1903,5 +1910,64 @@ void boopie_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, in
         }
         prev = dst;
         prev_m = m;
+    }
+}
+
+/* ---------------------------------------------------------------- overlay layer */
+
+static rgb_t s_layer[N][N];
+static mask_t s_layer_mask;
+static uint16_t s_layer_565[N * N], s_layer_565_dim[N * N];
+
+void boopie_overlay_layer_render(boopie_overlay_set_t overlays, const double overlay_t[BOOPIE_OVERLAY_COUNT])
+{
+    static pose_t pose;
+    memset(&pose, 0, sizeof(pose));
+    pose.light_level = 1;
+    m_clear(s_layer_mask);
+    for (int o = 0; o < BOOPIE_OVERLAY_COUNT; o++) {
+        if (overlays & BOOPIE_OVERLAY_BIT(o)) {
+            double ot = overlay_t[o] < 0 ? 0 : overlay_t[o];
+            overlay(&pose, (boopie_overlay_t)o, pymodd(ot, OVERLAY_LOOP[o]), OVERLAY_LOOP[o]);
+        }
+    }
+    s_dst = s_layer;
+    s_dst_mask = s_layer_mask;
+    for (int i = 0; i < pose.nfx; i++) {   /* the overlays draw at fixed places */
+        const fx_t *e = &pose.fx[i];
+        if (e->kind == FX_ICON) {
+            icon(e->icon, e->x, e->y);
+        } else if (e->kind == FX_PX) {
+            put(e->x, e->y, e->c);
+        }
+    }
+    s_dst = s_img;
+    s_dst_mask = NULL;
+    for (int y = 0; y < N; y++) {
+        for (uint64_t row = s_layer_mask[y]; row; row &= row - 1) {
+            int x = __builtin_ctzll(row);
+            rgb_t c = s_layer[y][x];
+            s_layer_565[y * N + x] = to565(c.r, c.g, c.b);
+            s_layer_565_dim[y * N + x] = to565(c.r * 0.72f, c.g * 0.72f, c.b * 0.72f);
+        }
+    }
+}
+
+void boopie_overlay_layer_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1)
+{
+    for (int y = y0; y <= y1; y++, dst += stride_px) {
+        uint8_t m = s_map[y];
+        int row = m & 0x7f;
+        uint64_t bits = s_layer_mask[row];
+        if (!bits) {
+            continue;
+        }
+        for (int i = 0; i <= x1 - x0; i++) {
+            uint8_t xm = s_map[x0 + i];
+            int x = xm & 0x7f;
+            if ((bits >> x) & 1u) {
+                dst[i] = (m & 0x80) || (xm & 0x80) ? s_layer_565_dim[row * N + x] : s_layer_565[row * N + x];
+            }
+        }
     }
 }

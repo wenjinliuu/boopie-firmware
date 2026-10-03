@@ -73,3 +73,11 @@ const uint8_t *boopie_pixel_rgb(void);
 /* As muse_pixel_set_size() / muse_pixel_scale(). */
 void boopie_pixel_set_size(int px);
 void boopie_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);
+
+/*
+ * The overlays' icons alone, on a layer of their own, for a character this
+ * file doesn't draw (Muse's own): render it each frame, then lay it over the
+ * scaled frame, as boopie_pixel_scale() blows it up.
+ */
+void boopie_overlay_layer_render(boopie_overlay_set_t overlays, const double overlay_t[BOOPIE_OVERLAY_COUNT]);
+void boopie_overlay_layer_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, int y1);

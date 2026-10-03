@@ -48,6 +48,10 @@ void boopie_avatar_set_colour(uint32_t rgb);
 void boopie_avatar_set_pet(boopie_expr_t expr);
 boopie_expr_t boopie_avatar_pet(void);
 
+/* A pet expression for a few seconds while idle, over the pet one: dizzy
+ * when shaken, eating when fed. */
+void boopie_avatar_react(boopie_expr_t expr, float seconds);
+
 /*
  * A reaction overlay on or off. LOW_BATTERY and CHARGING follow the battery
  * by themselves (muse_state_power), whatever is set here.
