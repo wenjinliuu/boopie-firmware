@@ -664,13 +664,10 @@ class Doubao(Rig):
 
 
 # ---------------------------------------------------------------- accessories
-# Worn in three slots each character marks where its head, eyes and neck are
-# ("slots" in draw()'s anchors): hat (bottom centre), eyes (centre, half the
-# gap between them), neck (centre, width). One item a slot.
+# Worn in the slots each character marks ("slots" in draw()'s anchors): hat
+# (bottom centre), eyes (centre, half the gap between them; none worn there
+# yet), neck (centre, width). One item a slot.
 HAT_SPRITES = {
-    "straw_hat": (["....######....", "...#yyyyyy#...", "...#yyyyyy#...", "..#rrrrrrrr#..",
-                   "##yyyyyyyyyy##", ".############."],
-                  {"#": (120, 82, 40), "y": (240, 200, 110), "r": (220, 70, 80)}),
     "bow": (["##.....##", "#pp#.#pp#", "#ppp#ppp#", "#pp#.#pp#", "##.....##"],
             {"#": (150, 40, 80), "p": (255, 120, 170)}),
     "party_hat": (["...w...", "..www..", "...#...", "..#p#..", "..#y#..", ".#ppp#.", ".#yyy#.", "#ppppp#", "#######"],
@@ -678,14 +675,9 @@ HAT_SPRITES = {
     "crown": (["g...g...g", "gg.ggg.gg", "ggggggggg", "grgggggbg", "ddddddddd"],
               {"g": (255, 210, 70), "d": (190, 130, 30), "r": (240, 60, 80), "b": (80, 170, 255)}),
 }
-NECK_SPRITES = {
-    "bow_tie": (["r.....r", "rr.k.rr", "rrrkrrr", "rr.k.rr", "r.....r"],
-                {"r": (220, 50, 70), "k": (120, 20, 40)}),
-}
 ACCESSORIES = {   # name: slot, Chinese name
-    "straw_hat": ("hat", "小草帽"), "bow": ("hat", "蝴蝶结"), "party_hat": ("hat", "生日帽"),
-    "crown": ("hat", "小皇冠"), "round_glasses": ("eyes", "圆眼镜"), "sunglasses": ("eyes", "墨镜"),
-    "scarf": ("neck", "红围巾"), "bow_tie": ("neck", "小领结"),
+    "bow": ("hat", "蝴蝶结"), "party_hat": ("hat", "生日帽"), "crown": ("hat", "小皇冠"),
+    "scarf": ("neck", "红围巾"),
 }
 
 
@@ -702,23 +694,6 @@ def wear(c: Canvas, name: str, slots: dict):
         rows, colours = HAT_SPRITES[name]
         hx, hy = slots["hat"]
         sprite(c, rows, colours, round(hx - len(rows[0]) / 2), round(hy) - len(rows) + 1)
-    elif slot == "eyes":
-        ex, ey, gap = slots["eyes"]
-        frame_c = (40, 30, 50) if name == "sunglasses" else (200, 150, 60)
-        for side in (-1, 1):
-            cx = round(ex + side * gap)
-            ring = [(-2, -2), (-1, -3), (0, -3), (1, -3), (2, -2), (3, -1), (3, 0), (3, 1), (2, 2), (1, 3), (0, 3),
-                    (-1, 3), (-2, 2), (-3, 1), (-3, 0), (-3, -1)]
-            if name == "sunglasses":
-                for dy in range(-2, 3):
-                    for dx in range(-2, 3):
-                        if abs(dx) + abs(dy) < 4:
-                            c.put(cx + dx, round(ey) + dy, (30, 30, 40))
-                c.put(cx - 1, round(ey) - 1, (150, 160, 190))
-            for dx, dy in ring:
-                c.put(cx + dx, round(ey) + dy, frame_c)
-        for x in range(round(ex - gap + 3), round(ex + gap - 2)):
-            c.put(x, round(ey) - 1, frame_c)
     elif name == "scarf":
         nx, ny, w = slots["neck"]
         red, dark = (230, 60, 70), (160, 30, 45)
@@ -728,10 +703,6 @@ def wear(c: Canvas, name: str, slots: dict):
         for dy in range(3, 8):   # the tail
             for dx in range(2):
                 c.put(nx + w / 4 + dx + (dy > 5), ny + dy, dark if dy == 7 else red)
-    else:
-        rows, colours = NECK_SPRITES[name]
-        nx, ny, _ = slots["neck"]
-        sprite(c, rows, colours, round(nx - len(rows[0]) / 2), round(ny) - 1)
 
 
 CHARACTERS = [Boopie, GPT, Codex, Klaude, Whale, Doubao]
