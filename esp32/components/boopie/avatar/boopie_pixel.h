@@ -75,14 +75,29 @@ void boopie_pixel_set_character(boopie_char_t c, uint32_t colour);
  * stars. Indexed 0 ... boopie_skin_count() - 1, in a fixed order (only ever
  * appended), so the index is what's kept of what's owned.
  */
+#define BOOPIE_SKIN_MUSE BOOPIE_CHAR_COUNT   /* boopie_skin_character() of Muse's own */
+
 int boopie_skin_count(void);
 const char *boopie_skin_key(int skin);          /* "boopie_starry" */
 const char *boopie_skin_name(int skin);         /* "星空" */
-boopie_char_t boopie_skin_character(int skin);  /* the character it's for */
+boopie_char_t boopie_skin_character(int skin);  /* the character it's for, or BOOPIE_SKIN_MUSE */
 int boopie_skin_price(int skin);                /* stars */
 bool boopie_skin_collector(int skin);           /* 典藏 */
 boopie_scene_t boopie_skin_scene(int skin);     /* the background it brings */
 int boopie_skin_from_key(const char *key);      /* or -1 */
+
+/*
+ * A Muse skin's colours, 0xRRGGBB, for Muse's own renderer (avatar/muse_pixel.c):
+ * its fur dark to highlight, outline and soft outline; and with face set, its
+ * face panel's shade, colour and light, and the eyes and mouth on it. False
+ * for a skin that isn't Muse's.
+ */
+typedef struct {
+    uint32_t fur[4], out, out2;
+    bool face;
+    uint32_t panel[3], features;
+} boopie_muse_colours_t;
+bool boopie_skin_muse_colours(int skin, boopie_muse_colours_t *out);
 
 /* Wear a skin (-1 for none) from the next boopie_pixel_set_character(); one
  * for another character is ignored. */

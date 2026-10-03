@@ -78,6 +78,7 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
  * stars (then wear it). False with *error set when it can't. A skin brings its
  * background while the background chosen is the default. */
 int boopie_avatar_skin(void);
+int boopie_avatar_of_skin(int skin);   /* the avatar it's for */
 bool boopie_avatar_owns(int skin);
 bool boopie_avatar_wear(int skin, const char **error);
 bool boopie_avatar_buy(int skin, const char **error);

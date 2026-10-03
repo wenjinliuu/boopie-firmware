@@ -3,6 +3,7 @@
 #include "muse_pixel.h"
 
 #include "boopie_expr.h"   /* Boopie: the pet expressions */
+#include "boopie_pixel.h"  /* Boopie: skins' colours */
 
 #include <math.h>
 #include <stdlib.h>
@@ -87,6 +88,8 @@ static int s_pet = BOOPIE_EXPR_IDLE;   /* a pet expression, or IDLE for none */
 static float s_pet_t;                  /* seconds in it */
 static bool s_blush, s_wide;           /* overlays: big blush, surprised eyes */
 static int s_pet_on;                   /* this frame's pet expression, or 0 */
+static boopie_muse_colours_t s_skin;   /* a skin's colours over the cream ones */
+static bool s_skin_on;
 
 void jolly_pixel_set_extra(int pet, float pet_t, bool blush, bool wide)
 {
@@ -94,6 +97,15 @@ void jolly_pixel_set_extra(int pet, float pet_t, bool blush, bool wide)
     s_pet_t = pet_t;
     s_blush = blush;
     s_wide = wide;
+}
+
+/* Boopie: a skin's colours, or NULL for Muse's own. */
+void jolly_pixel_set_colours(const boopie_muse_colours_t *c)
+{
+    s_skin_on = c != NULL;
+    if (c) {
+        s_skin = *c;
+    }
 }
 
 /* Cream fur and a peach face. */
@@ -231,6 +243,20 @@ static void update_palette(const scheme_t *target, float dt)
     rgb_t pal[C_COUNT];
     for (int i = 0; i < C_COUNT; i++) {
         pal[i] = hex_rgb(FIXED[i]);
+    }
+    if (s_skin_on) {   /* Boopie: a skin */
+        static const uint8_t FUR[4] = { C_BD, C_BM, C_BL, C_BH };
+        for (int i = 0; i < 4; i++) {
+            pal[FUR[i]] = hex_rgb(s_skin.fur[i]);
+        }
+        pal[C_OUT] = hex_rgb(s_skin.out);
+        pal[C_OUT2] = hex_rgb(s_skin.out2);
+        if (s_skin.face) {
+            pal[C_SKIND] = hex_rgb(s_skin.panel[0]);
+            pal[C_SKIN] = hex_rgb(s_skin.panel[1]);
+            pal[C_SKINL] = hex_rgb(s_skin.panel[2]);
+            pal[C_IRIS] = pal[C_MOUTH] = pal[C_BROW] = hex_rgb(s_skin.features);
+        }
     }
     rgb_t acc = s_scheme[4];
     pal[C_G0] = s_scheme[0];

@@ -1366,11 +1366,11 @@ static void tick_avatar(void)
     snprintf(line, sizeof line, "Lv %d  ·  %u/%u  ·  ★ %u", pet.level,
              (unsigned)pet.xp_into, (unsigned)pet.xp_need, (unsigned)pet.stars);
     set_text(s_pet_line, line);
-    /* Skins: this character's only; none yet for Muse's own. */
+    /* Skins: this character's only. */
     bool any = false;
     int worn = boopie_avatar_skin();
     for (int i = 0; i < boopie_skin_count() && i < SKIN_ROWS_MAX; i++) {
-        bool mine = (int)boopie_skin_character(i) + 1 == cur;
+        bool mine = boopie_avatar_of_skin(i) == cur;
         any |= mine;
         if (mine == lv_obj_has_flag(s_skin_rows[i], LV_OBJ_FLAG_HIDDEN)) {
             if (mine) {

@@ -1410,6 +1410,7 @@ static void blush(float fx, float fy, const pose_t *p, int dx_cheek, rgb_t colou
 
 typedef struct {
     float face_x, face_y, body_x, body_y, light_x, light_y;
+    float neck_x, neck_y;                  /* Doubao: where a scarf goes, for skins */
     bool show_face;
     bool has_screen;                       /* Codex: its screen, for skins */
     float screen_x0, screen_y0, screen_x1, screen_y1;
@@ -1421,6 +1422,8 @@ static rgb_t s_cheek = { 255, 122, 152 };
 static rgb_t s_codex_screen = { 30, 34, 84 };
 static rgb_t s_codex_glyph = { 120, 236, 240 };
 static bool s_glyph_follows_light = true;   /* the prompt takes the state light's colour */
+static bool s_klaude_eye_set;               /* a skin's eye colour for Klaude */
+static rgb_t s_whale_belly[2] = { { 214, 224, 255 }, { 240, 244, 255 } };   /* shade, light */
 
 typedef struct rig rig_t;
 struct rig {
@@ -1548,12 +1551,13 @@ static void draw_gpt(const rig_t *r, const pose_t *p, anchors_t *a)
     m_clear(bands);
     m_clear(holes);
     for (int y = 0; y < N; y++) {
-        int gy = (int)floorf(f_ry(&f, y) - (ky - n / 2.0f));
+        /* a hair over, as float misses exact boundaries the prototype's double hits */
+        int gy = (int)floorf(f_ry(&f, y) - (ky - n / 2.0f) + 1e-4f);
         if (gy < 0 || gy >= n) {
             continue;
         }
         for (int x = 0; x < N; x++) {
-            int gx = (int)floorf(f_rx(&f, x, y) - (kx - n / 2.0f));
+            int gx = (int)floorf(f_rx(&f, x, y) - (kx - n / 2.0f) + 1e-4f);
             if (gx >= 0 && gx < n) {
                 char ch = KNOT[gy][gx];
                 if (ch == '#') {
@@ -1716,6 +1720,9 @@ static void face_klaude(const rig_t *r, int fx, int fy, const pose_t *p)
     (void)r;
     bool white = p->light.r == 255 && p->light.g == 255 && p->light.b == 255;
     s_eye = p->has_light && !white ? mix(WHITE, p->light, 0.35) : (rgb_t){ 255, 246, 236 };
+    if (s_klaude_eye_set) {
+        s_eye = s_eye_base;
+    }
     s_has_shine = false;
     for (int side = -1; side <= 1; side += 2) {
         eye(fx + side * 7, fy, p, side, true);
@@ -1751,14 +1758,14 @@ static void draw_whale(const rig_t *r, const pose_t *p, anchors_t *a)
     ell(&f, cx, cy + 8, 10.5f, 6, belly);
     ell(&f, cx, cy, rx - 1.2f, ry - 1.2f, inner);
     m_and(belly, inner);
-    flat(belly, (rgb_t){ 240, 244, 255 });
+    flat(belly, s_whale_belly[1]);
     float bx, by;
     pt(&f, 0, cy + 10, &bx, &by);
     for (int y = 0; y < N; y++) {
         for (uint64_t row = belly[y]; row; row &= row - 1) {
             int x = __builtin_ctzll(row);
             if (bay(x, y) > 0.5f && y + 0.5f > by) {
-                s_img[y][x] = (rgb_t){ 214, 224, 255 };
+                s_img[y][x] = s_whale_belly[0];
             }
         }
     }
@@ -1837,6 +1844,7 @@ static void draw_doubao(const rig_t *r, const pose_t *p, anchors_t *a)
     pt(&f, 32, 30, &a->face_x, &a->face_y);
     pt(&f, 32, 44, &a->body_x, &a->body_y);
     pt(&f, 45, 16, &a->light_x, &a->light_y);
+    pt(&f, 32, 43, &a->neck_x, &a->neck_y);
     a->show_face = p->scale > 0.6f;
 }
 
@@ -1883,28 +1891,71 @@ uint32_t boopie_char_default_colour(boopie_char_t c)
 
 /* ---------------------------------------------------------------- skins */
 
-#define NO_COLOUR 0xffffffffu
-typedef enum { FX_BODY_NONE, FX_BODY_STARRY } body_fx_t;
+/* A skin's optional colour: SET(0xRRGGBB), or 0 for the character's own. */
+#define SET(rgb) (0x1000000u | (rgb))
+/* From here on only ever append: the index is what NVS keeps of what's owned. */
+typedef enum {
+    FX_BODY_NONE, FX_BODY_STARRY, FX_BODY_JELLY, FX_BODY_INK, FX_BODY_PORCELAIN, FX_BODY_CYBER, FX_BODY_NEON,
+    FX_BODY_ICE, FX_BODY_LAVA, FX_BODY_KOI, FX_BODY_GLOW_SPOTS, FX_BODY_WINTER,
+} body_fx_t;
 typedef enum { FX_FACE_NONE, FX_FACE_SCANLINES } face_fx_t;
+typedef enum { FX_BACK_NONE, FX_BACK_EMBERS } back_fx_t;
 
-/* Only ever append: the index is what NVS keeps of what's owned. */
 typedef struct {
     const char *key, *name;
-    boopie_char_t character;
-    bool collector;          /* 典藏 */
-    uint16_t price;          /* stars */
+    boopie_char_t character;  /* BOOPIE_SKIN_MUSE for Muse's own */
+    bool collector;           /* 典藏 */
+    uint16_t price;           /* stars */
     boopie_scene_t scene;
-    uint32_t colour, eye, cheek, glow, outline, screen, glyph;
-    bool glyph_fixed;        /* Codex's prompt stays its own colour */
+    uint32_t colour, eye, cheek, glow, outline;
+    uint32_t screen, glyph;   /* Codex */
+    bool glyph_fixed;         /* Codex's prompt stays its own colour */
+    uint32_t bands;           /* GPT's knot */
+    uint32_t belly[2];        /* the whale's, shade and light */
+    uint32_t hair, top;       /* Doubao */
+    uint32_t visor;           /* Muse: its face window */
     body_fx_t body_fx;
     face_fx_t face_fx;
+    back_fx_t back_fx;
 } skin_t;
 
+#define SKIN(k, n, c, coll, stars, sc, col) .key = k, .name = n, .character = c, .collector = coll, \
+    .price = stars, .scene = sc, .colour = col
+
+/* As the prototype's SKINS (tools/boopie/avatar_proto.py). */
 static const skin_t SKINS[] = {
-    { "boopie_starry", "星空", BOOPIE_CHAR_BOOPIE, true, 300, BOOPIE_SCENE_STARS,
-      0x3a2c8c, 0xececff, 0xd678d2, 0xffeca0, 0x9680ee, NO_COLOUR, NO_COLOUR, false, FX_BODY_STARRY, FX_FACE_NONE },
+    { SKIN("boopie_starry", "星空", BOOPIE_CHAR_BOOPIE, true, 300, BOOPIE_SCENE_STARS, 0x1f1856),
+      .eye = SET(0xececff), .cheek = SET(0xd678d2), .glow = SET(0xffeca0), .outline = SET(0x8c78ec), .body_fx = FX_BODY_STARRY },
+    { SKIN("boopie_jelly", "果冻", BOOPIE_CHAR_BOOPIE, false, 150, BOOPIE_SCENE_BUBBLES, 0x7fe6d4),
+      .cheek = SET(0xff8caa), .outline = SET(0x288c82), .body_fx = FX_BODY_JELLY },
+    { SKIN("muse_astronaut", "宇航员", BOOPIE_SKIN_MUSE, true, 300, BOOPIE_SCENE_STARS, 0xe8ecf2), .visor = SET(0x1d2b4a) },
+    { SKIN("muse_matcha", "抹茶", BOOPIE_SKIN_MUSE, false, 150, BOOPIE_SCENE_FIREFLIES, 0x8fbf6a) },
+    { SKIN("gpt_ink", "水墨", BOOPIE_CHAR_GPT, true, 300, BOOPIE_SCENE_DEFAULT, 0xdadada),
+      .cheek = SET(0xc87878), .bands = SET(0xc83a3a), .body_fx = FX_BODY_INK },
+    { SKIN("gpt_porcelain", "青花瓷", BOOPIE_CHAR_GPT, false, 150, BOOPIE_SCENE_PETALS, 0xf4f6fa),
+      .cheek = SET(0x96aae6), .bands = SET(0x3a5bb8), .body_fx = FX_BODY_PORCELAIN },
+    { SKIN("codex_neon", "霓虹", BOOPIE_CHAR_CODEX, true, 300, BOOPIE_SCENE_NEON_GRID, 0x120e24),
+      .cheek = SET(0xff3cc8), .outline = SET(0x00f0ff), .screen = SET(0x0a0014), .glyph = SET(0xff46d2), .glyph_fixed = true,
+      .body_fx = FX_BODY_NEON },
+    { SKIN("codex_glitch", "赛博故障", BOOPIE_CHAR_CODEX, false, 150, BOOPIE_SCENE_GLITCH, 0x5a3cf0),
+      .cheek = SET(0x00ffc8), .outline = SET(0x140a3c), .screen = SET(0x060614), .glyph = SET(0x00ffc8), .glyph_fixed = true,
+      .body_fx = FX_BODY_CYBER },
+    { SKIN("klaude_ice", "冰块", BOOPIE_CHAR_KLAUDE, true, 300, BOOPIE_SCENE_SNOW, 0xa9dcf2),
+      .eye = SET(0x285a8c), .cheek = SET(0x96c8f0), .outline = SET(0x468cbe), .body_fx = FX_BODY_ICE },
+    { SKIN("klaude_lava", "熔岩", BOOPIE_CHAR_KLAUDE, false, 150, BOOPIE_SCENE_DEFAULT, 0x1c1414),
+      .eye = SET(0xffec78), .cheek = SET(0xff5028), .outline = SET(0xbe1e14), .body_fx = FX_BODY_LAVA, .back_fx = FX_BACK_EMBERS },
+    { SKIN("whale_koi", "锦鲤", BOOPIE_CHAR_WHALE, true, 300, BOOPIE_SCENE_BUBBLES, 0xf6f2ec),
+      .outline = SET(0x964632), .belly = { SET(0xece6de), SET(0xfaf8f4) }, .body_fx = FX_BODY_KOI },
+    { SKIN("whale_deepsea", "深海", BOOPIE_CHAR_WHALE, false, 150, BOOPIE_SCENE_FIREFLIES, 0x16285e),
+      .eye = SET(0xdcffff), .outline = SET(0x3cb4dc), .glow = SET(0x50f0ff), .belly = { SET(0x1e3468), SET(0x284886) },
+      .body_fx = FX_BODY_GLOW_SPOTS },
+    { SKIN("doubao_sakura", "樱花", BOOPIE_CHAR_DOUBAO, false, 150, BOOPIE_SCENE_PETALS, 0xf2c9b4),
+      .glow = SET(0xffa0c8), .hair = SET(0xd9809e), .top = SET(0xf6c6d6) },
+    { SKIN("doubao_winter", "冬装", BOOPIE_CHAR_DOUBAO, true, 300, BOOPIE_SCENE_SNOW, 0xf2c9b4),
+      .top = SET(0xe6d9bf), .body_fx = FX_BODY_WINTER },
 };
 #define SKIN_COUNT (int)(sizeof(SKINS) / sizeof(SKINS[0]))
+_Static_assert(SKIN_COUNT <= 32, "NVS keeps what's owned in a u32");
 
 static int s_skin = -1;
 
@@ -1958,40 +2009,320 @@ int boopie_skin_from_key(const char *key)
     return -1;
 }
 
-/* A nebula, then stars twinkling inside the body, a few with a cross (the
- * prototype's skin_body). */
+static inline bool inb(int x, int y)
+{
+    return x >= 0 && x < N && y >= 0 && y < N && m_get(s_body, x, y);
+}
+
+static inline float bayf(int x, int y)
+{
+    return BAYER[y % 4][x % 4];
+}
+
+static rgb_t rgbf(uint8_t r, uint8_t g, uint8_t b)
+{
+    return (rgb_t){ r, g, b };
+}
+
+/* The patterns over the body, as the prototype's skin_body. */
 static void skin_body(const skin_t *sk, const pose_t *pose, const anchors_t *a)
 {
+    const double bx = a->body_x, by = a->body_y, t = pose->scene_t;   /* runs on, as the background */
+    switch (sk->body_fx) {
+    case FX_BODY_JELLY:     /* a glossy highlight and bubbles rising inside */
+        for (int y = 0; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                double u = (x - bx + 8) / 6, v = (y - by + 8) / 3.5;
+                if (inb(x, y) && u * u + v * v <= 1 && bayf(x, y) < 0.7) {
+                    put(x, y, rgbf(225, 255, 250));
+                }
+            }
+        }
+        for (int i = 0; i < 6; i++) {
+            double k = pymodd(t * (0.15 + h01(2, i, 3, 0) * 0.2) + h01(2, i, 1, 0), 1);
+            int x = (int)rint(bx + (h01(2, i, 2, 0) - 0.5) * 22), y = (int)rint(by + 10 - k * 22);
+            if (inb(x, y)) {
+                put(x, y, rgbf(200, 255, 245));
+            }
+        }
+        break;
+    case FX_BODY_INK:       /* ink pooling in the lower body, a few drops */
+        for (int y = 0; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                if (!inb(x, y)) {
+                    continue;
+                }
+                double d = (y - by) / 14 + (h01(3, x / 3, y / 3, 5) - 0.5) * 0.5;
+                if (d > 0.2 && bayf(x, y) < d) {
+                    put(x, y, mix(rgbf(150, 150, 150), rgbf(40, 40, 44), d < 1 ? d : 1));
+                }
+            }
+        }
+        for (int i = 0; i < 4; i++) {
+            int x = (int)rint(bx + (h01(2, i, 6, 0) - 0.5) * 24), y = (int)rint(by + (h01(2, i, 7, 0) - 0.8) * 16);
+            if (inb(x, y)) {
+                put(x, y, rgbf(30, 30, 34));
+            }
+        }
+        break;
+    case FX_BODY_PORCELAIN: /* a blue band and little blue flowers */
+        for (int y = 0; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                if (inb(x, y) && 7 <= y - by && y - by <= 9 + (x % 4 == 0)) {
+                    put(x, y, rgbf(50, 80, 180));
+                }
+            }
+        }
+        for (int i = 0; i < 5; i++) {
+            int x = (int)rint(bx + (h01(2, i, 8, 0) - 0.5) * 22), y = (int)rint(by + (h01(2, i, 9, 0) - 0.9) * 12);
+            static const int8_t D[5][2] = { { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+            for (int k = 0; k < 5; k++) {
+                if (inb(x + D[k][0], y + D[k][1])) {
+                    put(x + D[k][0], y + D[k][1], k ? rgbf(70, 100, 200) : rgbf(220, 230, 250));
+                }
+            }
+        }
+        break;
+    case FX_BODY_CYBER:     /* cyan lines across the body, magenta specks */
+        for (int y = 0; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                if (!inb(x, y)) {
+                    continue;
+                }
+                if ((y + (int)(t * 6)) % 4 == 0) {
+                    put(x, y, rgbf(0, 230, 210));
+                } else if (h01(3, x, y, (int)(t * 4)) > 0.97) {
+                    put(x, y, rgbf(255, 40, 180));
+                }
+            }
+        }
+        break;
+    case FX_BODY_NEON: {    /* a magenta tube inside the cyan one, and a glow outside */
+        static const int8_t D1[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        static const int8_t D2[4][2] = { { 2, 0 }, { -2, 0 }, { 0, 2 }, { 0, -2 } };
+        static const int8_t NX[4] = { -3, -2, 2, 3 }, NY[5] = { -3, -2, 0, 2, 3 };
+        for (int y = 0; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                if (inb(x, y)) {
+                    bool inner = true, edge1 = true;
+                    for (int k = 0; k < 4; k++) {
+                        inner &= inb(x + D2[k][0], y + D2[k][1]);
+                        edge1 &= inb(x + D1[k][0], y + D1[k][1]);
+                    }
+                    if (edge1 && !inner) {
+                        put(x, y, rgbf(255, 60, 200));
+                    }
+                } else {
+                    bool near = false, touch = false;
+                    for (int i = 0; i < 4 && !near; i++) {
+                        for (int j = 0; j < 5 && !near; j++) {
+                            near = inb(x + NX[i], y + NY[j]);
+                        }
+                    }
+                    for (int k = 0; k < 4; k++) {
+                        touch |= inb(x + D1[k][0], y + D1[k][1]);
+                    }
+                    if (near && !touch && bayf(x, y) < 0.35) {
+                        put(x, y, rgbf(0, 90, 110));
+                    }
+                }
+            }
+        }
+        break;
+    }
+    case FX_BODY_ICE: {     /* a shine across it, frost at the edges, a crack */
+        for (int y = 0; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                if (!inb(x, y)) {
+                    continue;
+                }
+                double d = (x - bx) + (y - by);
+                if (-14 <= d && d <= -11 && bayf(x, y) < 0.8) {
+                    put(x, y, rgbf(240, 252, 255));
+                }
+                bool edge = !(inb(x - 2, y) && inb(x + 2, y) && inb(x, y - 2) && inb(x, y + 2));
+                if (edge && bayf(x, y) < 0.5) {
+                    put(x, y, rgbf(225, 245, 255));
+                }
+            }
+        }
+        int x = (int)rint(bx + 6), y = (int)rint(by - 6);
+        for (int k = 0; k < 7; k++) {
+            x += k % 2 ? 1 : 0;
+            y += 1;
+            if (inb(x, y)) {
+                put(x, y, rgbf(250, 255, 255));
+            }
+        }
+        break;
+    }
+    case FX_BODY_LAVA: {    /* cooled black plates, molten red seams between them, pulsing */
+        double sx[7], sy[7];
+        for (int i = 0; i < 7; i++) {
+            sx[i] = bx + (h01(2, i, 30, 0) - 0.5) * 30;
+            sy[i] = by + (h01(2, i, 31, 0) - 0.5) * 22;
+        }
+        for (int y = 0; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                if (!inb(x, y) || (fabs(x - a->face_x) < 11 && fabs(y - a->face_y) < 4)) {
+                    continue;   /* the rock stays dark round the eyes, so they glow */
+                }
+                double d0 = 1e9, d1 = 1e9;
+                for (int i = 0; i < 7; i++) {
+                    double d = hypot(x - sx[i], y - sy[i]);
+                    if (d < d0) {
+                        d1 = d0;
+                        d0 = d;
+                    } else if (d < d1) {
+                        d1 = d;
+                    }
+                }
+                double gap = d1 - d0, heat = 0.75 + 0.25 * sin(t * 2.5 + (x + y) * 0.3);
+                if (gap < 0.7) {
+                    put(x, y, mix(rgbf(210, 30, 10), rgbf(255, 210, 60), heat));
+                } else if (gap < 1.6 && bayf(x, y) < 0.55) {
+                    put(x, y, mix(rgbf(90, 10, 5), rgbf(190, 35, 12), heat));
+                }
+            }
+        }
+        break;
+    }
+    case FX_BODY_KOI:       /* red-orange patches */
+        for (int i = 0; i < 4; i++) {
+            double px = bx + (h01(2, i, 12, 0) - 0.5) * 24, py = by + (h01(2, i, 13, 0) - 0.7) * 16;
+            double rx = 4 + h01(2, i, 14, 0) * 4, ry = 3 + h01(2, i, 15, 0) * 3;
+            for (int y = 0; y < N; y++) {
+                for (int x = 0; x < N; x++) {
+                    double u = (x - px) / rx, v = (y - py) / ry;
+                    if (inb(x, y) && u * u + v * v <= 1) {
+                        put(x, y, bayf(x, y) > 0.2 ? rgbf(238, 92, 50) : rgbf(250, 140, 90));
+                    }
+                }
+            }
+        }
+        break;
+    case FX_BODY_GLOW_SPOTS: /* glowing spots, pulsing */
+        for (int i = 0; i < 9; i++) {
+            int x = (int)rint(bx + (h01(2, i, 16, 0) - 0.5) * 28), y = (int)rint(by + (h01(2, i, 17, 0) - 0.7) * 18);
+            double g = 0.5 + 0.5 * sin(t * 2 + i);
+            if (inb(x, y)) {
+                put(x, y, mix(rgbf(40, 90, 140), rgbf(120, 255, 255), g));
+            }
+        }
+        break;
+    case FX_BODY_WINTER: {  /* a cable-knit jumper and a red scarf */
+        double nx = a->neck_x, ny = a->neck_y;
+        const rgb_t knit[6] = { s_rp3.out, s_rp3.dark, s_rp3.mid, s_rp3.light, s_rp3.high, s_rp3.glow };
+        for (int y = (int)rint(ny) + 2; y < N; y++) {
+            for (int x = 0; x < N; x++) {
+                if (!inb(x, y) || !(x % 3 == 0 || (x % 3 == 1 && y % 2))) {
+                    continue;
+                }
+                rgb_t c = s_img[y][x];
+                for (int k = 0; k < 6; k++) {
+                    if (c.r == knit[k].r && c.g == knit[k].g && c.b == knit[k].b) {
+                        put(x, y, rgbf(200, 186, 158));
+                        break;
+                    }
+                }
+            }
+        }
+        const rgb_t red = { 230, 50, 60 }, dark = { 165, 25, 40 };
+        for (int dy = -2; dy < 2; dy++) {      /* a thick red scarf */
+            for (int dx = -10; dx <= 10; dx++) {
+                putd(nx + dx, ny + dy, pymod(dx + dy, 4) == 0 ? dark : red);
+            }
+        }
+        for (int dy = 2; dy < 9; dy++) {       /* its end, hanging */
+            for (int dx = 4; dx <= 6; dx++) {
+                putd(nx + dx + (dy > 6), ny + dy, dy == 8 || dx == 6 ? dark : red);
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
     if (sk->body_fx != FX_BODY_STARRY) {
         return;
     }
+    /* A galaxy: deeper at the top, a milky band, stars of every size, a little
+     * dipper, a crescent-moon bulb. */
     for (int y = 0; y < N; y++) {
-        for (uint64_t row = s_body[y]; row; row &= row - 1) {
-            int x = __builtin_ctzll(row);
-            double n = h01(3, x / 4, y / 3, 23) * 0.6 + 0.4 * sin((x - a->body_x) * 0.35 + (y - a->body_y) * 0.25);
-            if (n > 0.55 && BAYER[y % 4][x % 4] < n - 0.3) {
-                put(x, y, (x / 4 + y / 3) % 2 ? (rgb_t){ 120, 70, 190 } : (rgb_t){ 70, 100, 210 });
+        for (int x = 0; x < N; x++) {
+            if (!inb(x, y)) {
+                continue;
+            }
+            double k = (y - by) / 10;
+            if (k < -0.4 && bayf(x, y) < -k - 0.3) {
+                put(x, y, rgbf(18, 14, 52));
+            }
+            double band = fabs((x - bx) * 0.55 + (y - by) * 0.9 - 2);
+            if (band < 4.5) {
+                double w = 1 - band / 4.5;
+                if (bayf(x, y) < w * 0.9) {
+                    put(x, y, h01(3, x, y, 40) > 0.5 ? rgbf(150, 90, 210) : rgbf(90, 120, 230));
+                }
+                if (w > 0.5 && h01(3, x, y, 41) > 0.9) {
+                    put(x, y, rgbf(240, 230, 255));
+                }
             }
         }
     }
-    for (int i = 0; i < 18; i++) {
-        int x = (int)rint(a->body_x + (h01(2, i, 7, 0) - 0.5) * 28);
-        int y = (int)rint(a->body_y + (h01(2, i, 8, 0) - 0.5) * 22);
-        if (x < 0 || x >= N || y < 0 || y >= N || !m_get(s_body, x, y)) {
+    static const rgb_t TINT[3] = { { 255, 250, 230 }, { 200, 230, 255 }, { 255, 220, 240 } };
+    for (int i = 0; i < 16; i++) {
+        int x = (int)rint(bx + (h01(2, i, 7, 0) - 0.5) * 30), y = (int)rint(by + (h01(2, i, 8, 0) - 0.5) * 24);
+        if (!inb(x, y)) {
             continue;
         }
-        double tw = 0.5 + 0.5 * sin(pose->t * (1 + h01(2, i, 9, 0) * 2) + i * 1.3);
-        if (tw > 0.3) {
-            put(x, y, mix((rgb_t){ 80, 80, 150 }, (rgb_t){ 255, 250, 220 }, tw));
-        }
-        if (tw > 0.85 && i % 4 == 0) {
+        double tw = 0.5 + 0.5 * sin(t * (1 + h01(2, i, 9, 0) * 2) + i * 1.3);
+        rgb_t col = TINT[i % 3];
+        put(x, y, mix(rgbf(70, 60, 140), col, tw));
+        if (i < 3 && tw > 0.4) {   /* three bright ones, four-pointed */
             static const int8_t D[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
             for (int k = 0; k < 4; k++) {
-                int xx = x + D[k][0], yy = y + D[k][1];
-                if (xx >= 0 && xx < N && yy >= 0 && yy < N && m_get(s_body, xx, yy)) {
-                    put(xx, yy, (rgb_t){ 150, 150, 220 });
+                if (inb(x + D[k][0], y + D[k][1])) {
+                    put(x + D[k][0], y + D[k][1], mix(rgbf(90, 80, 170), col, tw * 0.8));
                 }
             }
+        }
+    }
+    const double st[4][2] = { { bx - 9, by - 3 }, { bx - 5, by - 6 }, { bx + 1, by - 5 }, { bx + 5, by - 8 } };
+    for (int i = 0; i < 3; i++) {
+        for (int k = 1; k < 8; k++) {
+            int x = (int)rint(st[i][0] + (st[i + 1][0] - st[i][0]) * k / 8);
+            int y = (int)rint(st[i][1] + (st[i + 1][1] - st[i][1]) * k / 8);
+            if (inb(x, y) && k % 2) {
+                put(x, y, rgbf(110, 100, 190));
+            }
+        }
+    }
+    for (int i = 0; i < 4; i++) {
+        if (inb((int)rint(st[i][0]), (int)rint(st[i][1]))) {
+            putd(st[i][0], st[i][1], rgbf(255, 255, 255));
+        }
+    }
+    for (int dy = -3; dy < 4; dy++) {
+        for (int dx = -3; dx < 4; dx++) {
+            if ((dx - 1.2) * (dx - 1.2) + (dy + 1.0) * (dy + 1.0) <= 4.2 && dx * dx + dy * dy <= 6.5) {
+                putd(a->light_x + dx, a->light_y + dy, rgbf(12, 10, 30));
+            }
+        }
+    }
+}
+
+/* Behind the character, over the background: embers rising off the lava. */
+static void skin_back(const skin_t *sk, double t)
+{
+    if (sk->back_fx != FX_BACK_EMBERS) {
+        return;
+    }
+    for (int i = 0; i < 14; i++) {
+        double k = pymodd(t * (0.25 + h01(2, i, 50, 0) * 0.3) + h01(2, i, 51, 0), 1);
+        double x = h01(2, i, 52, 0) * 64 + sin(t * 2 + i) * 2, y = 62 - k * 62;
+        putd(x, y, mix(rgbf(255, 200, 60), rgbf(120, 20, 10), k));
+        if (k < 0.3) {
+            putd(x, y + 1, mix(rgbf(200, 60, 20), rgbf(80, 10, 5), k * 3));
         }
     }
 }
@@ -2027,27 +2358,63 @@ static void apply_colours(boopie_char_t c, uint32_t colour)
     s_codex_screen = (rgb_t){ 30, 34, 84 };
     s_codex_glyph = (rgb_t){ 120, 236, 240 };
     s_glyph_follows_light = true;
+    s_klaude_eye_set = false;
+    s_whale_belly[0] = (rgb_t){ 214, 224, 255 };
+    s_whale_belly[1] = (rgb_t){ 240, 244, 255 };
     if (sk) {
-        if (sk->glow != NO_COLOUR) {
+        s_klaude_eye_set = sk->eye != 0;
+        if (sk->belly[0]) {
+            s_whale_belly[0] = hex(sk->belly[0]);
+            s_whale_belly[1] = hex(sk->belly[1]);
+        }
+        if (sk->glow) {
             s_rp.glow = hex(sk->glow);
         }
-        if (sk->outline != NO_COLOUR) {
+        if (sk->outline) {
             s_rp.out = hex(sk->outline);
         }
-        if (sk->eye != NO_COLOUR) {
+        if (sk->eye) {
             s_eye_base = hex(sk->eye);
         }
-        if (sk->cheek != NO_COLOUR) {
+        if (sk->cheek) {
             s_cheek = hex(sk->cheek);
         }
-        if (sk->screen != NO_COLOUR) {
+        if (sk->screen) {
             s_codex_screen = hex(sk->screen);
         }
-        if (sk->glyph != NO_COLOUR) {
+        if (sk->glyph) {
             s_codex_glyph = hex(sk->glyph);
         }
         s_glyph_follows_light = !sk->glyph_fixed;
     }
+}
+
+static uint32_t rgb_hex(rgb_t c)
+{
+    return (uint32_t)c.r << 16 | (uint32_t)c.g << 8 | c.b;
+}
+
+bool boopie_skin_muse_colours(int skin, boopie_muse_colours_t *out)
+{
+    const skin_t *sk = skin_at(skin);
+    if (!sk || sk->character != BOOPIE_SKIN_MUSE) {
+        return false;
+    }
+    ramp_t r = ramp(sk->colour);
+    *out = (boopie_muse_colours_t){
+        .fur = { rgb_hex(r.dark), rgb_hex(r.mid), rgb_hex(r.light), rgb_hex(r.high) },
+        .out = rgb_hex(r.out),
+        .out2 = rgb_hex(mix(r.out, r.dark, 0.5)),
+        .face = sk->visor != 0,
+    };
+    if (sk->visor) {   /* a dark visor, the face lit on it */
+        ramp_t v = ramp(sk->visor & 0xffffff);
+        out->panel[0] = rgb_hex(v.dark);
+        out->panel[1] = rgb_hex(v.mid);
+        out->panel[2] = rgb_hex(v.light);
+        out->features = 0xe6f5ff;
+    }
+    return true;
 }
 
 void boopie_pixel_set_skin(int skin)
@@ -2063,14 +2430,18 @@ void boopie_pixel_set_character(boopie_char_t c, uint32_t colour)
     s_char = c;
     s_char_set = true;
     apply_colours(c, colour);
+    const skin_t *sk = skin_at(s_skin);
+    if (sk && sk->character != c) {
+        sk = NULL;
+    }
     s_rp2 = s_rp3 = s_rp;
     if (c == BOOPIE_CHAR_GPT) {
         s_rp.out = GPT_INK;
-        s_rp2 = ramp(0xf6f6f6);
+        s_rp2 = ramp(sk && sk->bands ? sk->bands & 0xffffff : 0xf6f6f6);   /* the knot */
         s_rp2.out = GPT_INK;
     } else if (c == BOOPIE_CHAR_DOUBAO) {
-        s_rp2 = ramp(0x6b4a3e);   /* hair */
-        s_rp3 = ramp(0x3a3a44);   /* top */
+        s_rp2 = ramp(sk && sk->hair ? sk->hair & 0xffffff : 0x6b4a3e);
+        s_rp3 = ramp(sk && sk->top ? sk->top & 0xffffff : 0x3a3a44);
     }
 }
 
@@ -2177,15 +2548,18 @@ static void render(const rig_t *rig, const pose_t *pose)
         }
     }
     scene_back(pose->scene, pose->scene_t);
+    const skin_t *sk = skin_at(s_skin);
+    if (sk && sk->character != s_char) {
+        sk = NULL;
+    }
+    if (sk) {
+        skin_back(sk, pose->scene_t);
+    }
     sparkles(32, 40, t, pose->sparkle_speed, false, acc);
     s_has_rim = true;
     s_rim = mix(acc, WHITE, 0.2);
     anchors_t an = { 0 };
     rig->draw(rig, pose, &an);
-    const skin_t *sk = skin_at(s_skin);
-    if (sk && sk->character != s_char) {
-        sk = NULL;
-    }
     if (sk) {
         skin_body(sk, pose, &an);
     }

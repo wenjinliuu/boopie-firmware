@@ -112,9 +112,10 @@ class BoopiePixelTest(unittest.TestCase):
                 self.compare(jobs, scene)
 
     def test_skins(self) -> None:
-        # Drafts are designs still under review, not in the firmware yet.
-        done = [k for k, sk in ap.SKINS.items() if not sk.draft]
-        self.assertEqual(done, [])   # all in review; the firmware keeps its earlier starry until then
+        # Drafts are designs still under review, not in the firmware yet; Muse's
+        # are drawn by Muse's own renderer, so aren't compared here.
+        done = [k for k, sk in ap.SKINS.items() if not sk.draft and sk.rig != "muse"]
+        self.assertEqual(len(done), 12)
         rigs = {R.key: R for R in ap.CHARACTERS}
         for key in done:
             skin = ap.SKINS[key]

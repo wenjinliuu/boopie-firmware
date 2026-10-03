@@ -112,19 +112,22 @@ def render_scenes(binary: Path, out: Path) -> list[Path]:
                 for avatar in ("muse", "boopie") for scene in SCENES]
 
 
-SKINS = [("boopie", "boopie_starry")]
+SKINS = [("boopie", "boopie_starry"), ("boopie", "boopie_jelly"), ("muse", "muse_astronaut"),
+         ("muse", "muse_matcha"), ("gpt", "gpt_ink"), ("gpt", "gpt_porcelain"), ("codex", "codex_neon"),
+         ("codex", "codex_glitch"), ("klaude", "klaude_ice"), ("klaude", "klaude_lava"), ("whale", "whale_koi"),
+         ("whale", "whale_deepsea"), ("doubao", "doubao_sakura"), ("doubao", "doubao_winter")]
+SKIN_STATES = [s for s in AVATAR_STATES if s[0] in ("idle", "thinking", "speaking", "happy")]
 
 
 def render_skins(binary: Path, out: Path) -> list[Path]:
-    """Each skin, and its character without it, in a few states."""
+    """Each skin in a few states (the characters without one are in avatars.png)."""
     pngs = []
     with tempfile.TemporaryDirectory() as tmp:
         for avatar, skin in SKINS:
-            for name, face, extra, advance in AVATAR_STATES:
-                for worn in (None, skin):
-                    env = {"BOOPIE_AVATAR": avatar, **({"BOOPIE_SKIN": worn} if worn else {})}
-                    pngs.append(shoot(binary, Path(tmp), out / f"skin-{worn or avatar}-{name}.png",
-                                      [f"face={face}", *extra], env, advance))
+            for name, face, extra, advance in SKIN_STATES:
+                env = {"BOOPIE_AVATAR": avatar, "BOOPIE_SKIN": skin}
+                pngs.append(shoot(binary, Path(tmp), out / f"skin-{skin}-{name}.png",
+                                  [f"face={face}", *extra], env, advance))
     return pngs
 
 
@@ -165,7 +168,7 @@ def main() -> int:
     scenes = render_scenes(args.binary, args.out)
     contact_sheet(scenes, args.out / "scenes.png", cols=len(SCENES))
     skins = render_skins(args.binary, args.out)
-    contact_sheet(skins, args.out / "skins.png", cols=4)
+    contact_sheet(skins, args.out / "skins.png", cols=len(SKIN_STATES) * 2)
     print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes) + len(skins)} screenshots in {args.out}",
           file=sys.stderr)
     return 0

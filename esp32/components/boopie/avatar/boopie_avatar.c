@@ -48,6 +48,12 @@ __attribute__((weak)) void jolly_pixel_set_extra(int pet, float pet_t, bool blus
     (void)wide;
 }
 
+/* A Muse skin's colours (NULL for its own); a custom avatar ignores them. */
+__attribute__((weak)) void jolly_pixel_set_colours(const boopie_muse_colours_t *c)
+{
+    (void)c;
+}
+
 /* Its frame, to compose the background and overlays over; a custom avatar
  * without it is shown as it draws itself. */
 __attribute__((weak)) bool jolly_pixel_frame(const uint8_t **fb, const uint16_t **palette, uint32_t *bg_mask)
@@ -157,10 +163,16 @@ bool boopie_avatar_owns(int skin)
     return skin >= 0 && skin < boopie_skin_count() && (s_owned >> skin & 1u);
 }
 
+int boopie_avatar_of_skin(int skin)
+{
+    boopie_char_t c = boopie_skin_character(skin);
+    return c == BOOPIE_SKIN_MUSE ? BOOPIE_AVATAR_MUSE : (int)c + 1;
+}
+
 bool boopie_avatar_wear(int skin, const char **error)
 {
     ensure_loaded();
-    if (skin >= 0 && (int)boopie_skin_character(skin) + 1 != s_avatar) {
+    if (skin >= 0 && boopie_avatar_of_skin(skin) != s_avatar) {
         *error = "that skin is for another character";
         return false;
     }
@@ -190,7 +202,7 @@ bool boopie_avatar_buy(int skin, const char **error)
         s_pet_state.stars -= price;
         s_owned |= 1u << skin;
     }
-    s_worn[boopie_skin_character(skin) + 1] = skin;
+    s_worn[boopie_avatar_of_skin(skin)] = skin;
     apply();
     save();
     return true;
@@ -199,7 +211,7 @@ bool boopie_avatar_buy(int skin, const char **error)
 /* The background shown: the one chosen, else the worn skin's own. */
 static boopie_scene_t shown_scene(void)
 {
-    if (s_scene == BOOPIE_SCENE_DEFAULT && s_avatar != BOOPIE_AVATAR_MUSE && s_worn[s_avatar] >= 0) {
+    if (s_scene == BOOPIE_SCENE_DEFAULT && s_worn[s_avatar] >= 0) {
         return boopie_skin_scene(s_worn[s_avatar]);
     }
     return s_scene;
@@ -215,7 +227,10 @@ static void apply(void)
     if (s_avatar != BOOPIE_AVATAR_MUSE) {
         boopie_pixel_set_skin(s_worn[s_avatar]);
         boopie_pixel_set_character((boopie_char_t)(s_avatar - 1), s_colour[s_avatar]);
+        return;
     }
+    boopie_muse_colours_t c;
+    jolly_pixel_set_colours(s_worn[s_avatar] >= 0 && boopie_skin_muse_colours(s_worn[s_avatar], &c) ? &c : NULL);
 }
 
 /* ---- keeping the choice ---- */
@@ -317,7 +332,7 @@ static void load(void)
     int skin = boopie_skin_from_key(getenv("BOOPIE_SKIN"));
     if (skin >= 0) {   /* owned and worn by its character */
         s_owned |= 1u << skin;
-        s_worn[boopie_skin_character(skin) + 1] = skin;
+        s_worn[boopie_avatar_of_skin(skin)] = skin;
     }
     int sc = scene_from_key(getenv("BOOPIE_SCENE"));
     if (sc >= 0) {
@@ -492,8 +507,8 @@ bool boopie_avatar_command(const char *avatar, const char *colour, const char *p
     if (sc >= 0) {
         boopie_avatar_set_scene((boopie_scene_t)sc);
     }
-    if (sk >= 0 && (int)boopie_skin_character(sk) + 1 != boopie_avatar_current()) {
-        boopie_avatar_select((int)boopie_skin_character(sk) + 1);   /* wearing it means showing that character */
+    if (sk >= 0 && boopie_avatar_of_skin(sk) != boopie_avatar_current()) {
+        boopie_avatar_select(boopie_avatar_of_skin(sk));   /* wearing it means showing that character */
     }
     if (sk != -2) {
         return boopie_avatar_wear(sk, error);
