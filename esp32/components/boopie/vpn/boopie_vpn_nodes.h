@@ -16,8 +16,8 @@
  *     or the older ss://base64(method:password@host:port)#name;
  *   - the same lines base64-encoded as a whole (most subscriptions);
  *   - Clash's YAML, its `proxies:` of `type: ss`.
- * Nodes with a cipher Boopie lacks (2022-*, stream ciphers) are kept, marked
- * so the list can say so. Plain C: the host tests run it.
+ * Nodes with a cipher Boopie lacks (the old stream ciphers, 2022's chacha8)
+ * or a 2022 key that doesn't decode are kept, marked so the list can say so. Plain C: the host tests run it.
  */
 
 #define BOOPIE_VPN_NAME_MAX 48

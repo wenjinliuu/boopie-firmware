@@ -19,6 +19,7 @@ set(srcs
     "font/boopie_pixel_font.c"
     "font/boopie_pixel_glyphs.c"
     "setup/boopie_sdk_token.c"
+    "vpn/boopie_blake3.c"
     "vpn/boopie_ss.c"
     "vpn/boopie_vpn_nodes.c")
 set(embed)

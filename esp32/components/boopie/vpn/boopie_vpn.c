@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
@@ -292,9 +293,18 @@ static bool open_tunnel(conn_t *c, const char *host)
     int kl = boopie_ss_key_len(c->cipher);
     uint8_t salt[BOOPIE_SS_KEY_MAX];
     esp_fill_random(salt, kl);
+    bool is2022 = boopie_ss_is_2022(c->cipher);
+    uint8_t keys[BOOPIE_SS_2022_KEYS_MAX][BOOPIE_SS_KEY_MAX];
+    int nkeys = is2022 ? boopie_ss_2022_keys(c->cipher, node.password, keys, BOOPIE_SS_2022_KEYS_MAX) : 0;
     bool ok = boopie_ss_password_key(c->cipher, node.password, c->key) && boopie_ss_aead_init(&c->up, c->cipher, c->key, salt);
     memset(node.password, 0, sizeof node.password);
-    if (!ok) {
+    if (!ok || (is2022 && !nkeys)) {
+        memset(keys, 0, sizeof keys);
+        return false;
+    }
+    if (is2022 && time(NULL) < 1700000000) {
+        ESP_LOGW(TAG, "2022 nodes need the time, and the clock isn't set yet");
+        memset(keys, 0, sizeof keys);
         return false;
     }
     c->sfd = dial(node.host, node.port, CONNECT_TIMEOUT_MS);
@@ -302,19 +312,32 @@ static bool open_tunnel(conn_t *c, const char *host)
         ESP_LOGW(TAG, "can't reach the node %s", node.name);
         return false;
     }
-    /* The address and the hello in one chunk: what the node sees first. */
+    /* The address and the hello together: what the node sees first. */
     uint8_t *first = c->buf;   /* plaintext here, sealed after it */
     size_t an = boopie_ss_address(host, RELAY_PORT, first);
     if (!an || an + c->hello_n > BOOPIE_SS_PAYLOAD_MAX) {
+        memset(keys, 0, sizeof keys);
         return false;
     }
     memcpy(first + an, c->hello, c->hello_n);
-    uint8_t *sealed = heap_caps_malloc(BOOPIE_SS_CHUNK_MAX + BOOPIE_SS_KEY_MAX, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t *sealed = heap_caps_malloc(BOOPIE_SS_CHUNK_MAX + BOOPIE_SS_KEY_MAX + 1024, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!sealed) {
+        memset(keys, 0, sizeof keys);
         return false;
     }
     memcpy(sealed, salt, kl);
-    size_t m = boopie_ss_seal(&c->up, first, an + c->hello_n, sealed + kl);
+    size_t m;
+    if (is2022) {
+        /* The request's headers carry the address and the hello; the reply
+         * must echo this salt, within half a minute of now. */
+        uint64_t now = (uint64_t)time(NULL);
+        m = boopie_ss_2022_request(&c->up, (const uint8_t (*)[BOOPIE_SS_KEY_MAX])keys, nkeys, salt, now, first, an,
+                                   c->hello, c->hello_n, sealed + kl);
+        boopie_ss_decoder_expect_2022(c->down, salt, now);
+    } else {
+        m = boopie_ss_seal(&c->up, first, an + c->hello_n, sealed + kl);
+    }
+    memset(keys, 0, sizeof keys);
     ok = m && send_all(c->sfd, sealed, kl + m);
     free(sealed);
     free(c->hello);
@@ -363,8 +386,13 @@ static bool from_server(conn_t *c)
         memcpy(c->salt_in + c->salt_have, in, take);
         c->salt_have += take;
         off = take;
-        if (c->salt_have == (size_t)kl && !boopie_ss_aead_init(&c->down->aead, c->cipher, c->key, c->salt_in)) {
-            return false;
+        if (c->salt_have == (size_t)kl) {
+            /* Set up the reading side, keeping a 2022 reply's expectations. */
+            boopie_ss_aead_t a;
+            if (!boopie_ss_aead_init(&a, c->cipher, c->key, c->salt_in)) {
+                return false;
+            }
+            c->down->aead = a;
         }
     }
     while (off < (size_t)r) {
@@ -440,7 +468,7 @@ static void relay_task(void *arg)
                 c->cfd = fd;
                 c->hello = heap_caps_malloc(HELLO_MAX, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
                 c->down = heap_caps_calloc(1, sizeof *c->down, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-                c->buf = heap_caps_malloc(BOOPIE_SS_CHUNK_MAX, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+                c->buf = heap_caps_malloc(BOOPIE_SS_OPEN_MAX + BOOPIE_SS_TAG, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
                 if (!c->hello || !c->down || !c->buf) {
                     conn_close(c);
                 }

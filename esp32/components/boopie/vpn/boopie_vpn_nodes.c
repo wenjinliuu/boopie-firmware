@@ -130,7 +130,16 @@ static bool set_hostport(boopie_vpn_node_t *node, const char *s, size_t n)
 
 static void finish(boopie_vpn_node_t *node)
 {
-    node->supported = boopie_ss_cipher(node->cipher) != BOOPIE_SS_UNSUPPORTED;
+    boopie_ss_cipher_t c = boopie_ss_cipher(node->cipher);
+    node->supported = c != BOOPIE_SS_UNSUPPORTED;
+    if (boopie_ss_is_2022(c)) {
+        /* Its password is its keys: they have to decode. Several keys (a
+         * relay's) only go with aes. */
+        uint8_t keys[BOOPIE_SS_2022_KEYS_MAX][BOOPIE_SS_KEY_MAX];
+        int n = boopie_ss_2022_keys(c, node->password, keys, BOOPIE_SS_2022_KEYS_MAX);
+        memset(keys, 0, sizeof keys);
+        node->supported = n == 1 || (n > 1 && c != BOOPIE_SS_2022_CHACHA20_POLY1305);
+    }
     if (!node->name[0]) {
         snprintf(node->name, sizeof node->name, "%.40s:%u", node->host, node->port);
     }

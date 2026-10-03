@@ -1631,7 +1631,7 @@ static void build_vpn_page(lv_obj_t *tile)
     note(list, "节点");
     s_vpn_list = column(list);
     note(list, "订阅在 设置 › 手机扫码设置 里导入。只有 Muse 走 VPN，小智、校时直连。支持 Shadowsocks"
-               "（aes-gcm、chacha20），不支持插件和 2022 加密。");
+               "（aes-gcm、chacha20）和 SS2022，不支持插件。");
     s_vpn_shown = 0;
 }
 

@@ -5,9 +5,13 @@
 
 #include "boopie_ss.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "psa/crypto.h"
+
+#include "boopie_blake3.h"
+#include "boopie_vpn_nodes.h"   /* base64 */
 
 static const struct {
     const char *name;
@@ -17,7 +21,24 @@ static const struct {
     [BOOPIE_SS_AES_192_GCM] = { "aes-192-gcm", 24 },
     [BOOPIE_SS_AES_256_GCM] = { "aes-256-gcm", 32 },
     [BOOPIE_SS_CHACHA20_POLY1305] = { "chacha20-ietf-poly1305", 32 },
+    [BOOPIE_SS_2022_AES_128_GCM] = { "2022-blake3-aes-128-gcm", 16 },
+    [BOOPIE_SS_2022_AES_256_GCM] = { "2022-blake3-aes-256-gcm", 32 },
+    [BOOPIE_SS_2022_CHACHA20_POLY1305] = { "2022-blake3-chacha20-poly1305", 32 },
 };
+
+#define HEADER_CLIENT 0
+#define HEADER_SERVER 1
+#define MAX_SKEW_S 30   /* a reply this far from our time is refused (SIP022) */
+
+bool boopie_ss_is_2022(boopie_ss_cipher_t c)
+{
+    return c >= BOOPIE_SS_2022_AES_128_GCM && c < BOOPIE_SS_CIPHER_COUNT;
+}
+
+static bool is_chacha(boopie_ss_cipher_t c)
+{
+    return c == BOOPIE_SS_CHACHA20_POLY1305 || c == BOOPIE_SS_2022_CHACHA20_POLY1305;
+}
 
 boopie_ss_cipher_t boopie_ss_cipher(const char *name)
 {
@@ -48,8 +69,39 @@ static bool hash(psa_algorithm_t alg, const uint8_t *in, size_t n, uint8_t *out,
     return psa_hash_compute(alg, in, n, out, cap, &len) == PSA_SUCCESS;
 }
 
+int boopie_ss_2022_keys(boopie_ss_cipher_t c, const char *password, uint8_t keys[][BOOPIE_SS_KEY_MAX], int max)
+{
+    int len = boopie_ss_key_len(c), n = 0;
+    if (!boopie_ss_is_2022(c)) {
+        return 0;
+    }
+    for (const char *p = password; n < max;) {
+        const char *colon = strchr(p, ':');
+        size_t pl = colon ? (size_t)(colon - p) : strlen(p);
+        uint8_t dec[BOOPIE_SS_KEY_MAX + 8];
+        if (pl > 64 || boopie_vpn_base64(p, pl, dec) != len) {
+            return 0;
+        }
+        memcpy(keys[n++], dec, len);
+        if (!colon) {
+            return n;
+        }
+        p = colon + 1;
+    }
+    return 0;   /* more keys than we take */
+}
+
 bool boopie_ss_password_key(boopie_ss_cipher_t c, const char *password, uint8_t key[BOOPIE_SS_KEY_MAX])
 {
+    if (boopie_ss_is_2022(c)) {
+        uint8_t keys[BOOPIE_SS_2022_KEYS_MAX][BOOPIE_SS_KEY_MAX];
+        int n = boopie_ss_2022_keys(c, password, keys, BOOPIE_SS_2022_KEYS_MAX);
+        if (n) {
+            memcpy(key, keys[n - 1], BOOPIE_SS_KEY_MAX);
+        }
+        memset(keys, 0, sizeof keys);
+        return n > 0;
+    }
     int need = boopie_ss_key_len(c);
     size_t pw = strlen(password);
     if (!need || pw > 128 || psa_crypto_init() != PSA_SUCCESS) {
@@ -114,7 +166,18 @@ static bool subkey(const uint8_t *key, const uint8_t *salt, int len, uint8_t *ou
 
 static psa_algorithm_t alg_of(boopie_ss_cipher_t c)
 {
-    return c == BOOPIE_SS_CHACHA20_POLY1305 ? PSA_ALG_CHACHA20_POLY1305 : PSA_ALG_GCM;
+    return is_chacha(c) ? PSA_ALG_CHACHA20_POLY1305 : PSA_ALG_GCM;
+}
+
+/* 2022's subkeys: BLAKE3 over the key and the salt. */
+static bool blake3_subkey(const char *context, const uint8_t *key, const uint8_t *salt, int len, uint8_t *out)
+{
+    uint8_t material[2 * BOOPIE_SS_KEY_MAX];
+    memcpy(material, key, len);
+    memcpy(material + len, salt, len);
+    bool ok = boopie_blake3_derive_key(context, material, 2 * len, out, len) == 0;
+    memset(material, 0, sizeof material);
+    return ok;
 }
 
 bool boopie_ss_aead_init(boopie_ss_aead_t *a, boopie_ss_cipher_t c, const uint8_t *key, const uint8_t *salt)
@@ -123,13 +186,15 @@ bool boopie_ss_aead_init(boopie_ss_aead_t *a, boopie_ss_cipher_t c, const uint8_
     a->cipher = c;
     int len = boopie_ss_key_len(c);
     uint8_t sub[BOOPIE_SS_KEY_MAX];
-    if (!len || psa_crypto_init() != PSA_SUCCESS || !subkey(key, salt, len, sub)) {
+    bool derived = boopie_ss_is_2022(c) ? blake3_subkey("shadowsocks 2022 session subkey", key, salt, len, sub)
+                                        : subkey(key, salt, len, sub);
+    if (!len || psa_crypto_init() != PSA_SUCCESS || !derived) {
         return false;
     }
     psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
     psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT);
     psa_set_key_algorithm(&attr, alg_of(c));
-    psa_set_key_type(&attr, c == BOOPIE_SS_CHACHA20_POLY1305 ? PSA_KEY_TYPE_CHACHA20 : PSA_KEY_TYPE_AES);
+    psa_set_key_type(&attr, is_chacha(c) ? PSA_KEY_TYPE_CHACHA20 : PSA_KEY_TYPE_AES);
     psa_set_key_bits(&attr, (size_t)len * 8);
     psa_key_id_t id;
     psa_status_t st = psa_import_key(&attr, sub, len, &id);
@@ -186,10 +251,31 @@ size_t boopie_ss_seal(boopie_ss_aead_t *a, const uint8_t *in, size_t n, uint8_t 
     return 2 + BOOPIE_SS_TAG + n + BOOPIE_SS_TAG;
 }
 
+void boopie_ss_decoder_expect_2022(boopie_ss_decoder_t *d, const uint8_t *request_salt, uint64_t now)
+{
+    d->header = true;
+    memcpy(d->request_salt, request_salt, BOOPIE_SS_KEY_MAX);   /* before aead is set up: all of it */
+    d->now = now;
+}
+
+static uint64_t be64(const uint8_t *p)
+{
+    uint64_t v = 0;
+    for (int i = 0; i < 8; i++) {
+        v = v << 8 | p[i];
+    }
+    return v;
+}
+
 int boopie_ss_decode(boopie_ss_decoder_t *d, const uint8_t *in, size_t n, size_t *used, uint8_t *out)
 {
     *used = 0;
-    size_t need = d->want_payload ? d->want_payload + BOOPIE_SS_TAG : 2 + BOOPIE_SS_TAG;
+    int kl = boopie_ss_key_len(d->aead.cipher);
+    /* 2022: type, time, our salt, the first chunk's length. */
+    size_t header = 1 + 8 + (size_t)kl + 2;
+    size_t need = d->header         ? header + BOOPIE_SS_TAG
+                : d->want_payload ? d->want_payload + BOOPIE_SS_TAG
+                                  : 2 + BOOPIE_SS_TAG;
     size_t take = need - d->have < n ? need - d->have : n;
     memcpy(d->buf + d->have, in, take);
     d->have += take;
@@ -197,12 +283,33 @@ int boopie_ss_decode(boopie_ss_decoder_t *d, const uint8_t *in, size_t n, size_t
     if (d->have < need) {
         return 0;
     }
+    if (d->header) {
+        uint8_t h[1 + 8 + BOOPIE_SS_KEY_MAX + 2];
+        if (!open_(&d->aead, d->buf, d->have, h)) {
+            return -1;
+        }
+        uint64_t t = be64(h + 1);
+        if (h[0] != HEADER_SERVER || memcmp(h + 9, d->request_salt, kl) != 0
+            || t + MAX_SKEW_S < d->now || t > d->now + MAX_SKEW_S) {
+            return -1;   /* not the reply to our request, or a replay */
+        }
+        d->header = false;
+        d->have = 0;
+        d->want_payload = (size_t)h[9 + kl] << 8 | h[10 + kl];
+        size_t more;
+        int r = n - take ? boopie_ss_decode(d, in + take, n - take, &more, out) : 0;
+        *used += r >= 0 && n - take ? more : 0;
+        return r;
+    }
     if (!d->want_payload) {
         uint8_t len[2];
         if (!open_(&d->aead, d->buf, d->have, len)) {
             return -1;
         }
-        d->want_payload = ((size_t)len[0] << 8 | len[1]) & BOOPIE_SS_PAYLOAD_MAX;
+        d->want_payload = (size_t)len[0] << 8 | len[1];
+        if (!boopie_ss_is_2022(d->aead.cipher)) {
+            d->want_payload &= BOOPIE_SS_PAYLOAD_MAX;
+        }
         d->have = 0;
         if (!d->want_payload) {
             return -1;
@@ -233,4 +340,77 @@ size_t boopie_ss_address(const char *host, uint16_t port, uint8_t *out)
     out[2 + n] = (uint8_t)(port >> 8);
     out[3 + n] = (uint8_t)port;
     return 4 + n;
+}
+
+/* ---- 2022 requests ---- */
+
+/* AES on one block: the identity header's cipher. */
+static bool aes_block(const uint8_t *key, int len, const uint8_t in[16], uint8_t out[16])
+{
+    psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT);
+    psa_set_key_algorithm(&attr, PSA_ALG_ECB_NO_PADDING);
+    psa_set_key_type(&attr, PSA_KEY_TYPE_AES);
+    psa_set_key_bits(&attr, (size_t)len * 8);
+    psa_key_id_t id;
+    psa_status_t st = psa_import_key(&attr, key, len, &id);
+    psa_reset_key_attributes(&attr);
+    if (st != PSA_SUCCESS) {
+        return false;
+    }
+    size_t n;
+    st = psa_cipher_encrypt(id, PSA_ALG_ECB_NO_PADDING, in, 16, out, 16, &n);
+    psa_destroy_key(id);
+    return st == PSA_SUCCESS && n == 16;
+}
+
+size_t boopie_ss_2022_request(boopie_ss_aead_t *up, const uint8_t keys[][BOOPIE_SS_KEY_MAX], int nkeys,
+                              const uint8_t *salt, uint64_t now, const uint8_t *addr, size_t an,
+                              const uint8_t *payload, size_t pn, uint8_t *out)
+{
+    boopie_ss_cipher_t c = up->cipher;
+    int kl = boopie_ss_key_len(c);
+    if (!boopie_ss_is_2022(c) || nkeys < 1 || (nkeys > 1 && is_chacha(c))) {
+        return 0;   /* identity headers are for aes only */
+    }
+    size_t o = 0;
+    for (int i = 0; i + 1 < nkeys; i++) {
+        uint8_t sub[BOOPIE_SS_KEY_MAX], hash[16];
+        bool ok = blake3_subkey("shadowsocks 2022 identity subkey", keys[i], salt, kl, sub)
+               && boopie_blake3_hash(keys[i + 1], kl, hash, 16) == 0 && aes_block(sub, kl, hash, out + o);
+        memset(sub, 0, sizeof sub);
+        if (!ok) {
+            return 0;
+        }
+        o += 16;
+    }
+    /* Padding hides the length of a short first message; with none at all it must be there. */
+    size_t pad = pn ? 0 : 1 + (size_t)(salt[0] | salt[1] << 8) % 900;
+    size_t vn = an + 2 + pad + pn;
+    if (vn > BOOPIE_SS_OPEN_MAX) {
+        return 0;
+    }
+    uint8_t fixed[11] = { HEADER_CLIENT };
+    for (int i = 0; i < 8; i++) {
+        fixed[1 + i] = (uint8_t)(now >> (56 - 8 * i));
+    }
+    fixed[9] = (uint8_t)(vn >> 8);
+    fixed[10] = (uint8_t)vn;
+    if (!seal(up, fixed, sizeof fixed, out + o)) {
+        return 0;
+    }
+    o += sizeof fixed + BOOPIE_SS_TAG;
+    uint8_t *v = malloc(vn);
+    if (!v) {
+        return 0;
+    }
+    memcpy(v, addr, an);
+    v[an] = (uint8_t)(pad >> 8);
+    v[an + 1] = (uint8_t)pad;
+    memset(v + an + 2, 0, pad);
+    memcpy(v + an + 2 + pad, payload, pn);
+    bool ok = seal(up, v, vn, out + o);
+    memset(v, 0, vn);
+    free(v);
+    return ok ? o + vn + BOOPIE_SS_TAG : 0;
 }
