@@ -49,6 +49,8 @@ python -m esptool --chip esp32s3 -p COM5 -b 921600 write-flash 0x0 boopie-wavesh
 
 > 以后再刷新版本**不用擦除**，直接 `write-flash`，配对和 Wi-Fi 会保留。
 
+> **分区表**：Boopie 用自己的 `esp32/partitions_boopie_32mb.csv`：两个程序区各 8 MB（官方是 4 MB），给以后的国内大脑、唤醒词和小游戏留空间；设置区等位置和官方一样。分区表只能通过 USB 刷机写入，在线升级改不了，所以第一次刷机就用这张表，以后不用再插线改分区。
+
 ## 4. 看启动日志
 
 ```

@@ -1,0 +1,16 @@
+# Copyright (c) 2026 Boopie contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Boopie on the Waveshare 1.75C (32 MB flash): partitions_muse.csv with the
+# app slots grown from 4 MB to 8 MB each, room for the second brain, wake
+# word and games. Everything before the slots is where Muse's table has it,
+# so NVS (settings, pairing) carries over. About 16 MB stays unused.
+# A partition table can't change over the air: it goes in with a USB flash.
+# Name,    Type, SubType, Offset,    Size,    Flags
+nvs,       data, nvs,     0x11000,   0xC000,
+otadata,   data, ota,     0x1D000,   0x2000,
+phy_init,  data, phy,     0x1F000,   0x1000,
+ota_0,     app,  ota_0,   0x20000,   8M,
+ota_1,     app,  ota_1,   0x820000,  8M,
+prod_data, data, 0x40,    0x1020000, 0x1000,
+prod_bak,  data, 0x41,    0x1021000, 0x1000,

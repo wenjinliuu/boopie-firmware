@@ -31,7 +31,7 @@ jobs:
         working-directory: esp32
     env:
       BUILD_DIR: build-boopie-175c
-      DEFAULTS: sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c
+      DEFAULTS: sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c;devices/sdkconfig.boopie-175c
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
