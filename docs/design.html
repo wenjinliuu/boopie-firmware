@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Boopie 设计方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 单栏文档，左侧窄目录（宽屏），圆屏徽记做页眉；章节用细线分隔，表格自带横向滚动 */
+:root{
+  --bg:#F4F5F9;
+  --surface:#FFFFFF;
+  --fg:#1B1E2B;
+  --muted:#626882;
+  --line:#DCDFEA;
+  --accent:#D9466C;
+  --accent-soft:#FBE4EA;
+  --ok:#17806F;
+  --ok-soft:#DDF2EE;
+  --warn:#A8620B;
+  --warn-soft:#FCEFD9;
+  --screen:#0C0D12;
+  --font-display:"Fredoka","Noto Sans SC",system-ui,sans-serif;
+  --font-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111219;--surface:#1A1C26;--fg:#E8E9F0;--muted:#9AA0B8;--line:#2C2F3D;
+  --accent:#FF7898;--accent-soft:#3A1C27;--ok:#4FC7B2;--ok-soft:#14302B;--warn:#F2B356;--warn-soft:#352813;--screen:#000;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111219;--surface:#1A1C26;--fg:#E8E9F0;--muted:#9AA0B8;--line:#2C2F3D;
+  --accent:#FF7898;--accent-soft:#3A1C27;--ok:#4FC7B2;--ok-soft:#14302B;--warn:#F2B356;--warn-soft:#352813;--screen:#000;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15.5px;line-height:1.75;padding-inline:16px;padding-block:0 64px}
+.wrap{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px}
+nav.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;padding-top:40px;font-size:13.5px}
+nav.toc p{font-family:var(--font-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+nav.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:4px;counter-reset:t}
+nav.toc a{color:var(--muted);text-decoration:none;display:block;padding:3px 0}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--accent)}
+main{min-width:0;padding-top:40px}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+header.hero{display:flex;gap:28px;align-items:center;flex-wrap:wrap;padding-bottom:32px;border-bottom:1px solid var(--line)}
+.dial{width:132px;height:132px;border-radius:50%;background:var(--screen);flex:0 0 auto;display:grid;place-items:center;box-shadow:0 0 0 6px var(--surface),0 0 0 7px var(--line)}
+.dial canvas{width:72px;height:72px;image-rendering:pixelated}
+.hero-text{min-width:0;flex:1 1 300px}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin:0}
+h1{font-family:var(--font-display);font-weight:600;font-size:clamp(40px,7vw,60px);line-height:1.05;margin:6px 0 10px;letter-spacing:-.01em}
+h1 small{font-family:var(--font-body);font-weight:500;font-size:.42em;color:var(--muted);margin-left:10px;letter-spacing:0}
+.lede{margin:0;max-width:60ch;color:var(--fg)}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:13px;color:var(--muted)}
+.meta code{font-family:var(--font-mono);font-size:12.5px;color:var(--fg)}
+section{padding-block:36px 8px;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+h2{font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.25;margin:0 0 6px;text-wrap:balance}
+h2 .n{font-family:var(--font-mono);font-size:13px;font-weight:500;color:var(--accent);margin-right:10px;vertical-align:4px}
+h3{font-size:17px;font-weight:700;margin:28px 0 8px}
+p{margin:0 0 14px;max-width:68ch}
+ul,ol{margin:0 0 14px;padding-left:1.3em;max-width:68ch}
+li{margin:4px 0}
+code{font-family:var(--font-mono);font-size:.88em;background:var(--accent-soft);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.tbl{overflow-x:auto;margin:10px 0 18px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:10px 14px;border-bottom:1px solid var(--line)}
+th{font-weight:700;font-size:13px;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:500;white-space:nowrap}
+.pill{display:inline-block;font-size:12px;font-weight:500;padding:1px 9px;border-radius:999px;line-height:1.7;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.no{background:var(--accent-soft);color:var(--accent)}
+.note{border-left:3px solid var(--warn);background:var(--warn-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0 18px;max-width:68ch}
+.note.key{border-color:var(--accent);background:var(--accent-soft)}
+.note p:last-child{margin:0}
+.note strong{color:var(--fg)}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 20px}
+.flow span{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:13.5px}
+.flow i{font-style:normal;color:var(--muted)}
+.phases{list-style:none;padding:0;margin:16px 0;display:grid;gap:14px;max-width:none}
+.phase{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 14px}
+.phase .num{font-family:var(--font-display);font-weight:600;font-size:26px;color:var(--accent);line-height:1.2;grid-row:span 3}
+.phase h4{margin:0;font-size:16.5px;font-weight:700;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.phase ul{margin:4px 0 0;font-size:14.5px}
+.phase .out{font-size:13.5px;color:var(--muted);margin:6px 0 0}
+.phase .out b{color:var(--fg);font-weight:500}
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:12px 0 18px}
+.app{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.app b{display:block;font-size:15px;margin-bottom:2px}
+.app p{font-size:13.5px;color:var(--muted);margin:0;line-height:1.6}
+.app.star{border-color:var(--accent)}
+.refgroups{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 32px}
+.rg{min-width:0}
+.rg h3{font-size:14px;margin:20px 0 6px;color:var(--muted);letter-spacing:.02em}
+.rg ul{list-style:none;padding:0;margin:0;font-size:14px;line-height:1.5}
+.rg li{margin:0;padding:7px 0;border-bottom:1px dashed var(--line)}
+.rg li a{display:block;text-decoration:none;font-weight:500}
+.rg li a:hover{text-decoration:underline}
+.rg li span{display:block;font-family:var(--font-mono);font-size:11.5px;color:var(--muted);overflow-wrap:anywhere;user-select:all}
+footer{margin-top:32px;font-size:12.5px;color:var(--muted)}
+@media (max-width:820px){
+  .wrap{grid-template-columns:minmax(0,1fr);gap:0}
+  nav.toc{display:none}
+  main{padding-top:24px}
+  h2{font-size:24px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<nav class="toc" aria-label="目录">
+  <p>目录</p>
+  <ol>
+    <li><a href="#overview">项目概述</a></li>
+    <li><a href="#muse">Muse 官方发布</a></li>
+    <li><a href="#terms">条款与边界</a></li>
+    <li><a href="#firmware">官方固件能力</a></li>
+    <li><a href="#boards">两块硬件</a></li>
+    <li><a href="#arch">底座与架构</a></li>
+    <li><a href="#apps">应用规划</a></li>
+    <li><a href="#roadmap">阶段路线</a></li>
+    <li><a href="#risks">风险与待确认</a></li>
+    <li><a href="#refs">参考资料</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="dial" aria-hidden="true"><canvas id="pix" width="16" height="16"></canvas></div>
+  <div class="hero-text">
+    <p class="eyebrow">设计方案 · v0.1 · 2026-10-03</p>
+    <h1>Boopie<small>布比</small></h1>
+    <p class="lede">一块圆屏小设备上的多应用系统。Muse 是常驻的 AI 应用，旁边再装电子宠物、表盘、信息卡片和小游戏。名字来自 boop，戳它一下，它就会有反应。</p>
+    <div class="meta">
+      <span>仓库 <code>wenjinliuu/boopie-firmware</code></span>
+      <span>Secret <code>MUSE_SDK_TOKEN</code></span>
+      <span>主板 微雪 ESP32-S3-Touch-AMOLED-1.75C</span>
+      <span>第二板 乐鑫 ESP-Mosaico</span>
+    </div>
+  </div>
+</header>
+
+<section id="overview">
+  <h2><span class="n">01</span>项目概述</h2>
+  <p>Meta 在 2026 年 10 月 2 日开源了 Muse Gadgets：一套 ESP32 固件和 Linux SDK，让现成的开发板变成 Muse 的外设。Boopie 以这套固件为起点，扩展成一个通用的圆屏小系统。</p>
+  <h3>核心定位</h3>
+  <ul>
+    <li><strong>Muse 是一个应用，不是全部。</strong>它常驻在系统里，按键就能对话；其他时间屏幕交给宠物、表盘和各类小应用。</li>
+    <li><strong>主角是你自己的 Muse 形象。</strong>每个用户的 Muse 都能生成专属像素形象，Boopie 的宠物和游戏都用它当角色，不使用 Meta 的默认吉祥物。</li>
+    <li><strong>一次刷机，之后全部在线升级。</strong>第一次用 USB 刷入，之后通过自建 OTA 更新。</li>
+    <li><strong>开发全程在云端。</strong>代码放在 GitHub，Actions 编译，Windows 电脑只负责第一次刷机。</li>
+  </ul>
+</section>
+
+<section id="muse">
+  <h2><span class="n">02</span>Muse 官方发布了什么</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>内容</th><th>说明</th><th>与我们的关系</th></tr></thead>
+    <tbody>
+      <tr><td>ESP32 Device SDK</td><td>开源固件，Apache 2.0 协议。仓库自带 <code>AGENTS.md</code>，可直接交给 coding agent 编译和刷机</td><td><span class="pill ok">核心底座</span></td></tr>
+      <tr><td>Linux Device SDK</td><td>把树莓派等 Linux 设备变成 Muse 外设</td><td><span class="pill warn">暂不涉及</span></td></tr>
+      <tr><td>SDK token</td><td>在 gadgets.muse.ai 账号设置里免费生成，每个设备配对都需要</td><td><span class="pill ok">需要</span></td></tr>
+      <tr><td>Muse Home Link</td><td>Meta 自己做的联网小盒子。仅限美国订阅用户，每人一台，10 月发货，共约 5000 台</td><td><span class="pill ok">已登记排队</span></td></tr>
+      <tr><td>Muse 电视棒</td><td>插 HDMI 口，让 Muse 往电视投内容</td><td><span class="pill warn">即将推出</span></td></tr>
+      <tr><td>推荐板子</td><td>微雪 1.75C、M5Stack StickS3、AIPI Lite、Seeed reTerminal 等，均为第三方产品，Meta 不背书</td><td><span class="pill ok">微雪在列</span></td></tr>
+    </tbody>
+  </table></div>
+  <p>配对方式：设备刷好后，在 Muse App 中打开 <strong>设置 › 设备 › 开发者模式</strong>，添加设备，名称显示为 <code>MuseGadget-XXXXXX</code>，再按一下板子上的按键确认。</p>
+</section>
+
+<section id="terms">
+  <h2><span class="n">03</span>条款与边界</h2>
+  <p>代码是开源的，但接入 Muse 服务受 SDK token 条款约束。开源许可证不授予任何 token 权利。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>事项</th><th>条款规定</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td>使用性质</td><td>个人、非商业使用</td><td><span class="pill ok">自用可以</span></td></tr>
+      <tr><td>送人</td><td>一个 token 最多嵌入 50 台给别人用的设备，最多关联 50 台</td><td><span class="pill ok">送朋友可以</span></td></tr>
+      <tr><td>售卖（嵌入我们的 token）</td><td>不能把你的 token 嵌入收费出售、公开上架或用于促销的设备；其他分发需要 Meta 书面许可</td><td><span class="pill no">不能这样卖</span></td></tr>
+      <tr><td>售卖（用户自填 token）</td><td>固件不带任何 token，买家用自己的 token，属于其本人使用。条款没有直接禁止，但 Meta 如何认定不由我们决定</td><td><span class="pill warn">灰色地带，售卖前确认</span></td></tr>
+      <tr><td>他人数据</td><td>对方配对前要告知设备如何处理其信息；不得截留或转发其对话</td><td><span class="pill warn">需告知</span></td></tr>
+      <tr><td>品牌</td><td>不得暗示设备由 Meta 制造或背书</td><td><span class="pill warn">名字不带 Muse</span></td></tr>
+      <tr><td>默认形象</td><td>默认吉祥物 Jollybot 是 Meta 的角色，Apache 协议不覆盖</td><td><span class="pill warn">用自己的形象</span></td></tr>
+      <tr><td>绕过 token</td><td>不得绕过使用限制或安全措施</td><td><span class="pill no">不做</span></td></tr>
+      <tr><td>稳定性</td><td>官方明确说这不是正式产品，随时可能变更或停止</td><td><span class="pill warn">商业风险</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note key"><p><strong>设计决定：token 由用户自己填。</strong>固件不内置任何人的 token。每个用户在 gadgets.muse.ai 生成自己的 token，在设备设置页填入，属于用户本人的使用。这样“嵌入我们的 token 售卖”这条限制不再直接适用，送给朋友时用的也都是对方自己的账号和 token。但条款同时要求个人、非商业使用，不得暗示 Meta 背书，且随时可能修改，所以正式售卖前仍要确认条款或取得 Meta 授权，并且设备不能带 Meta 的默认形象。</p></div>
+</section>
+
+<section id="firmware">
+  <h2><span class="n">04</span>官方固件能力</h2>
+  <p>固件要求 <strong>ESP-IDF v6.0.1</strong>，其他版本官方不支持。入口在 <code>main/main.c</code>，主要逻辑在 <code>main/app.c</code>，带屏板子的形象、语音和设置界面在 <code>components/muse</code>。设备通过蓝牙与手机配对，接入 Wi-Fi，与 Muse 云端保持加密会话。</p>
+  <h3>微雪 1.75C 上已有的功能</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>功能</th><th>状态</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>形象界面与设置</td><td><span class="pill ok">支持</span></td><td>动画形象显示状态，带设置页和触摸操作</td></tr>
+      <tr><td>按键说话</td><td><span class="pill ok">支持</span></td><td>PWR 键说话，扬声器播放回复</td></tr>
+      <tr><td>显示图片</td><td><span class="pill ok">支持</span></td><td>Muse 可以把图片推到屏幕上</td></tr>
+      <tr><td>家庭网络隧道</td><td><span class="pill ok">支持</span></td><td>Muse 能访问局域网里有 HTTP 接口的设备</td></tr>
+      <tr><td>OTA 在线升级</td><td><span class="pill ok">默认开启</span></td><td>两个程序槽，每个 4 MB</td></tr>
+      <tr><td>电池状态</td><td><span class="pill ok">支持</span></td><td>显示电量</td></tr>
+      <tr><td>陀螺仪 QMI8658</td><td><span class="pill warn">未使用</span></td><td>官方固件没用到，留给我们做体感</td></tr>
+    </tbody>
+  </table></div>
+  <h3>形象动画</h3>
+  <p>默认形象是 64×64 的像素角色，由代码实时绘制（<code>muse_pixel.c</code>），共 8 种状态：开机、待机、聆听、思考、说话、出错、关机，以及被摸时的开心反应。官方脚本 <code>avatar.py</code> 能让你的 Muse 把自己的形象重画成新的绘制代码，还支持一句话修改，比如“耳朵大一点”。</p>
+  <p>64×64 放大到 466×466 的屏幕上，每个像素约成 7×7 的方块，所以看起来偏粗糙。这是刻意的复古像素风：不占存储，在 S3 上每帧绘制不到 10 毫秒。Muse 生成的用户形象也是同样规格。</p>
+  <h3>设备命令</h3>
+  <p>设备向 Muse 注册命令，Muse 在对话中调用它们。已有的例子包括 <code>display.draw_url</code>（显示网络图片）、<code>sensors.read</code>（读传感器）、<code>camera.capture</code>（拍照，Seeed Watcher 上）。<strong>Boopie 的大部分扩展都会通过新增命令接入 Muse。</strong></p>
+</section>
+
+<section id="boards">
+  <h2><span class="n">05</span>两块硬件</h2>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>微雪 ESP32-S3-Touch-AMOLED-1.75C</th><th>乐鑫 ESP-Mosaico</th></tr></thead>
+    <tbody>
+      <tr><td>芯片</td><td>ESP32-S3R8，Xtensa 双核 240 MHz</td><td>ESP32-S31，RISC-V 双核 320 MHz</td></tr>
+      <tr><td>内存 / 存储</td><td>8 MB PSRAM，32 MB Flash</td><td>16 MB PSRAM，16 MB NOR + 1 Gbit NAND</td></tr>
+      <tr><td>屏幕</td><td>1.75 寸圆形 AMOLED，466×466，CO5300 驱动</td><td>2.16 寸方形 AMOLED，480×480，CO5300 驱动</td></tr>
+      <tr><td>触摸</td><td>CST9217</td><td>CST9220 系列</td></tr>
+      <tr><td>音频</td><td>ES8311 + ES7210，双麦克风，回声消除</td><td>ES8311 + NS4150B 功放</td></tr>
+      <tr><td>传感器</td><td>QMI8658 六轴</td><td>BMI270 六轴，双 BMM150 磁力计，振动马达</td></tr>
+      <tr><td>无线</td><td>Wi-Fi 4，蓝牙 5</td><td>Wi-Fi 6，蓝牙 5.4，Thread / Zigbee</td></tr>
+      <tr><td>扩展</td><td>侧边 PWR、BOOT 按键</td><td>左右 2×10P 排针，摄像头扩展板</td></tr>
+      <tr><td>Muse 固件</td><td><span class="pill ok">官方完整支持</span></td><td><span class="pill warn">需要移植</span></td></tr>
+      <tr><td>原厂生态</td><td>Arduino / ESP-IDF 示例，小智 AI</td><td>ChatCoding、VibeCoding、Idea Center</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note"><p><strong>Mosaico 的门槛：</strong>ESP32-S31 要到 ESP-IDF v6.1 才有预览支持，而 Muse 固件锁定在 6.0.1。v6.1 与 6.0 基本兼容，移植可行，但要先把固件升级到 6.1。好消息是两块板子的屏幕驱动和音频编解码芯片相同，可以拿微雪的配置做底子改。</p></div>
+</section>
+
+<section id="arch">
+  <h2><span class="n">06</span>底座与架构</h2>
+  <h3>底座选择</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>以 Muse 固件为底座加功能</th><th>拆开放进 ESP-Brookesia</th></tr></thead>
+    <tbody>
+      <tr><td>Muse 可用时间</td><td>第一天就能用</td><td>移植完才能用</td></tr>
+      <tr><td>跟进官方更新</td><td>容易合并</td><td>每次手工搬</td></tr>
+      <tr><td>工作量</td><td>小</td><td>大</td></tr>
+      <tr><td>App 多了以后</td><td>结构可能变乱</td><td>天生为多 App 设计</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>决定：先以 Muse 固件为底座。</strong>我们的代码全部放在独立模块目录里，只在少数几个固定挂钩点改动 Muse 原有代码，比如主界面入口和页面注册。这样官方更新时冲突少；以后应用多到撑不住，也能把模块整体搬进 Brookesia。最终方案在读完界面代码后确认。</p>
+
+  <h3>双大脑：一个形象，两套 AI 后端（优先推进）</h3>
+  <p>Muse 的连接是板子直连 Meta 云端的端到端加密会话，我们的服务器插不进去，所以两套后端各走各的链路，<strong>统一放在板子上的中间层</strong>。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>层</th><th>内容</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>界面层</td><td>形象动画、状态、按键说话、屏幕、宠物、游戏</td><td><span class="pill ok">两个大脑共用</span></td></tr>
+      <tr><td>大脑接口</td><td>开始听、发送音频、收到文字和语音、状态变化、工具调用</td><td><span class="pill ok">统一事件</span></td></tr>
+      <tr><td>能力清单</td><td>倒计时、开始游戏、读取姿态、振动等设备功能</td><td>定义一次，同时导出成 Muse 命令和国内模型的 MCP 工具</td></tr>
+      <tr><td>Muse 大脑</td><td>官方客户端，直连 Meta 云端</td><td>需要 Muse token 和可访问海外的网络</td></tr>
+      <tr><td>国内大脑</td><td>小智协议客户端：WebSocket + Opus 音频</td><td>经国内服务器调用语音识别、大模型、语音合成，<strong>无需代理</strong></td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>国内链路：</strong>DeepSeek 只处理文字，需要“语音识别 → 大模型 → 语音合成”链路。服务器用开源的 xiaozhi-esp32-server（Docker 部署），支持阿里、腾讯语音识别，通义、豆包及任何 OpenAI 兼容接口，DeepSeek 走兼容接口。服务器放国内机房，延迟低。</li>
+    <li><strong>小智固件</strong>是 MIT 协议，可商用，设备端工具用 MCP 定义，正好对接能力清单。</li>
+    <li><strong>费用：</strong>用户填自己的 API key，和 Muse token 同一个道理，在同一个设置流程里完成。</li>
+    <li><strong>切换：</strong>设置页选“Muse”或“国内 AI”，同一时间只运行一个，不占双份内存。</li>
+    <li><strong>待验证：</strong>小智要求 IDF 6.0.2 及以后的 6.0 版本，Muse 固件是 6.0.1，合并时统一到 6.0.x。</li>
+  </ul>
+
+  <h3>底层改造</h3>
+  <ol>
+    <li><strong>token 与 API key 用户自填：</strong>从编译时写死改为存进 NVS，启动时读取。所有人刷同一个固件。打开 NVS 加密，防止拿到板子的人直接读出。长按按键 5 秒重置时一并清除；换 Muse token 后需在 Muse App 重新配对。</li>
+    <li><strong>扫码设置：</strong>设备屏幕显示二维码，手机扫码打开设备自带的设置页，粘贴填写 Wi-Fi、大脑选择、Muse token、国内 API key 和代理。几十位的密钥不适合在 1.75 寸圆屏上手敲，屏幕键盘只作兜底（例如 Wi-Fi 密码）。以后有 iOS App，改为在 App 里粘贴、蓝牙写入。</li>
+    <li><strong>可配置网络代理：</strong>先做轻量方案，设备连接经局域网代理（例如开了“允许局域网”的 Clash）转发；导入节点、在板子上直接跑代理协议的完整方案作为研究方向。</li>
+  </ol>
+
+  <h3>两种联网模式</h3>
+  <p>Muse 需要连到海外云端。Boopie 同时保留两种联网方式，在家用 Wi-Fi，出门像手表一样靠手机。</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>在家：Wi-Fi + 代理</th><th>出门：蓝牙连手机中转</th></tr></thead>
+    <tbody>
+      <tr><td>链路</td><td>板子 → Wi-Fi → 局域网代理 → Muse 云端</td><td>板子 ⇄ 蓝牙 ⇄ Boopie iOS App ⇄ 手机网络（含 VPN）⇄ Muse 云端</td></tr>
+      <tr><td>代理</td><td>板子上配置代理地址或导入节点</td><td>板子不碰代理，手机怎么联网板子就怎么联网</td></tr>
+      <tr><td>带宽</td><td>充足，图片和语音都流畅</td><td>几十到一两百 KB/s，语音够用，图片偏慢</td></tr>
+      <tr><td>功耗</td><td>较高</td><td>可关 Wi-Fi，更省电</td></tr>
+      <tr><td>前提</td><td>局域网有代理，或路由器本身可直连</td><td>需要自己开发 Boopie iOS App；iOS 后台蓝牙联网稳定性需实测</td></tr>
+      <tr><td>隐私</td><td colspan="2">板子与 Muse 之间端到端加密，代理和 App 只转发字节，看不到对话内容，符合条款中不截留他人数据的要求</td></tr>
+    </tbody>
+  </table></div>
+  <p>官方固件里蓝牙只用于配对，之后板子用 Wi-Fi 直连云端，官方 Muse App 不会帮板子转发流量，所以蓝牙中转需要固件加一层“网络走蓝牙”的转发，加上我们自己的 iOS App。这条蓝牙通道和骑行导航、配套 App 是同一条，一起开发。零开发的备选是让板子连手机热点，但 iOS 热点设备的流量通常不走手机上的 VPN，需要实测。</p>
+
+  <h3>形象系统：四种风格</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>档位</th><th>内容</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>像素风</td><td>保留官方 64×64 绘制机制，用户可让自己的 Muse 生成像素形象</td><td><span class="pill ok">官方路线</span></td></tr>
+      <tr><td>Boopie 高清默认</td><td>我们自己设计的高清角色（粉色布比），作为出厂默认</td><td>替代 Meta 的 Jollybot，送人或售卖的设备都不带 Meta 角色</td></tr>
+      <tr><td>自定义高清形象包</td><td>用户用 AI 生图做出各状态角色图，云端工具转成形象包，经 OTA 推到设备</td><td>每个人的布比都独一无二</td></tr>
+      <tr><td>字符画</td><td>布比由字母、数字、标点按明暗排列拼成，说话时字符跳动闪烁；开机时乱码收拢成布比</td><td>灵感来自 Muse 官网首页的字符画手法。只画文字，不存图片，S3 很轻松；黑底亮字在 AMOLED 上效果好。拼的是布比，不照搬 Muse 标志</td></tr>
+    </tbody>
+  </table></div>
+  <p>高清实现有两条路线，到货后实测再定：</p>
+  <ul>
+    <li><strong>序列帧：</strong>每个状态一组图片轮播，效果最好。8 种状态每种十几帧，不压缩会超过 10 MB，需要压缩或降低帧率；32 MB Flash 装得下。</li>
+    <li><strong>Lottie 矢量动画：</strong>LVGL 9 支持，文件小、缩放清晰，可从 AE 等工具导出；渲染吃算力，大尺寸下帧率要实测。</li>
+  </ul>
+
+  <h3>表情规范：所有风格统一</h3>
+  <p>四种风格共用一套表情清单和编号。系统只发出表情编号，由当前风格负责画出来，这样双大脑、宠物、游戏触发的表情在任何风格下都一致。</p>
+  <p><strong>核心表情（8 个，对应官方像素形象的全部状态，每种风格必须实现）</strong></p>
+  <div class="tbl"><table>
+    <thead><tr><th>编号</th><th>表情</th><th>什么时候出现</th></tr></thead>
+    <tbody>
+      <tr><td><code>boot</code></td><td>开机</td><td>上电启动</td></tr>
+      <tr><td><code>idle</code></td><td>待机</td><td>没事的时候，主界面常态</td></tr>
+      <tr><td><code>listening</code></td><td>聆听</td><td>按下说话键，正在收音</td></tr>
+      <tr><td><code>thinking</code></td><td>思考</td><td>等待 AI 回复</td></tr>
+      <tr><td><code>speaking</code></td><td>说话</td><td>AI 在语音回复</td></tr>
+      <tr><td><code>error</code></td><td>出错</td><td>断网、连不上 AI、其他错误</td></tr>
+      <tr><td><code>off</code></td><td>关机 / 息屏</td><td>关机或进入休眠</td></tr>
+      <tr><td><code>happy</code></td><td>开心</td><td>被摸、被戳</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>扩展表情（Boopie 新增，给宠物和游戏用，可持续增加）</strong></p>
+  <div class="tbl"><table>
+    <thead><tr><th>编号</th><th>表情</th><th>触发</th><th>缺省时退回</th></tr></thead>
+    <tbody>
+      <tr><td><code>hungry</code></td><td>饿了</td><td>宠物饥饿值低</td><td><code>idle</code></td></tr>
+      <tr><td><code>eating</code></td><td>吃东西</td><td>喂食、游戏奖励零食</td><td><code>happy</code></td></tr>
+      <tr><td><code>sleepy</code></td><td>犯困 / 睡觉</td><td>夜间或长时间没人理</td><td><code>off</code></td></tr>
+      <tr><td><code>sad</code></td><td>难过</td><td>心情值低、游戏失败</td><td><code>idle</code></td></tr>
+      <tr><td><code>surprised</code></td><td>惊讶</td><td>突然被拿起、收到新消息</td><td><code>happy</code></td></tr>
+      <tr><td><code>dizzy</code></td><td>晕了</td><td>被用力摇晃（陀螺仪）</td><td><code>error</code></td></tr>
+      <tr><td><code>celebrate</code></td><td>庆祝</td><td>游戏破纪录、成长升级</td><td><code>happy</code></td></tr>
+      <tr><td><code>shy</code></td><td>害羞</td><td>连续被戳</td><td><code>happy</code></td></tr>
+      <tr><td><code>low_battery</code></td><td>没电了</td><td>电量过低</td><td><code>sleepy</code> → <code>off</code></td></tr>
+      <tr><td><code>charging</code></td><td>充电中</td><td>接上电源</td><td><code>idle</code></td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>退回规则：</strong>某种风格还没做某个扩展表情时，自动显示“缺省时退回”那一列的表情，所以新增表情不会让任何风格坏掉。</li>
+    <li><strong>像素风的限制：</strong>Muse 生成的像素形象只包含 8 个核心表情。扩展表情要么用退回规则，要么在生成提示词里追加这些状态，让 Muse 一起画出来。</li>
+    <li><strong>新增表情的流程：</strong>先在清单里加编号和退回目标，再逐个风格补画，补完一个上线一个。</li>
+  </ul>
+
+  <h3>自建 OTA</h3>
+  <div class="flow" role="img" aria-label="OTA 流程：提交代码、Actions 编译、签名、上传 R2、Worker 发布版本清单、设备后台更新">
+    <span>提交代码</span><i>→</i><span>GitHub Actions 编译</span><i>→</i><span>自有密钥签名</span><i>→</i><span>上传 Cloudflare R2</span><i>→</i><span>Worker 版本清单</span><i>→</i><span>设备后台下载、切换、重启</span>
+  </div>
+  <ul>
+    <li>更新源指向我们自己的服务器，避免被官方 OTA 覆盖。自编译固件版本号默认 999.0.0，具体判断逻辑待读代码确认。</li>
+    <li>官方仓库用公开的开发密钥签名，我们换成自己的私钥，设备只接受我们签名的固件。</li>
+    <li>打开 ESP-IDF 的启动失败自动回滚，升级出错退回旧槽。</li>
+    <li>固件放 R2，同时解决国内下载 GitHub 慢的问题。</li>
+  </ul>
+</section>
+
+<section id="apps">
+  <h2><span class="n">07</span>应用规划</h2>
+  <h3>三大基础（同步重要）</h3>
+  <div class="apps">
+    <div class="app star"><b>① Muse 对话</b><p>第一位。先把 Muse 接通落地：按键说话、语音回复、显示 Muse 推来的图片。</p></div>
+    <div class="app star"><b>② 国内大脑</b><p>小智协议接 DeepSeek、通义、豆包等国内模型，国内网络直连，不用代理。形象和宠物与 Muse 共用。</p></div>
+    <div class="app star"><b>③ 电子宠物 = 主界面</b><p>布比就是主界面。平时陪着你，有心情、饥饿、成长；按键时就是 AI 在说话。表盘时间也显示在这一屏。</p></div>
+  </div>
+  <h3>其次</h3>
+  <div class="apps">
+    <div class="app"><b>小游戏</b><p>主角是布比，玩游戏给宠物挣零食和心情。设计见下文。</p></div>
+    <div class="app"><b>新增设备命令</b><p>开始游戏、倒计时、读取姿态、振动提醒。“陪我玩个游戏”就能直接启动。</p></div>
+    <div class="app"><b>信息卡片</b><p>AI 定时推送天气、日程、期权日报摘要。</p></div>
+    <div class="app"><b>Boopie iOS App</b><p>出门时当联网中转，同时负责导航推送、设置和形象管理。</p></div>
+    <div class="app"><b>骑行导航</b><p>参考 moto2000：屏幕只显示，路线由 iPhone App 通过蓝牙推送。</p></div>
+    <div class="app"><b>Mosaico 摄像头</b><p>照着官方的拍照命令移植，让 AI 看见你拿着的东西。Mosaico 的磁力计还能做指南针。</p></div>
+  </div>
+
+  <h3>小游戏设计</h3>
+  <p>决定性能的不是画风，而是<strong>每帧有多少像素在变</strong>。S3 没有图形加速，466×466 全屏一帧约 434 KB，每帧整屏重画会很吃力；只重画移动的小区域就很轻松。像素风的优势在于可以用低分辨率画、再放大显示，全屏都在动的游戏用它最稳。所以策略是：</p>
+  <ul>
+    <li><strong>背景静态、角色和道具小而动：</strong>只刷新变化的区域，背景可以是高清的。</li>
+    <li><strong>全屏动作类用像素风：</strong>按 1/4 分辨率绘制再放大，计算量降到约 1/16。</li>
+    <li><strong>游戏里用像素版布比：</strong>官方 64×64 像素形象天然适合当游戏角色，主界面再用高清版。</li>
+    <li><strong>黑底为主：</strong>AMOLED 黑色像素不发光，省电，也减少要画的内容。</li>
+    <li><strong>目标 30 帧，</strong>AI 说话时游戏自动暂停。</li>
+  </ul>
+  <div class="tbl"><table>
+    <thead><tr><th>游戏</th><th>玩法</th><th>用到</th><th>渲染压力</th></tr></thead>
+    <tbody>
+      <tr><td>戳戳布比 <span class="pill no">首批</span></td><td>布比在圆屏边缘随机冒头，限时点中得分</td><td>触摸</td><td><span class="pill ok">很低</span></td></tr>
+      <tr><td>布比接零食 <span class="pill no">首批</span></td><td>倾斜板子让布比沿底部圆弧移动，接住掉下的零食，喂给宠物</td><td>陀螺仪</td><td><span class="pill ok">低</span></td></tr>
+      <tr><td>吹气飞飞</td><td>对着麦克风吹气或喊，声音越大布比飞得越高，躲开障碍</td><td>麦克风</td><td><span class="pill warn">中</span></td></tr>
+      <tr><td>圆环躲避</td><td>圆环障碍向中心收缩，旋转板子找缺口，专为圆屏设计</td><td>陀螺仪 / 触摸</td><td><span class="pill warn">中，用像素风</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note key"><p><strong>已确定首批两款：</strong>先做“戳戳布比”，打通触摸、角色绘制、计分和奖励宠物这一整套机制；再做“布比接零食”，把陀螺仪用起来。两款游戏挣到的零食和心情都直接反馈给宠物主界面。“吹气飞飞”和“圆环躲避”留作后续。</p></div>
+  <p>同类开源项目可参考：乐鑫 ESP-Brookesia（手机式启动器）、基于它的微雪 S3-Watch 手表固件、Tactility（ESP32 小系统，GPL-3 协议）。</p>
+</section>
+
+<section id="roadmap">
+  <h2><span class="n">08</span>阶段路线</h2>
+  <ol class="phases">
+    <li class="phase"><span class="num">0</span>
+      <h4>云端编译跑通 <span class="pill ok">现在开始</span></h4>
+      <ul>
+        <li>把官方仓库导入 <code>boopie-firmware</code>，保留官方仓库作为上游</li>
+        <li>GitHub Actions 用官方 IDF 6.0.1 环境编译微雪 1.75C 配置</li>
+        <li>token 存 GitHub Secrets，名称固定为 <code>MUSE_SDK_TOKEN</code>，编译时注入 <code>CONFIG_GADGET_SDK_TOKEN</code></li>
+        <li>摸清代码：界面组织、OTA 来源、token 使用位置、命令注册方式</li>
+      </ul>
+      <p class="out"><b>产出：</b>可下载的 .bin 固件和一份代码摸底说明。<b>你要做：</b>在 gadgets.muse.ai 生成 token，存入仓库 Settings › Secrets and variables › Actions，名称 <code>MUSE_SDK_TOKEN</code>。token 不进代码、不发聊天。</p>
+    </li>
+    <li class="phase"><span class="num">1</span>
+      <h4>到货刷机，Muse 对话落地 <span class="pill no">基础 ①</span></h4>
+      <ul>
+        <li>Windows 上先备份原厂固件，再用网页刷机工具刷入</li>
+        <li>Muse App 配对，<strong>验证国内网络能否连上</strong>，跑通按键对话</li>
+        <li>手动生成自己的形象：在 Muse App 发提示词，拿到代码交给云端编译</li>
+      </ul>
+      <p class="out"><b>产出：</b>能和 Muse 对话、显示自己形象的板子。</p>
+    </li>
+    <li class="phase"><span class="num">2</span>
+      <h4>底座改造</h4>
+      <ul>
+        <li>token 用户自填，配网设置页，可配置代理</li>
+        <li>自建 OTA、自有签名密钥、自动回滚</li>
+        <li>页面切换框架，代码放独立模块</li>
+      </ul>
+      <p class="out"><b>产出：</b>此后升级不再需要插电脑。</p>
+    </li>
+    <li class="phase"><span class="num">3</span>
+      <h4>双大脑与宠物主界面 <span class="pill no">基础 ② ③</span></h4>
+      <ul>
+        <li>抽出大脑接口，接入国内大脑（小智协议 + 自部署服务器 + 用户自己的 API key）</li>
+        <li>建立能力清单，同时导出成 Muse 命令和 MCP 工具</li>
+        <li>电子宠物作为主界面：心情、饥饿、成长，时间显示在同一屏</li>
+      </ul>
+      <p class="out"><b>产出：</b>三大基础齐备：不用代理也能完整使用，布比就是主界面，两个大脑都能调用板子功能。</p>
+    </li>
+    <li class="phase"><span class="num">4</span>
+      <h4>小游戏</h4>
+      <ul>
+        <li>先做“戳戳布比”，打通触摸、角色、计分、奖励宠物</li>
+        <li>再做“布比接零食”，用上陀螺仪</li>
+        <li>注册“开始游戏”命令，让 AI 能直接启动游戏</li>
+      </ul>
+      <p class="out"><b>产出：</b>能玩、能喂宠物、能被 AI 叫起来的小游戏。</p>
+    </li>
+    <li class="phase"><span class="num">5</span>
+      <h4>移植 Mosaico</h4>
+      <ul>
+        <li>备份原厂固件，升级 IDF 6.1，新建板子配置，适配方屏和触摸</li>
+        <li>加入摄像头命令；S31 有 2D 图形加速，游戏和高清形象会更流畅</li>
+      </ul>
+      <p class="out"><b>产出：</b>两块板子跑同一套 Boopie。</p>
+    </li>
+    <li class="phase"><span class="num">6</span>
+      <h4>扩展（按兴趣挑）</h4>
+      <ul>
+        <li>iOS 配套 App：蓝牙中转联网（出门模式）、骑行导航，共用一条蓝牙通道</li>
+        <li>信息卡片、更多小游戏</li>
+      </ul>
+    </li>
+  </ol>
+</section>
+
+<section id="risks">
+  <h2><span class="n">09</span>风险与待确认</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>事项</th><th>影响</th><th>应对</th></tr></thead>
+    <tbody>
+      <tr><td>国内网络</td><td>设备连不上 Muse 云端，一切停摆</td><td>阶段 1 首先验证；连不上就把代理功能提前</td></tr>
+      <tr><td>密钥安全</td><td>token 和 API key 存在板子上，可能被读出</td><td>打开 NVS 加密；只通过加密连接发送；可随时在官网或服务商处吊销</td></tr>
+      <tr><td>IDF 版本合并</td><td>小智要 6.0.2+，Muse 锁 6.0.1</td><td>统一到 6.0.x 后跑通两套客户端再合并</td></tr>
+      <tr><td>蓝牙中转</td><td>带宽有限；iOS 后台蓝牙联网可能被系统挂起</td><td>只承担语音和小数据；在家优先走 Wi-Fi；做原型实测</td></tr>
+      <tr><td>官方随时变更</td><td>SDK 不是正式产品，可能改动或停止</td><td>保持上游同步；宠物、表盘等功能不依赖 Muse</td></tr>
+      <tr><td>内存</td><td>微雪只有 8 MB PSRAM，多应用同跑可能吃紧</td><td>应用按需加载，阶段 2 实测</td></tr>
+      <tr><td>S31 支持</td><td>IDF 6.1 对 S31 仍是预览</td><td>Mosaico 放在阶段 5，等主线稳定</td></tr>
+      <tr><td>官方 OTA 覆盖</td><td>自改固件可能被官方更新替换</td><td>读代码确认，更新源指向自建服务器</td></tr>
+      <tr><td>界面代码结构</td><td>若写得很死，挂钩点难找</td><td>阶段 0 读代码后再定方案</td></tr>
+      <tr><td>商业化</td><td>条款禁止售卖嵌入我们 token 的设备；用户自填 token 属灰色地带</td><td>当前只做自用与送人；售卖前确认条款或取得授权；设备不带 Meta 默认形象</td></tr>
+      <tr><td>高清形象性能</td><td>序列帧占存储，Lottie 占算力</td><td>到货后两种路线各做一个状态实测帧率和体积</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="refs">
+  <h2><span class="n">10</span>参考资料</h2>
+  <p>按来源分组。链接都在新标签页打开，地址也一并列出，方便复制。</p>
+  <div class="refgroups">
+    <div class="rg">
+      <h3>Boopie 项目</h3>
+      <ul>
+        <li><a href="https://github.com/wenjinliuu/boopie-firmware">固件仓库 boopie-firmware</a><span>github.com/wenjinliuu/boopie-firmware</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>Muse 官方</h3>
+      <ul>
+        <li><a href="https://gadgets.muse.ai/">Muse Gadgets 官网</a><span>gadgets.muse.ai</span></li>
+        <li><a href="https://gadgets.muse.ai/settings/sdk-tokens">SDK token 生成页</a><span>gadgets.muse.ai/settings/sdk-tokens</span></li>
+        <li><a href="https://gadgets.muse.ai/sdk-terms">Gadget SDK Token 条款</a><span>gadgets.muse.ai/sdk-terms</span></li>
+        <li><a href="https://gadgets.muse.ai/home-link">Muse Home Link 介绍</a><span>gadgets.muse.ai/home-link</span></li>
+        <li><a href="https://muse.ai">Muse 主站</a><span>muse.ai</span></li>
+        <li><a href="https://muse.ai/terms">Muse 服务条款</a><span>muse.ai/terms</span></li>
+        <li><a href="https://developer.meta.com/ai/lp/muse-code/">Muse Code（官方 coding agent）</a><span>developer.meta.com/ai/lp/muse-code</span></li>
+        <li><a href="https://discord.gg/3bhjCkZdd6">Muse Gadgets Discord 社区</a><span>discord.gg/3bhjCkZdd6</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>Muse 开源仓库</h3>
+      <ul>
+        <li><a href="https://github.com/facebookincubator/muse-gadget-sdk">muse-gadget-sdk 总仓库</a><span>github.com/facebookincubator/muse-gadget-sdk</span></li>
+        <li><a href="https://github.com/facebookincubator/muse-gadget-sdk/tree/main/esp32">ESP32 Device SDK</a><span>…/tree/main/esp32</span></li>
+        <li><a href="https://github.com/facebookincubator/muse-gadget-sdk/tree/main/linux">Linux Device SDK</a><span>…/tree/main/linux</span></li>
+        <li><a href="https://github.com/facebookincubator/muse-gadget-sdk/blob/main/esp32/AGENTS.md">ESP32 AGENTS.md（编译刷机全流程）</a><span>…/esp32/AGENTS.md</span></li>
+        <li><a href="https://github.com/facebookincubator/muse-gadget-sdk/blob/main/esp32/devices/README.md">设备功能对照表</a><span>…/esp32/devices/README.md</span></li>
+        <li><a href="https://github.com/facebookincubator/muse-gadget-sdk/blob/main/esp32/devices/sdkconfig.muse-waveshare-s3-175c">微雪 1.75C 板子配置</a><span>…/devices/sdkconfig.muse-waveshare-s3-175c</span></li>
+        <li><a href="https://github.com/facebookincubator/muse-gadget-sdk/blob/main/esp32/tools/muse/AVATAR_RECIPE.md">形象定制说明</a><span>…/tools/muse/AVATAR_RECIPE.md</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>微雪 ESP32-S3-Touch-AMOLED-1.75C</h3>
+      <ul>
+        <li><a href="https://www.waveshare.net/shop/ESP32-S3-Touch-AMOLED-1.75C.htm">微雪中文商城产品页</a><span>waveshare.net/shop/ESP32-S3-Touch-AMOLED-1.75C.htm</span></li>
+        <li><a href="https://www.waveshare.com/esp32-s3-touch-amoled-1.75c.htm">微雪英文官网产品页</a><span>waveshare.com/esp32-s3-touch-amoled-1.75c.htm</span></li>
+        <li><a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C">中文文档首页</a><span>docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C</span></li>
+        <li><a href="https://docs.waveshare.com/ESP32-S3-Touch-AMOLED-1.75C">英文文档首页</a><span>docs.waveshare.com/ESP32-S3-Touch-AMOLED-1.75C</span></li>
+        <li><a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/Resources-And-Documents">原理图、规格书、示例代码</a><span>…/Resources-And-Documents</span></li>
+        <li><a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/ESP-IDF">ESP-IDF 开发教程</a><span>…/ESP-IDF</span></li>
+        <li><a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/Arduino">Arduino 开发教程</a><span>…/Arduino</span></li>
+        <li><a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/ESP32-AI-Tutorials">AI 应用教程（小智）</a><span>…/ESP32-AI-Tutorials</span></li>
+        <li><a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/Firmware-Flashing">固件烧录与擦除</a><span>…/Firmware-Flashing</span></li>
+        <li><a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/FAQ">产品 FAQ</a><span>…/FAQ</span></li>
+        <li><a href="https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75C">微雪官方 GitHub 示例仓库</a><span>github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75C</span></li>
+        <li><a href="https://github.com/waveshareteam">微雪 GitHub 组织</a><span>github.com/waveshareteam</span></li>
+        <li><a href="https://devices.esphome.io/devices/waveshare-esp32-s3-touch-amoled-175/">ESPHome 设备页（1.75 系列）</a><span>devices.esphome.io</span></li>
+        <li><a href="https://weixuesm.tmall.com/">微雪天猫旗舰店</a><span>weixuesm.tmall.com</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>乐鑫 ESP-Mosaico</h3>
+      <ul>
+        <li><a href="https://mosaico.espressif.com">Mosaico 产品官网</a><span>mosaico.espressif.com</span></li>
+        <li><a href="https://mosaico.espressif.com/guide/">上手指南</a><span>mosaico.espressif.com/guide</span></li>
+        <li><a href="https://mosaico.espressif.com/guide/chat-coding/">ChatCoding 说明</a><span>…/guide/chat-coding</span></li>
+        <li><a href="https://mosaico.espressif.com/guide/vibe-coding/">VibeCoding 说明</a><span>…/guide/vibe-coding</span></li>
+        <li><a href="https://mosaico.espressif.com/firmware-update/">原厂固件更新（恢复用）</a><span>mosaico.espressif.com/firmware-update</span></li>
+        <li><a href="https://mosaico-ideas.espressif.com">Idea Center 应用中心</a><span>mosaico-ideas.espressif.com</span></li>
+        <li><a href="https://docs.espressif.com/projects/esp-dev-kits/zh_CN/latest/esp32s31/esp-mosaico/index.html">中文用户指南（商品页给出的地址）</a><span>docs.espressif.com/…/zh_CN/…/esp-mosaico</span></li>
+        <li><a href="https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s31/esp-mosaico/user_guide.html">英文硬件用户指南 V1.0</a><span>docs.espressif.com/…/esp-mosaico/user_guide.html</span></li>
+        <li><a href="https://github.com/esp-mosaico">Mosaico 软件资源（GitHub）</a><span>github.com/esp-mosaico</span></li>
+        <li><a href="https://item.taobao.com/item.htm?id=1075501920711">官方淘宝购买页</a><span>item.taobao.com/item.htm?id=1075501920711</span></li>
+        <li><a href="https://linuxgizmos.com/esp-mosaico-places-dual-core-risc-v-esp32-s31-behind-a-2-16-inch-square-amoled/">LinuxGizmos 评测报道</a><span>linuxgizmos.com</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>ESP32-S31 芯片与 ESP-IDF</h3>
+      <ul>
+        <li><a href="https://www.espressif.com/en/news/ESP32_S31_Mass_Production">ESP32-S31 量产公告</a><span>espressif.com/en/news/ESP32_S31_Mass_Production</span></li>
+        <li><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32s31/get-started/index.html">ESP32-S31 ESP-IDF 入门</a><span>docs.espressif.com/projects/esp-idf/…/esp32s31</span></li>
+        <li><a href="https://github.com/espressif/esp-idf/releases/tag/v6.1">ESP-IDF v6.1 发布说明（S31 预览支持）</a><span>github.com/espressif/esp-idf/releases/tag/v6.1</span></li>
+        <li><a href="https://github.com/espressif/esp-idf">ESP-IDF 仓库（固件要求 v6.0.1）</a><span>github.com/espressif/esp-idf</span></li>
+        <li><a href="https://docs.espressif.com/projects/esp-idf/en/v6.0.1/esp32s3/get-started/index.html">ESP-IDF v6.0.1 入门（ESP32-S3）</a><span>docs.espressif.com/projects/esp-idf/en/v6.0.1</span></li>
+        <li><a href="https://hub.docker.com/r/espressif/idf">ESP-IDF 官方 Docker 镜像（云端编译用）</a><span>hub.docker.com/r/espressif/idf</span></li>
+        <li><a href="https://components.espressif.com">ESP 组件库</a><span>components.espressif.com</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>刷机工具</h3>
+      <ul>
+        <li><a href="https://espressif.github.io/esptool-js/">esptool-js 网页刷机（Chrome / Edge）</a><span>espressif.github.io/esptool-js</span></li>
+        <li><a href="https://espressif.github.io/esp-launchpad/">ESP Launchpad 网页刷机</a><span>espressif.github.io/esp-launchpad</span></li>
+        <li><a href="https://github.com/espressif/esptool">esptool 命令行工具</a><span>github.com/espressif/esptool</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>多应用系统参考</h3>
+      <ul>
+        <li><a href="https://github.com/espressif/esp-brookesia">ESP-Brookesia（乐鑫官方）</a><span>github.com/espressif/esp-brookesia</span></li>
+        <li><a href="https://github.com/SlimyRedstone/S3-Watch">S3-Watch 微雪手表固件</a><span>github.com/SlimyRedstone/S3-Watch</span></li>
+        <li><a href="https://github.com/TactilityProject/Tactility">Tactility（GPL-3）</a><span>github.com/TactilityProject/Tactility</span></li>
+        <li><a href="https://github.com/78/xiaozhi-esp32">小智 AI 固件 xiaozhi-esp32（MIT）</a><span>github.com/78/xiaozhi-esp32</span></li>
+        <li><a href="https://github.com/xinnan-tech/xiaozhi-esp32-server">小智自部署服务器 xiaozhi-esp32-server</a><span>github.com/xinnan-tech/xiaozhi-esp32-server</span></li>
+        <li><a href="https://dev.to/numbpill3d/building-the-brain-behind-your-esp32-a-deep-dive-into-xiaozhi-esp32-server-53lg">小智服务器架构介绍</a><span>dev.to</span></li>
+        <li><a href="https://api-docs.deepseek.com/">DeepSeek API 文档</a><span>api-docs.deepseek.com</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>导航与其他应用参考</h3>
+      <ul>
+        <li><a href="https://github.com/dev-ale/moto2000">moto2000：微雪 1.75 + iPhone 摩托导航</a><span>github.com/dev-ale/moto2000</span></li>
+        <li><a href="https://github.com/deanthecoder/SteedPilot">SteedPilot：iPhone + ESP32 圆屏导航</a><span>github.com/deanthecoder/SteedPilot</span></li>
+        <li><a href="https://github.com/TueftelTyp/NavGet">NavGet：圆屏摩托导航</a><span>github.com/TueftelTyp/NavGet</span></li>
+        <li><a href="https://github.com/emdzej/opencluster">OpenCluster：圆屏仪表盘</a><span>github.com/emdzej/opencluster</span></li>
+      </ul>
+    </div>
+    <div class="rg">
+      <h3>新闻报道</h3>
+      <ul>
+        <li><a href="https://www.unite.ai/meta-open-sources-muse-gadget-sdks-for-diy-ai-hardware-devices/">Unite.AI：Meta 开源 Muse Gadget SDK</a><span>unite.ai</span></li>
+        <li><a href="https://www.techmeme.com/261002/p24">Techmeme：发布汇总</a><span>techmeme.com/261002/p24</span></li>
+      </ul>
+    </div>
+  </div>
+  <footer>Boopie 设计方案 v0.1 · wenjin · 2026-10-03。各项事实以官方最新文档为准。</footer>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+  var c=document.getElementById('pix'); if(!c) return;
+  var x=c.getContext('2d');
+  var m=[
+  "................",
+  "....AA....AA....",
+  "...AAAA..AAAA...",
+  "..AAAAAAAAAAAA..",
+  ".AAAAAAAAAAAAAA.",
+  ".AAAAAAAAAAAAAA.",
+  ".AAAWWAAAAWWAAA.",
+  ".AAAWKAAAAWKAAA.",
+  ".AAAAAAAAAAAAAA.",
+  ".AAPPAAAAAAPPAA.",
+  ".AAAAAAKKAAAAAA.",
+  "..AAAAAAAAAAAA..",
+  "...AAAAAAAAAA...",
+  "....AAAAAAAA....",
+  "................",
+  "................"];
+  var col={A:'#FF8FAB',W:'#FFFFFF',K:'#14141C',P:'#FFC2D1'};
+  function draw(blink){
+    x.clearRect(0,0,16,16);
+    for(var r=0;r<16;r++)for(var k=0;k<16;k++){
+      var ch=m[r][k]; if(ch==='.')continue;
+      if(blink&&(r===6||r===7)&&(ch==='W'||ch==='K')) ch=(r===7?'K':'A');
+      x.fillStyle=col[ch]; x.fillRect(k,r,1,1);
+    }
+  }
+  draw(false);
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!reduce){ setInterval(function(){draw(true);setTimeout(function(){draw(false)},160)},3200); }
+})();
+</script>
+
+</body>
+</html>
