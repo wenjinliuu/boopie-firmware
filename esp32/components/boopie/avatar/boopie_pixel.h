@@ -29,6 +29,16 @@
 #define BOOPIE_FOOD_X1 61
 #define BOOPIE_FOOD_Y1 59
 
+/* What the food overlay offers: a different one each meal. */
+typedef enum {
+    BOOPIE_FOOD_RICE = 0,
+    BOOPIE_FOOD_DRUMSTICK,
+    BOOPIE_FOOD_ONIGIRI,
+    BOOPIE_FOOD_FISH,
+    BOOPIE_FOOD_COOKIE,
+    BOOPIE_FOOD_COUNT,
+} boopie_food_t;
+
 typedef enum {
     BOOPIE_CHAR_BOOPIE = 0,
     BOOPIE_CHAR_GPT,
@@ -143,6 +153,7 @@ typedef struct {
     double overlay_t[BOOPIE_OVERLAY_COUNT];  /* seconds each has been on */
     float dt;                /* seconds since the last frame, for easing the
                               * accent; 0 jumps straight to it */
+    boopie_food_t food;      /* what the food overlay offers */
     boopie_scene_t scene;    /* the background */
     double scene_t;          /* seconds the background has run */
 } boopie_pixel_pose_t;

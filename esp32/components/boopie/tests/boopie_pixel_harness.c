@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -51,6 +52,13 @@ int main(void)
         if (kp) {
             sscanf(kp + 5, "%31s", skin);
             *kp = '\0';
+        }
+        /* food:<index> as the prototype's FOODS */
+        int food = 0;
+        char *fp = strstr(line, "food:");
+        if (fp) {
+            food = atoi(fp + 5);
+            *fp = '\0';
         }
         char wear[64] = "";
         char *wp = strstr(line, "wear:");
@@ -102,6 +110,7 @@ int main(void)
                 return 1;
             }
         }
+        p.food = (boopie_food_t)food;
         boopie_pixel_set_wear(worn);
         boopie_pixel_set_skin(skin[0] ? boopie_skin_from_key(skin) : -1);
         boopie_pixel_set_character((boopie_char_t)c, BOOPIE_COLOUR_DEFAULT);

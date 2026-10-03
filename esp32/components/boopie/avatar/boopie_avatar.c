@@ -896,7 +896,10 @@ void muse_pixel_render(const muse_pose_t *p)
 
     uint8_t on = s_overlays | device_overlays();
     if (s_pet_state.hungry && p->mode == MUSE_MODE_IDLE && s_happy_since < 0) {
-        on |= BOOPIE_OVERLAY_BIT(BOOPIE_OVERLAY_FOOD);   /* the bowl to tap */
+        on |= BOOPIE_OVERLAY_BIT(BOOPIE_OVERLAY_FOOD);   /* the food to tap */
+        /* A different food each meal, the same all through one: from when it got hungry. */
+        uint32_t h = (uint32_t)(s_pet_state.hungry_since / 60) * 2654435761u;
+        bp.food = (boopie_food_t)((h >> 16) % BOOPIE_FOOD_COUNT);
     }
     for (int o = 0; o < BOOPIE_OVERLAY_COUNT; o++) {
         if (p->t < s_flash_until[o]) {

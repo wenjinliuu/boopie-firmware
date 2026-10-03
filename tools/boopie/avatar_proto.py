@@ -85,6 +85,9 @@ OVERLAYS = [
 
 # Where the food bowl sits (the food overlay): tap inside to feed.
 FOOD_BOX = (44, 42, 61, 59)   # x0, y0, x1, y1, grid cells, inclusive
+# What the pet may be offered (icons), a different one each meal, centred on
+# the rice bowl's place and bottom-aligned with it.
+FOODS = ["rice", "drumstick", "onigiri", "fish", "big_cookie"]
 
 
 def ramp(hex_colour: str) -> dict:
@@ -119,6 +122,18 @@ ICONS = {
     "code": (["#...#", "#.#.#", "#...#"], {"#": (150, 245, 200)}),
     "rice": (["..o...o...o", ".o...o...o.", "wwwwwwwwwww", "#wwwwwwwww#", ".#########.", "..#######..", "...#####..."],
              {"w": (250, 248, 236), "#": (240, 140, 60), "o": (170, 170, 190)}),
+    # Food: one shows when the pet's hungry, and the same sprites fall in the snack game.
+    "drumstick": ([".ddddd.....", "dbbbbbd....", "dbhhbbbd...", "dbhbbbbd...", "dbbbbbbd...", ".dbbbbdw...",
+                   "..ddddww...", "......ww.w.", ".......wwww", "........ww."],
+                  {"d": (150, 70, 30), "b": (214, 120, 50), "h": (250, 190, 110), "w": (245, 240, 225)}),
+    "onigiri": (["....ww....", "...wwww...", "..wwwwww..", ".wwwwwwww.", "wwwnnnnwww", "wwwnnnnwww", ".wwnnnnww."],
+                {"w": (250, 248, 236), "n": (40, 70, 50)}),
+    "fish": (["...ffff....f", "..ffffff..ff", ".fefffffffff", ".fffffffffff", "..llllll..ff", "...llll....f"],
+             {"f": (90, 160, 255), "l": (190, 225, 255), "e": (20, 20, 40)}),
+    "big_cookie": (["..#####..", ".##o####.", "#####o###", "##o######", "####o##o#", ".#######.", "..#####.."],
+                   {"#": (214, 150, 80), "o": (110, 64, 34)}),
+    "candy": (["p.......p", "pp.ryr.pp", "ppryryrpp", "pp.ryr.pp", "p.......p"],
+              {"p": (255, 150, 200), "r": (255, 90, 120), "y": (255, 230, 120)}),
     "laptop": (["..##########..", ".############.", ".#####oo#####.", ".############.",
                 ".############.", "ssssssssssssss", ".kkkkkkkkkkkk."],
                {"#": (70, 66, 96), "o": (150, 245, 200), "s": (160, 156, 186), "k": (110, 106, 136)}),
@@ -1299,7 +1314,7 @@ def pose_for(name: str, t: float, length: float) -> Pose:
     return p
 
 
-def overlay(p: Pose, name: str, t: float, length: float) -> Pose:
+def overlay(p: Pose, name: str, t: float, length: float, food: str = "rice") -> Pose:
     """Lays an overlay over a pose: shared by every character, drawn in any expression."""
     if name == "surprise":
         k = t / length
@@ -1330,9 +1345,10 @@ def overlay(p: Pose, name: str, t: float, length: float) -> Pose:
         if int(t * 2) % 2:
             p.fx.append(("icon", "battery", 50, 6))
             p.light, p.light_level = RED, min(p.light_level, 0.6)
-    elif name == "food":   # a bowl of rice, steaming, bobbing to be tapped
+    elif name == "food":   # something to eat, bobbing to be tapped
         bob = int(wave(t, 1.6, 0, 2))
-        p.fx.append(("icon", "rice", 47, 48 + bob))
+        rows = ICONS[food][0]
+        p.fx.append(("icon", food, 47 + (11 - len(rows[0])) // 2, 55 - len(rows) + bob))
     elif name == "charging":
         p.fx.append(("icon", "bolt", 53, 4 + int(wave(t, 0.8, 0, 2))))
         for i in range(3):

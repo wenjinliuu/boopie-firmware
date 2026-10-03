@@ -207,12 +207,12 @@ typedef struct {
     const char *const *rows;
     uint8_t nrows;
     const char *keys;      /* the characters drawn ... */
-    rgb_t colours[3];      /* ... in these colours */
+    rgb_t colours[4];      /* ... in these colours */
 } icon_t;
 
 enum {
     I_HEART, I_Z, I_EXCL, I_DROP, I_DOT, I_NOTE, I_BOWL, I_COOKIE, I_BATTERY, I_BOLT, I_BUBBLE,
-    I_CODE, I_LAPTOP, I_RICE, I_COUNT,
+    I_CODE, I_LAPTOP, I_RICE, I_DRUMSTICK, I_ONIGIRI, I_FISH, I_BIG_COOKIE, I_CANDY, I_COUNT,
 };
 
 #define ROWS(...) (const char *const[]){ __VA_ARGS__ }, sizeof((const char *const[]){ __VA_ARGS__ }) / sizeof(char *)
@@ -233,14 +233,30 @@ static const icon_t ICONS[I_COUNT] = {
     [I_CODE] = { ROWS("#...#", "#.#.#", "#...#"), "#", { { 150, 245, 200 } } },
     [I_LAPTOP] = { ROWS("..##########..", ".############.", ".#####oo#####.", ".############.",
                         ".############.", "ssssssssssssss", ".kkkkkkkkkkkk."),
-                   "#osk", { { 70, 66, 96 }, { 150, 245, 200 }, { 160, 156, 186 } } },
+                   "#osk", { { 70, 66, 96 }, { 150, 245, 200 }, { 160, 156, 186 }, { 110, 106, 136 } } },
+    /* Food: one shows when the pet's hungry, and the same sprites fall in the snack game. */
+    [I_RICE] = { ROWS("..o...o...o", ".o...o...o.", "wwwwwwwwwww", "#wwwwwwwww#", ".#########.", "..#######..",
+                      "...#####..."),
+                 "wo#", { { 250, 248, 236 }, { 170, 170, 190 }, { 240, 140, 60 } } },
+    [I_DRUMSTICK] = { ROWS(".ddddd.....", "dbbbbbd....", "dbhhbbbd...", "dbhbbbbd...", "dbbbbbbd...", ".dbbbbdw...",
+                           "..ddddww...", "......ww.w.", ".......wwww", "........ww."),
+                      "dbhw", { { 150, 70, 30 }, { 214, 120, 50 }, { 250, 190, 110 }, { 245, 240, 225 } } },
+    [I_ONIGIRI] = { ROWS("....ww....", "...wwww...", "..wwwwww..", ".wwwwwwww.", "wwwnnnnwww", "wwwnnnnwww",
+                         ".wwnnnnww."),
+                    "wn", { { 250, 248, 236 }, { 40, 70, 50 } } },
+    [I_FISH] = { ROWS("...ffff....f", "..ffffff..ff", ".fefffffffff", ".fffffffffff", "..llllll..ff", "...llll....f"),
+                 "fle", { { 90, 160, 255 }, { 190, 225, 255 }, { 20, 20, 40 } } },
+    [I_BIG_COOKIE] = { ROWS("..#####..", ".##o####.", "#####o###", "##o######", "####o##o#", ".#######.",
+                            "..#####.."),
+                       "#o", { { 214, 150, 80 }, { 110, 64, 34 } } },
+    [I_CANDY] = { ROWS("p.......p", "pp.ryr.pp", "ppryryrpp", "pp.ryr.pp", "p.......p"),
+                  "pry", { { 255, 150, 200 }, { 255, 90, 120 }, { 255, 230, 120 } } },
 };
-/* The bowl of rice the food overlay shows. */
-static const icon_t RICE = { ROWS("..o...o...o", ".o...o...o.", "wwwwwwwwwww", "#wwwwwwwww#", ".#########.",
-                                  "..#######..", "...#####..."),
-                             "wo#", { { 250, 248, 236 }, { 170, 170, 190 }, { 240, 140, 60 } } };
-/* The laptop has a fourth colour, its keyboard. */
-static const rgb_t LAPTOP_KEYS = { 110, 106, 136 };
+/* What the pet may be offered, as boopie_food_t. */
+static const uint8_t FOOD_ICONS[BOOPIE_FOOD_COUNT] = {
+    [BOOPIE_FOOD_RICE] = I_RICE, [BOOPIE_FOOD_DRUMSTICK] = I_DRUMSTICK, [BOOPIE_FOOD_ONIGIRI] = I_ONIGIRI,
+    [BOOPIE_FOOD_FISH] = I_FISH, [BOOPIE_FOOD_COOKIE] = I_BIG_COOKIE,
+};
 
 /* Codex's face: 3 x 5 glyphs. */
 static const char *glyph_rows(char ch)
@@ -667,6 +683,8 @@ static rgb_t hsv(float h, double s, float v)
 }
 
 /* Lays an overlay over a pose: shared by every character, drawn in any expression. */
+static int s_food_icon = I_RICE;   /* what the food overlay offers this frame */
+
 static void overlay(pose_t *p, boopie_overlay_t name, double t, double length)
 {
     switch (name) {
@@ -715,9 +733,13 @@ static void overlay(pose_t *p, boopie_overlay_t name, double t, double length)
             p->light_level = fmin(p->light_level, 0.6);
         }
         break;
-    case BOOPIE_OVERLAY_FOOD:   /* a bowl of rice, steaming, bobbing to be tapped */
-        fx_icon(p, FX_ICON, I_RICE, 47, 48 + (int)wave(t, 1.6, 0, 2));
+    case BOOPIE_OVERLAY_FOOD: {   /* something to eat, bobbing to be tapped: centred and
+                                   * bottom-aligned on the rice bowl's place */
+        const icon_t *ic = &ICONS[s_food_icon];
+        int w = (int)strlen(ic->rows[0]);
+        fx_icon(p, FX_ICON, s_food_icon, 47 + (int)floor((11 - w) / 2.0), 55 - ic->nrows + (int)wave(t, 1.6, 0, 2));
         break;
+    }
     case BOOPIE_OVERLAY_CHARGING:
         fx_icon(p, FX_ICON, I_BOLT, 53, 4 + (int)wave(t, 0.8, 0, 2));
         for (int i = 0; i < 3; i++) {
@@ -884,13 +906,13 @@ static void shaded(const mask_t m, const ramp_t *rp)
 
 static void icon(int which, float x, float y)
 {
-    const icon_t *ic = which == I_RICE ? &RICE : &ICONS[which];
+    const icon_t *ic = &ICONS[which];
     for (int j = 0; j < ic->nrows; j++) {
         for (int i = 0; ic->rows[j][i]; i++) {
             const char *k = strchr(ic->keys, ic->rows[j][i]);
             if (ic->rows[j][i] != '.' && k) {
                 int ci = (int)(k - ic->keys);
-                put(x + i, y + j, ci == 3 ? LAPTOP_KEYS : ic->colours[ci]);
+                put(x + i, y + j, ic->colours[ci]);
             }
         }
     }
@@ -2777,6 +2799,7 @@ void boopie_pixel_render(const boopie_pixel_pose_t *in)
         boopie_pixel_set_character(BOOPIE_CHAR_BOOPIE, BOOPIE_COLOUR_DEFAULT);
     }
     boopie_expr_t e = boopie_expr_valid(in->expr) ? in->expr : BOOPIE_EXPR_IDLE;
+    s_food_icon = FOOD_ICONS[(int)in->food >= 0 && in->food < BOOPIE_FOOD_COUNT ? in->food : BOOPIE_FOOD_RICE];
     double length = LOOP[e];
     double t = in->t < 0 ? 0 : in->t;
     /* BOOT and OFF play once and hold; THINKING runs on into working; the rest loop. */
@@ -2922,6 +2945,7 @@ void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t b
     if (s_slots_set) {
         wear_all(&s_slots);
     }
+    s_food_icon = FOOD_ICONS[(int)in->food >= 0 && in->food < BOOPIE_FOOD_COUNT ? in->food : BOOPIE_FOOD_RICE];
     static pose_t pose;   /* the overlays draw at fixed places */
     memset(&pose, 0, sizeof(pose));
     pose.light_level = 1;
