@@ -68,6 +68,7 @@ static void usage(FILE *out, const char *argv0)
             "  ble=off|advertising|connected         passkey=0..999999\n"
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
+            "  tap=X,Y            swipe=left|right|up|down\n"
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
@@ -289,8 +290,70 @@ static bool set_link(const char *value)
     return false;
 }
 
+/* Boopie: a scripted finger, for screenshots past the face: tap=X,Y and
+ * swipe=left|right|up|down (a finger moving that way across the middle). */
+static lv_indev_t *s_finger;
+static lv_point_t s_finger_at;
+static bool s_finger_down;
+
+static void finger_read(lv_indev_t *indev, lv_indev_data_t *data)
+{
+    (void)indev;
+    data->point = s_finger_at;
+    data->state = s_finger_down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+
+static void finger(bool down, int x, int y, uint32_t then_ms, bool real_time)
+{
+    if (!s_finger) {
+        s_finger = lv_indev_create();
+        lv_indev_set_type(s_finger, LV_INDEV_TYPE_POINTER);
+        lv_indev_set_read_cb(s_finger, finger_read);
+    }
+    s_finger_down = down;
+    s_finger_at = (lv_point_t){ x, y };
+    render_for(then_ms, real_time);
+}
+
+static bool tap(const char *value, bool real_time)
+{
+    int x, y;
+    if (sscanf(value, "%d,%d", &x, &y) != 2) {
+        return false;
+    }
+    finger(true, x, y, 80, real_time);
+    finger(false, x, y, 300, real_time);
+    return true;
+}
+
+static bool swipe(const char *value, bool real_time)
+{
+    static const struct { const char *name; int dx, dy; } WAYS[] = {
+        { "left", -1, 0 }, { "right", 1, 0 }, { "up", 0, -1 }, { "down", 0, 1 },
+    };
+    int size = lv_display_get_horizontal_resolution(sim_board_display());
+    int c = size / 2, reach = size / 3;
+    for (size_t i = 0; i < sizeof WAYS / sizeof WAYS[0]; i++) {
+        if (!strcmp(value, WAYS[i].name)) {
+            for (int k = 0; k <= 10; k++) {
+                finger(true, c - WAYS[i].dx * reach + WAYS[i].dx * reach * 2 * k / 10,
+                       c - WAYS[i].dy * reach + WAYS[i].dy * reach * 2 * k / 10, 15, real_time);
+            }
+            finger(false, c + WAYS[i].dx * reach, c + WAYS[i].dy * reach, 600, real_time);
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool apply_setting(const char *key, const char *value, bool real_time)
 {
+    if (!strcmp(key, "tap")) {
+        return tap(value, real_time);
+    }
+    if (!strcmp(key, "swipe")) {
+        return swipe(value, real_time);
+    }
     bool flag;
     long number;
     float scalar;

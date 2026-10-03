@@ -159,6 +159,10 @@ add_executable(muse_simulator
     "${MUSE_COMPONENT_DIR}/muse_state.c"
     "${MUSE_COMPONENT_DIR}/muse_text.c"
     "${MUSE_COMPONENT_DIR}/../../avatar/muse_pixel.c"
+    # Boopie: the real settings pages and keypad, over stand-in services.
+    "${MUSE_COMPONENT_DIR}/muse_settings_ui.c"
+    "${MUSE_COMPONENT_DIR}/muse_keypad.c"
+    src/sim_settings.c
     # Boopie: the avatars, and the switcher between them and Muse's.
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_avatar.c"
     "${BOOPIE_COMPONENT_DIR}/avatar/boopie_pixel.c"
@@ -188,6 +192,10 @@ target_link_libraries(muse_simulator PRIVATE
 )
 
 target_link_libraries(muse_simulator PRIVATE m)
+
+# Boopie: strdup for the settings pages.
+set_source_files_properties("${MUSE_COMPONENT_DIR}/muse_settings_ui.c" PROPERTIES COMPILE_DEFINITIONS
+    "_POSIX_C_SOURCE=200809L")
 
 # Boopie: Muse's renderer under the names the avatar switcher calls.
 set_source_files_properties("${MUSE_COMPONENT_DIR}/../../avatar/muse_pixel.c" PROPERTIES COMPILE_DEFINITIONS

@@ -165,7 +165,8 @@ static const char *stand_in(int32_t cp)
     if ((cp >= 0x0300 && cp <= 0x036F)      /* accents typed after their letter */
         || (cp >= 0x200B && cp <= 0x200F)   /* zero-width spaces and joiners, direction marks */
         || cp == 0x20E3                     /* keycap */
-        || (cp >= 0x2600 && cp <= 0x27BF)   /* symbols and dingbats */
+        || (cp >= 0x2600 && cp <= 0x27BF && cp != 0x2605 && cp != 0x2606)   /* symbols and dingbats;
+                                                                             * Boopie: its font draws the stars */
         || (cp >= 0x2B00 && cp <= 0x2BFF)   /* more arrows, stars */
         || (cp >= 0xFE00 && cp <= 0xFE0F)   /* emoji or text style */
         || (cp >= 0x1F000 && cp <= 0x1FAFF) /* emoji */

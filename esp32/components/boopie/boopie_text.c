@@ -20,6 +20,7 @@ static const struct {
     { 0x2160, 0x216B },   /* Roman numerals */
     { 0x2460, 0x249B },   /* circled, parenthesised and dotted numbers */
     { 0x25A0, 0x25FF },   /* geometric shapes: ■□▲△◆◇○● */
+    { 0x2605, 0x2606 },   /* ★☆ */
     { 0x2E80, 0x303E },   /* CJK radicals, symbols and punctuation */
     { 0x3041, 0x33FF },   /* kana, Bopomofo, enclosed CJK, CJK compatibility */
     { 0x3400, 0x4DBF },   /* CJK Extension A */

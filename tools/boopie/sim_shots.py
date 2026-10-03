@@ -149,6 +149,22 @@ def render_accessories(binary: Path, out: Path) -> list[Path]:
                 for avatar in AVATARS for wear in WEARS]
 
 
+# The settings pages, reached by a scripted finger (466 px screen).
+SETTINGS = [
+    ("settings-home", ["swipe=left"]),
+    ("settings-wifi", ["swipe=left", "tap=230,113", "advance=600"]),
+    ("settings-wifi-password", ["swipe=left", "tap=230,113", "advance=600", "tap=230,459", "advance=600"]),
+    ("settings-avatar", ["swipe=left", "tap=230,249", "advance=600"]),
+]
+
+
+def render_settings(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
+                      {"BOOPIE_PET_XP": "900"})
+                for name, steps in SETTINGS]
+
+
 def contact_sheet(pngs: list[Path], dest: Path, cols: int = 5) -> None:
     ims = [Image.open(p) for p in pngs]
     w, h = ims[0].size
@@ -180,9 +196,11 @@ def main() -> int:
     contact_sheet(scenes, args.out / "scenes.png", cols=len(SCENES))
     skins = render_skins(args.binary, args.out)
     contact_sheet(skins, args.out / "skins.png", cols=len(SKIN_STATES) * 2)
+    settings = render_settings(args.binary, args.out)
+    contact_sheet(settings, args.out / "settings.png", cols=len(SETTINGS))
     wears = render_accessories(args.binary, args.out)
     contact_sheet(wears, args.out / "accessories.png", cols=len(WEARS) * 2)
-    print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes) + len(skins) + len(wears)} screenshots in {args.out}",
+    print(f"{len(pngs) + len(avatars) + len(pets) + len(scenes) + len(skins) + len(wears) + len(settings)} screenshots in {args.out}",
           file=sys.stderr)
     return 0
 
