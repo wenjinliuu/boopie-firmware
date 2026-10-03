@@ -118,6 +118,8 @@ static lv_obj_t *s_bar;     /* compact layout's stand-in for the ring */
 static lv_obj_t *s_state_lbl;
 static lv_obj_t *s_name_lbl;    /* this gadget's own name, to tell it from the next one */
 static lv_obj_t *s_power_lbl;
+static lv_obj_t *s_time_lbl;      /* Boopie: the time, in the status line */
+static lv_obj_t *s_batt_icon;     /* Boopie: the battery as an icon beside its % */
 static lv_obj_t *s_caption_lbl;
 static lv_obj_t *s_reply_lbl;   /* full layout: the reply's page while answering */
 static lv_obj_t *s_meter[METER_SEGS];
@@ -140,7 +142,7 @@ static bool s_ready;
 static float s_level;
 static int s_shown_state = -1;
 static const char *s_shown_name;
-static const char *s_idle_name = "READY";   /* idle's label: set by the Wi-Fi state */
+static const char *s_idle_name = "在这儿";   /* idle's label: set by the Wi-Fi state */
 static int s_shown_lit = -1;
 static uint32_t s_shown_accent;
 static bool s_meter_visible = true;
@@ -177,13 +179,14 @@ static int s_muse_y;            /* and now */
 static int s_from_px, s_from_y, s_to_px, s_to_y;
 
 static const char *const MODE_NAMES[MUSE_MODE_COUNT] = {
-    [MUSE_MODE_BOOT] = "WAKING UP",
-    [MUSE_MODE_IDLE] = "READY",
-    [MUSE_MODE_LISTENING] = "LISTENING",
-    [MUSE_MODE_THINKING] = "THINKING",
-    [MUSE_MODE_SPEAKING] = "SPEAKING",
-    [MUSE_MODE_ERROR] = "ERROR",
-    [MUSE_MODE_OFF] = "GOODBYE",
+    /* Boopie: in Chinese, in the pixel font (docs/boopie-interaction.md). */
+    [MUSE_MODE_BOOT] = "醒来中",
+    [MUSE_MODE_IDLE] = "在这儿",
+    [MUSE_MODE_LISTENING] = "在听",
+    [MUSE_MODE_THINKING] = "想一想",
+    [MUSE_MODE_SPEAKING] = "说话中",
+    [MUSE_MODE_ERROR] = "出错了",
+    [MUSE_MODE_OFF] = "再见",
 };
 
 /*
@@ -516,12 +519,12 @@ static void on_speaker_event(lv_event_t *e)
         muse_settings_set_speaker_on(!on);
         show_speaker(!on);
         if (idle) {
-            muse_state_set_caption(on ? "SPEAKER OFF" : "SPEAKER ON");
+            muse_state_set_caption(on ? "已静音：只显示文字" : "已打开声音");
         }
         break;
     case LV_EVENT_SHORT_CLICKED:
         if (idle) {
-            muse_state_set_caption(on ? "HOLD TO MUTE" : "HOLD TO UNMUTE");
+            muse_state_set_caption(on ? "按住静音" : "按住打开声音");
         }
         break;
     case LV_EVENT_RELEASED:
@@ -875,13 +878,16 @@ static void build_screen(void)
     lv_obj_align(status, LV_ALIGN_TOP_MID, 0, s_small ? 1 : 20 + s_dy);
     s_wifi_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     s_ble_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
-    s_power_lbl = make_label(status, &lv_font_unscii_8, COLOR_DIM);
+    /* Boopie: Wi-Fi, a phone if one's connected, the time, the battery. */
+    s_time_lbl = make_label(status, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, COLOR_DIM);
+    s_batt_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
+    s_power_lbl = make_label(status, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, 0xff6b6b);
 
     /* The compact layout leaves the state to the avatar and the caption,
      * unless the screen is tall enough to fit it in small type above Muse. */
-    s_state_lbl = make_label(face, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, 0xffffff);
+    s_state_lbl = make_label(face, s_small ? &boopie_font_pixel_12 : &boopie_font_pixel_24, 0xffffff);
     lv_obj_set_style_text_letter_space(s_state_lbl, s_small ? 1 : 2, 0);
-    lv_obj_align(s_state_lbl, LV_ALIGN_TOP_MID, 0, s_small ? 22 : 40 + s_dy);
+    lv_obj_align(s_state_lbl, LV_ALIGN_TOP_MID, 0, s_small ? 22 : 46 + s_dy);
     lv_obj_set_flag(s_state_lbl, LV_OBJ_FLAG_HIDDEN, s_small && !s_tall);
 
     /* This gadget's own name, dim under the state while it's unpaired: with
@@ -1071,11 +1077,11 @@ static void build_overlays(void)
     lv_obj_set_style_border_width(s_pair, 2, 0);
     lv_obj_remove_flag(s_pair, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
-    s_pair_title = make_label(s_pair, font_pick(&lv_font_montserrat_20, FONT_COMPACT), COLOR_LIT);
+    s_pair_title = make_label(s_pair, boopie_font_with_cjk(font_pick(&lv_font_montserrat_20, FONT_COMPACT)), COLOR_LIT);
     lv_label_set_text(s_pair_title, "Pairing code");
-    s_pair_code = make_label(s_pair, font_pick(&lv_font_montserrat_28, &lv_font_montserrat_20), COLOR_ACCENT);
+    s_pair_code = make_label(s_pair, boopie_font_with_cjk(font_pick(&lv_font_montserrat_28, &lv_font_montserrat_20)), COLOR_ACCENT);
     lv_obj_set_style_text_letter_space(s_pair_code, s_small ? 2 : 6, 0);
-    s_pair_hint = make_label(s_pair, font_pick(&lv_font_montserrat_14, FONT_COMPACT), COLOR_DIM);
+    s_pair_hint = make_label(s_pair, boopie_font_with_cjk(font_pick(&lv_font_montserrat_14, FONT_COMPACT)), COLOR_DIM);
     lv_label_set_text(s_pair_hint, s_small ? "Enter on phone" : "Enter it on your phone");
     /* Wraps: "bottom right button" is wider than the AIPI's card. */
     lv_obj_set_width(s_pair_hint, lv_pct(100));
@@ -1146,24 +1152,37 @@ static bool update_sleep(void)
     return s_dark;
 }
 
-/* Idle's label: whether a press reaches Hatch now or waits for Wi-Fi. */
+/* Idle's label: whether a press reaches Hatch now or waits for Wi-Fi.
+ * Boopie: online, how the pet is (the time is in the status line). */
 static const char *idle_name(muse_wifi_state_t wifi)
 {
     static bool joined;   /* since boot: from then on, a drop is reconnecting */
     switch (wifi) {
     case MUSE_WIFI_CONNECTED: {
         joined = true;
-        const char *clock = boopie_pages_clock();   /* Boopie: the time, once it's known */
-        return clock ? clock : MODE_NAMES[MUSE_MODE_IDLE];
+        switch (boopie_avatar_reacting()) {
+        case BOOPIE_EXPR_HAPPY: return "开心";
+        case BOOPIE_EXPR_EATING: return "好吃";
+        case BOOPIE_EXPR_DIZZY: return "晕了";
+        default: break;
+        }
+        boopie_pet_status_t pet;
+        boopie_avatar_pet_status(&pet);
+        switch (pet.mood) {
+        case BOOPIE_EXPR_HUNGRY: return "饿了";
+        case BOOPIE_EXPR_SAD: return "好饿呀";
+        case BOOPIE_EXPR_SLEEPY: return "困了";
+        default: return boopie_avatar_pet_name();
+        }
     }
     case MUSE_WIFI_OFF:
-        return "WI-FI OFF";
+        return "Wi-Fi 已关";
     case MUSE_WIFI_NO_NETWORK:
-        return "SET UP WI-FI";
+        return "去设置 Wi-Fi";
     case MUSE_WIFI_NOT_NEARBY:
-        return "NO WI-FI";   /* none of the saved networks is in range */
+        return "找不到 Wi-Fi";   /* none of the saved networks is in range */
     default:
-        return joined ? "RECONNECTING" : "CONNECTING";
+        return joined ? "重新连接中" : "连接中";
     }
 }
 
@@ -1210,7 +1229,8 @@ static void update_chrome(float now)
     s_idle_name = idle_name(w.state);
     muse_ble_status_t b;
     muse_ble_status(&b);
-    const char *ble = b.state != MUSE_BLE_OFF ? LV_SYMBOL_BLUETOOTH : "";
+    /* Boopie: only while a phone is connected; on and waiting says nothing. */
+    const char *ble = b.state == MUSE_BLE_CONNECTED ? LV_SYMBOL_BLUETOOTH : "";
     if (strcmp(ble, lv_label_get_text(s_ble_icon)) != 0) {
         lv_label_set_text(s_ble_icon, ble);
         lv_obj_set_style_text_color(s_ble_icon, lv_color_hex(b.state == MUSE_BLE_CONNECTED ? COLOR_ACCENT : COLOR_DIM), 0);
@@ -1244,13 +1264,14 @@ static void update_chrome(float now)
     if (b.passkey || confirm) {
         char code[24], hint[40];
         if (confirm) {
-            strlcpy(code, s_small ? "Press" : "Press button", sizeof(code));
-            snprintf(hint, sizeof(hint), s_small ? "%s button" : "Press the %s button", muse_board->talk_button);
+            /* Boopie: in Chinese; the talk button is the top one. */
+            strlcpy(code, "按上面的键", sizeof(code));
+            strlcpy(hint, "确认是你在配对", sizeof(hint));
         } else {
             snprintf(code, sizeof(code), "%06lu", (unsigned long)b.passkey);
-            strlcpy(hint, s_small ? "Enter on phone" : "Enter it on your phone", sizeof(hint));
+            strlcpy(hint, "在手机上输入", sizeof(hint));
         }
-        const char *title = confirm ? (s_small ? "Muse app" : "Pair with Muse app") : "Pairing code";
+        const char *title = confirm ? "Muse App 配对" : "配对码";
         if (strcmp(code, lv_label_get_text(s_pair_code)) != 0) {
             lv_label_set_text(s_pair_code, code);
             lv_label_set_text(s_pair_title, title);
@@ -1263,8 +1284,13 @@ static void update_chrome(float now)
     if (s_speaker && (int)speaker != s_shown_speaker) {
         show_speaker(speaker);
     }
-    if (s_speaker && paired == lv_obj_has_flag(s_speaker, LV_OBJ_FLAG_HIDDEN)) {
-        lv_obj_set_flag(s_speaker, LV_OBJ_FLAG_HIDDEN, !paired);
+    /* Boopie: only while a reply is on its way or being said, to mute it
+     * there and then; the rest of the time it's in settings and the power menu. */
+    float mode_t;
+    muse_mode_t mode = muse_state_mode(&mode_t);
+    bool replying = mode == MUSE_MODE_THINKING || mode == MUSE_MODE_SPEAKING;
+    if (s_speaker && (paired && replying) == lv_obj_has_flag(s_speaker, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_set_flag(s_speaker, LV_OBJ_FLAG_HIDDEN, !(paired && replying));
     }
     /* Unpaired, a press only says "SET UP MUSE FIRST", so the mic goes too.
      * While a reply's layout is up it decides; that's only ever paired. */
@@ -1311,14 +1337,29 @@ static void update_power(float now)
 
     muse_power_t p = muse_state_power();
     char buf[32];
+    const char *icon = "";
     if (p.battery_pct < 0) {
-        strlcpy(buf, p.usb ? (s_small ? "USB" : "USB POWER") : "", sizeof(buf));
-    } else if (s_small) {
-        snprintf(buf, sizeof(buf), "%s%d%%", p.charging ? "+" : "", p.battery_pct);
-    } else if (p.charging) {
-        snprintf(buf, sizeof(buf), "CHARGING %d%%", p.battery_pct);
+        strlcpy(buf, "", sizeof(buf));
+        icon = p.usb ? LV_SYMBOL_USB : "";
     } else {
-        snprintf(buf, sizeof(buf), "BATTERY %d%%", p.battery_pct);
+        /* Boopie: an icon, not BATTERY 72%; the number only once it's low. */
+        bool low = p.battery_pct <= 20 && !p.charging;
+        snprintf(buf, sizeof(buf), low ? "%d%%" : "", p.battery_pct);
+        icon = p.charging ? LV_SYMBOL_CHARGE
+             : p.battery_pct > 80 ? LV_SYMBOL_BATTERY_FULL
+             : p.battery_pct > 55 ? LV_SYMBOL_BATTERY_3
+             : p.battery_pct > 30 ? LV_SYMBOL_BATTERY_2
+             : p.battery_pct > 10 ? LV_SYMBOL_BATTERY_1 : LV_SYMBOL_BATTERY_EMPTY;
+    }
+    if (strcmp(icon, lv_label_get_text(s_batt_icon)) != 0) {
+        lv_label_set_text(s_batt_icon, icon);
+        lv_obj_set_style_text_color(s_batt_icon,
+                                    lv_color_hex(p.battery_pct >= 0 && p.battery_pct <= 20 && !p.charging ? 0xff6b6b
+                                                 : COLOR_DIM), 0);
+    }
+    const char *clock = boopie_pages_clock();
+    if (strcmp(clock ? clock : "", lv_label_get_text(s_time_lbl)) != 0) {
+        lv_label_set_text(s_time_lbl, clock ? clock : "");
     }
     if (strcmp(buf, lv_label_get_text(s_power_lbl)) != 0) {
         lv_label_set_text(s_power_lbl, buf);

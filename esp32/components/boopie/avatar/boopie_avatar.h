@@ -121,6 +121,9 @@ typedef struct {
 
 void boopie_avatar_pet_status(boopie_pet_status_t *out);
 
+/* The reaction showing now (boopie_avatar_react: a feed, a poke), or IDLE. */
+boopie_expr_t boopie_avatar_reacting(void);
+
 /* Which AI answers (chosen in the setup guide; Xiaozhi until one is), and
  * whether the guide has been through. Kept in NVS with the rest. */
 typedef enum { BOOPIE_BRAIN_XIAOZHI = 0, BOOPIE_BRAIN_MUSE, BOOPIE_BRAIN_COUNT } boopie_brain_t;

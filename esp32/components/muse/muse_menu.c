@@ -460,7 +460,7 @@ static void handle(muse_menu_key_t key)
             show(VIEW_LIST);
         } else {
             muse_menu_close();
-            muse_state_set_caption("RESETTING...");
+            muse_state_set_caption("正在重置……");
             muse_link_reset_setup();
         }
         break;

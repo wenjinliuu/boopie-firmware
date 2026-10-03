@@ -170,6 +170,7 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_input.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_guide.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_setup.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_heads.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin_dict.c"
     "${BOOPIE_COMPONENT_DIR}/store/boopie_assets.c"

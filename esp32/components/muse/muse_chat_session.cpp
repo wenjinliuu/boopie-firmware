@@ -987,7 +987,7 @@ static bool turn_start(uint32_t gen, bool text)
 {
     if (s_turn.phase != P_IDLE) {
         if (s_turn.text) {
-            turn_fail("INTERRUPTED");
+            turn_fail("被打断了");
         } else {
             turn_finish();
         }
@@ -1007,7 +1007,7 @@ static bool turn_start(uint32_t gen, bool text)
     s_turn.start_us = now_us();
     resampler_init(&s_turn.up, MIC_RATE, DICT_RATE);
     if (!ensure_connected()) {
-        turn_fail(muse_hatch_configured() ? "CAN'T REACH MUSE" : "MUSE NOT SET UP");
+        turn_fail(muse_hatch_configured() ? "连不上 Muse" : "Muse 还没设置");
         return false;
     }
     return true;
@@ -1021,7 +1021,7 @@ static void turn_begin(uint32_t gen)
     if (VOICE_NOTE) {
         if (!open_note()) {
             disconnect("chat open failed");
-            turn_fail("CAN'T REACH MUSE");
+            turn_fail("连不上 Muse");
             return;
         }
         s_turn.phase = P_LISTEN;
@@ -1032,7 +1032,7 @@ static void turn_begin(uint32_t gen)
     s_turn.dict_id = open_stream(K_DICT, "POST", path, nullptr, "application/x-ndjson", nullptr, false);
     if (!s_turn.dict_id) {
         disconnect("dictation open failed");
-        turn_fail("CAN'T REACH MUSE");
+        turn_fail("连不上 Muse");
         return;
     }
     s_turn.phase = P_LISTEN;
@@ -1189,7 +1189,7 @@ static void send_chat(const char *text, const char *modality)
     cJSON_free(json);
     if (!ok) {
         disconnect("chat/stream failed");
-        turn_fail("CAN'T REACH MUSE");
+        turn_fail("连不上 Muse");
         return;
     }
     s_turn.body_sent = len;
@@ -1523,7 +1523,7 @@ static void start_tts(void)
         int64_t sid = open_stream(K_TTS, "GET", path, nullptr, "audio/mpeg", nullptr, true);
         if (!sid) {
             disconnect("tts open failed");
-            turn_fail("CAN'T REACH MUSE");
+            turn_fail("连不上 Muse");
             return;
         }
         find_stream(sid)->msg = i;
@@ -2132,7 +2132,7 @@ extern "C" void muse_hatch_text_turn(char *text)
 {
     cmd_t cmd{ CMD_TEXT, 0, text };
     if (!s_cmds || !muse_hatch_configured()) {
-        muse_hatch_console("error", "MUSE NOT SET UP", nullptr);
+        muse_hatch_console("error", "Muse 还没设置", nullptr);
         free(text);
     } else if (xQueueSend(s_cmds, &cmd, pdMS_TO_TICKS(1000)) != pdTRUE) {
         muse_hatch_console("error", "BUSY", nullptr);

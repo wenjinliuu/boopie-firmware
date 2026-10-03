@@ -38,7 +38,8 @@ SHOTS = [
     ("speaking-mixed", "speaking", ["level=0.5", "progress=0.6",
                                     "caption=我会说中文，也会说 English。“布比”——你的小伙伴……"]),
     ("happy", "happy", []),
-    ("error", "error", ["caption=CAN'T REACH MUSE"]),
+    ("error", "error", ["caption=连不上 Muse"]),
+    ("battery-low", "idle", ["advance=1200"], {"BATTERY": "15"}),
     ("off", "off", []),
 ]
 
@@ -109,8 +110,8 @@ def shoot(binary: Path, tmp: Path, png: Path, lines: list[str], env_extra: dict 
 
 def render(binary: Path, out: Path) -> list[Path]:
     with tempfile.TemporaryDirectory() as tmp:
-        return [shoot(binary, Path(tmp), out / f"{name}.png", [f"face={face}", *extra])
-                for name, face, extra in SHOTS]
+        return [shoot(binary, Path(tmp), out / f"{name}.png", [f"face={face}", *shot[2]], *shot[3:])
+                for shot in SHOTS for name, face in [shot[:2]]]
 
 
 def render_avatars(binary: Path, out: Path) -> list[Path]:
@@ -213,9 +214,9 @@ SETTINGS = [
     ("settings-home", ["swipe=left"]),
     ("settings-wifi", ["swipe=left", "tap=230,113", "advance=600"]),
     ("settings-wifi-password", ["swipe=left", "tap=230,113", "advance=600", "tap=230,459", "advance=600"]),
-    ("settings-avatar", ["swipe=left", "tap=230,317", "advance=600"]),
+    ("settings-avatar", ["settings=avatar", "advance=600"]),
     *[(f"settings-{page}", [f"settings={page}", "advance=600"])
-      for page in ("muse", "bluetooth", "sound", "sleep", "battery", "power")],
+      for page in ("brain", "xiaozhi", "muse", "bluetooth", "sound", "sleep", "battery")],
 ]
 
 

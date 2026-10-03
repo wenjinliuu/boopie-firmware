@@ -12,11 +12,13 @@
 #include "boopie_avatar.h"
 #include "boopie_font.h"
 #include "boopie_games.h"
+#include "boopie_heads.h"
 #include "boopie_input.h"
 #include "boopie_store.h"
 #include "muse_board.h"
 #include "muse_input.h"
 #include "muse_settings.h"
+#include "muse_ui.h"
 #ifdef ESP_PLATFORM
 #include "boopie_clock.h"
 #include "esp_system.h"
@@ -77,7 +79,8 @@ static void set_text(lv_obj_t *l, const char *s)
 
 static lv_obj_t *title(lv_obj_t *page, const char *s)
 {
-    lv_obj_t *t = text(page, &lv_font_unscii_16, COLOR_ACCENT, s);
+    /* In the pixel font, Chinese too, as the face's state is. */
+    lv_obj_t *t = text(page, &boopie_font_pixel_24, COLOR_ACCENT, s);
     lv_obj_set_style_text_letter_space(t, 2, 0);
     lv_obj_align(t, LV_ALIGN_TOP_MID, 0, TITLE_Y);
     return t;
@@ -104,16 +107,15 @@ typedef struct {
     const char *game;   /* boopie_games_open()'s id */
 } app_t;
 
-/* The games first; what isn't built yet says so. */
+/* What's built, each a big card; what isn't yet, named on one card below. */
 static const app_t APPS[] = {
-    { "戳戳布比", "触摸", true, "whack" },
-    { "接零食", "倾斜", false, NULL },
-    { "重力迷宫", "倾斜", false, NULL },
-    { "计时器", "专注", false, NULL },
-    { "白噪音", "助眠", false, NULL },
-    { "更多", "敬请期待", false, NULL },
+    { "戳戳布比", "宠物冒头就戳它", true, "whack" },
 };
 #define APP_COUNT (int)(sizeof APPS / sizeof APPS[0])
+static const char SOON[] = "接零食 · 重力迷宫\n计时器 · 白噪音";
+
+static lv_obj_t *s_app_icons[APP_COUNT];
+static int s_app_icon_for = -1;
 
 static void on_app(lv_event_t *e)
 {
@@ -125,22 +127,42 @@ static void on_app(lv_event_t *e)
 
 static void build_apps(lv_obj_t *page)
 {
-    title(page, "APPS");
-    /* Two columns of three, inside the circle. */
-    const int w = 150, h = 92, gap = 12, top = 86;
+    title(page, "应用");
+    const int w = 320, h = 96, gap = 12, top = 92;
     for (int i = 0; i < APP_COUNT; i++) {
         lv_obj_t *c = card(page, w, h);
         lv_obj_add_flag(c, LV_OBJ_FLAG_CLICKABLE);
-        int col = i % 2, row = i / 2;
-        lv_obj_align(c, LV_ALIGN_TOP_MID, col ? (w + gap) / 2 : -(w + gap) / 2, top + row * (h + gap));
-        lv_obj_t *n = text(c, &lv_font_montserrat_20, APPS[i].ready ? COLOR_TEXT : COLOR_DIM, APPS[i].name);
-        lv_obj_align(n, LV_ALIGN_CENTER, 0, -14);
-        lv_obj_t *s = text(c, &lv_font_montserrat_20, COLOR_DIM, APPS[i].ready ? APPS[i].note : "即将推出");
-        if (APPS[i].ready) {
-            lv_obj_add_event_cb(c, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
-        }
-        lv_obj_align(s, LV_ALIGN_CENTER, 0, 16);
+        lv_obj_align(c, LV_ALIGN_TOP_MID, 0, top + i * (h + gap));
+        /* Its icon: the pet that pops up in it. */
+        s_app_icons[i] = lv_image_create(c);
+        lv_obj_remove_flag(s_app_icons[i], LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_align(s_app_icons[i], LV_ALIGN_LEFT_MID, 18, 0);
+        lv_obj_t *n = text(c, &lv_font_montserrat_20, COLOR_TEXT, APPS[i].name);
+        lv_obj_align(n, LV_ALIGN_LEFT_MID, 106, -14);
+        lv_obj_t *d = text(c, &lv_font_montserrat_16, COLOR_DIM, APPS[i].note);
+        lv_obj_align(d, LV_ALIGN_LEFT_MID, 106, 16);
+        lv_obj_add_event_cb(c, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
     }
+    lv_obj_t *c = card(page, w, 110);
+    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, top + APP_COUNT * (h + gap));
+    lv_obj_t *t = text(c, &lv_font_montserrat_16, COLOR_DIM, "即将推出");
+    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 14);
+    lv_obj_t *n = text(c, &lv_font_montserrat_20, COLOR_DIM, SOON);
+    lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(n, LV_ALIGN_TOP_MID, 0, 42);
+}
+
+static void tick_apps(void)
+{
+    int cur = boopie_avatar_current();
+    if (cur == s_app_icon_for) {
+        return;
+    }
+    const lv_image_dsc_t *head = boopie_head(cur, 5);
+    for (int i = 0; head && i < APP_COUNT; i++) {
+        lv_image_set_src(s_app_icons[i], head);
+    }
+    s_app_icon_for = cur;
 }
 
 /* ---------------------------------------------------------------- cards */
@@ -149,7 +171,7 @@ static lv_obj_t *s_date;
 
 static void build_cards(lv_obj_t *page)
 {
-    title(page, "TODAY");
+    title(page, "今天");
     s_date = text(page, &lv_font_montserrat_28, COLOR_TEXT, "");
     lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, 96);
     lv_obj_t *c = card(page, 330, 150);
@@ -175,7 +197,15 @@ static void tick_cards(void)
 
 /* ---------------------------------------------------------------- the pet */
 
-static lv_obj_t *s_name, *s_level, *s_bar, *s_xp, *s_stars, *s_mood;
+static lv_obj_t *s_name, *s_level, *s_bar, *s_xp, *s_stars, *s_mood, *s_pet_head;
+static int s_pet_head_for = -1;
+
+/* To the wardrobe: the companion page in settings. */
+static void on_dress(lv_event_t *e)
+{
+    (void)e;
+    muse_ui_open_settings("avatar");
+}
 
 static void tick_pet(void);
 
@@ -199,32 +229,42 @@ static void on_name(lv_event_t *e)
 
 static void build_pet(lv_obj_t *page)
 {
-    title(page, "PET");
+    title(page, "小窝");
+    /* The pet itself, over its name. */
+    s_pet_head = lv_image_create(page);
+    lv_obj_align(s_pet_head, LV_ALIGN_TOP_MID, 0, 80);
     s_name = text(page, &lv_font_montserrat_28, COLOR_TEXT, "");
-    lv_obj_align(s_name, LV_ALIGN_TOP_MID, 0, 92);
+    lv_obj_align(s_name, LV_ALIGN_TOP_MID, 0, 148);
     lv_obj_add_flag(s_name, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(s_name, 20);
     lv_obj_add_event_cb(s_name, on_name, LV_EVENT_CLICKED, NULL);
     s_level = text(page, &lv_font_montserrat_20, COLOR_ACCENT, "");
-    lv_obj_align(s_level, LV_ALIGN_TOP_MID, 0, 146);
+    lv_obj_align(s_level, LV_ALIGN_TOP_MID, -110, 196);
+    lv_obj_set_width(s_level, 70);
 
     s_bar = lv_bar_create(page);
-    lv_obj_set_size(s_bar, 280, 14);
-    lv_obj_align(s_bar, LV_ALIGN_TOP_MID, 0, 184);
+    lv_obj_set_size(s_bar, 180, 12);
+    lv_obj_align(s_bar, LV_ALIGN_TOP_MID, 10, 202);
     lv_obj_set_style_bg_color(s_bar, lv_color_hex(COLOR_CARD), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_bar, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(s_bar, lv_color_hex(COLOR_ACCENT), LV_PART_INDICATOR);
-    lv_obj_set_style_radius(s_bar, 7, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_bar, 7, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(s_bar, 6, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_bar, 6, LV_PART_INDICATOR);
     s_xp = text(page, &lv_font_montserrat_16, COLOR_DIM, "");
-    lv_obj_align(s_xp, LV_ALIGN_TOP_MID, 0, 208);
+    lv_obj_align(s_xp, LV_ALIGN_TOP_MID, 10, 220);
 
-    lv_obj_t *c = card(page, 300, 120);
-    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, 248);
+    lv_obj_t *c = card(page, 320, 96);
+    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, 252);
     s_stars = text(c, &lv_font_montserrat_20, COLOR_GOLD, "");
-    lv_obj_align(s_stars, LV_ALIGN_TOP_MID, 0, 22);
+    lv_obj_align(s_stars, LV_ALIGN_TOP_MID, 0, 16);
     s_mood = text(c, &lv_font_montserrat_20, COLOR_TEXT, "");
-    lv_obj_align(s_mood, LV_ALIGN_TOP_MID, 0, 64);
+    lv_obj_align(s_mood, LV_ALIGN_TOP_MID, 0, 52);
+
+    lv_obj_t *b = card(page, 150, 48);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(b, LV_ALIGN_TOP_MID, 0, 362);
+    lv_obj_center(text(b, &lv_font_montserrat_20, COLOR_ACCENT, LV_SYMBOL_IMAGE "  换装"));
+    lv_obj_add_event_cb(b, on_dress, LV_EVENT_CLICKED, NULL);
 }
 
 static const char *mood_name(const boopie_pet_status_t *st)
@@ -251,6 +291,14 @@ static void tick_pet(void)
     set_text(s_name, buf);
     snprintf(buf, sizeof buf, "Lv %d", st.level);
     set_text(s_level, buf);
+    int cur = boopie_avatar_current();
+    if (cur != s_pet_head_for) {
+        const lv_image_dsc_t *head = boopie_head(cur, 5);
+        if (head) {
+            lv_image_set_src(s_pet_head, head);
+        }
+        s_pet_head_for = cur;
+    }
     lv_bar_set_range(s_bar, 0, st.xp_need > 0 ? (int32_t)st.xp_need : 1);
     lv_bar_set_value(s_bar, (int32_t)st.xp_into, LV_ANIM_OFF);
     snprintf(buf, sizeof buf, "%u / %u", (unsigned)st.xp_into, (unsigned)st.xp_need);
@@ -280,6 +328,8 @@ void boopie_pages_tick(lv_obj_t *shown)
         tick_cards();
     } else if (shown && shown == s_pet) {
         tick_pet();
+    } else if (shown && shown == s_apps) {
+        tick_apps();
     }
 }
 

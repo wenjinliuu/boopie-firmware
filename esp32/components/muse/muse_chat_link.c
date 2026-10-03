@@ -522,7 +522,7 @@ static void on_ack(void)
     rx_t *rx = &s_rx[RX_NOTE];
     if (rx->status != 200) {
         ESP_LOGW(TAG, "chat/stream: %d %.120s", rx->status, rx->body);
-        fail(rx->status < 0 ? "LOST CONNECTION TO MUSE" : "MUSE DIDN'T TAKE IT");
+        fail(rx->status < 0 ? "和 Muse 断开了" : "Muse 没收到");
         return;
     }
     cJSON *root = cJSON_Parse(rx->body);
@@ -532,7 +532,7 @@ static void on_ack(void)
     cJSON_Delete(root);
     if (!s_turn.note_id[0]) {
         ESP_LOGW(TAG, "chat/stream ack without a message id: %.120s", rx->body);
-        fail("MUSE DIDN'T TAKE IT");
+        fail("Muse 没收到");
         return;
     }
     ESP_LOGI(TAG, "note %s sent; ack after %.2fs", s_turn.note_id, (esp_timer_get_time() - s_turn.t_end) / 1e6);
@@ -591,7 +591,7 @@ static void on_page(void)
     if (rx->status != 200) {
         ESP_LOGW(TAG, "chat/history: %d", rx->status);
         if (rx->status < 0) {
-            fail("LOST CONNECTION TO MUSE");
+            fail("和 Muse 断开了");
         }
         return;
     }
@@ -642,12 +642,12 @@ static void pump(void)
     }
     if (s_turn.phase != T_REPLY) {
         if (s_turn.phase == T_ACK && now - s_turn.t_end > REPLY_TIMEOUT_US) {
-            fail("NO REPLY FROM MUSE");
+            fail("Muse 没有回复");
         }
         return;
     }
     if (!s_stream[RX_ROW] && now >= s_turn.t_poll && !poll_row()) {
-        fail("LOST CONNECTION TO MUSE");
+        fail("和 Muse 断开了");
         return;
     }
     if (s_turn.replied) {
@@ -657,7 +657,7 @@ static void pump(void)
             emit(MUSE_HATCH_EV_DONE, NULL);
         }
     } else if (now - s_turn.t_end > REPLY_TIMEOUT_US) {
-        fail(s_turn.skipped_big ? "REPLY TOO LONG" : "NO REPLY FROM MUSE");
+        fail(s_turn.skipped_big ? "回复太长了" : "Muse 没有回复");
     }
 }
 
@@ -728,12 +728,12 @@ void muse_hatch_turn_begin(void)
     s_turn.stage = malloc(STAGE_BYTES);
     s_turn.chunk = malloc(CHUNK_BYTES + sizeof(MUSE_HATCH_NOTE_TAIL));
     if (!s_turn.stage || !s_turn.chunk) {
-        fail("OUT OF MEMORY");
+        fail("内存不够了");
         return;
     }
     if (!request(RX_NOTE, "POST", "/chat/stream", true, false)
         || !muse_link_req_send(s_stream[RX_NOTE], MUSE_HATCH_NOTE_HEAD, sizeof(MUSE_HATCH_NOTE_HEAD) - 1, false, SEND_WAIT_MS)) {
-        fail("CAN'T REACH MUSE");
+        fail("连不上 Muse");
         return;
     }
     muse_hatch_wav_header(s_turn.stage, MIC_RATE);
@@ -752,7 +752,7 @@ void muse_hatch_turn_audio(const int16_t *pcm, size_t frames)
         p += take;
         n -= take;
         if (s_turn.stage_len == STAGE_BYTES && !send_stage(false)) {
-            fail("CAN'T KEEP UP");
+            fail("网络太慢了");
         }
     }
 }
@@ -761,11 +761,11 @@ void muse_hatch_turn_end(void)
 {
     if (s_turn.phase != T_TALKING) {
         /* Failed while recording: that error went to the recording caption. */
-        emit(MUSE_HATCH_EV_ERROR, s_turn.error[0] ? s_turn.error : "CAN'T REACH MUSE");
+        emit(MUSE_HATCH_EV_ERROR, s_turn.error[0] ? s_turn.error : "连不上 Muse");
         return;
     }
     if (!send_stage(true)) {
-        fail("CAN'T KEEP UP");
+        fail("网络太慢了");
         return;
     }
     free(s_turn.stage);
@@ -780,7 +780,7 @@ void muse_hatch_turn_end(void)
      * adds this note's row only after transcribing it, so none is missed.
      */
     if (!poll_row()) {
-        fail("LOST CONNECTION TO MUSE");
+        fail("和 Muse 断开了");
     }
 }
 

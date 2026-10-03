@@ -850,6 +850,11 @@ void boopie_avatar_pet_status(boopie_pet_status_t *out)
     out->mood = s_pet_mood;
 }
 
+boopie_expr_t boopie_avatar_reacting(void)
+{
+    return (boopie_expr_t)s_reacting;
+}
+
 bool boopie_avatar_unlocked(boopie_unlock_kind_t kind, int index, int *level)
 {
     ensure_loaded();

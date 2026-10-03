@@ -28,6 +28,11 @@ button{border:0;border-radius:12px;padding:12px 16px;font:inherit;background:var
 button.main{width:100%;background:var(--accent);color:#14102a;font-weight:600;margin-top:8px}
 button.small{flex:0 0 auto;padding:10px 12px}
 #msg{min-height:24px;margin:12px 0 0;text-align:center}
+details{margin:10px 0 0;border-top:1px solid var(--line);padding-top:8px}
+summary{color:var(--accent);cursor:pointer}
+ol{margin:8px 0 0;padding-left:22px;color:var(--text);font-size:14px}
+ol li{margin:4px 0}
+code{background:#120f24;padding:1px 5px;border-radius:5px}
 .ok{color:var(--ok)}.bad{color:var(--bad)}
 </style>
 </head>
@@ -52,11 +57,33 @@ button.small{flex:0 0 auto;padding:10px 12px}
 <label><input type="radio" name="brain" value="0">小智 · 国内</label>
 <label><input type="radio" name="brain" value="1">Muse · 海外</label>
 </div>
-<p class="note">没选就是小智。</p>
+<p class="note">没选就是小智。小智用国内服务器，不用代理；Muse 需要 App 配对和海外网络。</p>
+<details>
+<summary>怎样接入小智</summary>
+<p class="note">小智接入还在开发中，接通后是这样：</p>
+<ol>
+<li>这里选“小智”，并让板子连上 Wi-Fi。</li>
+<li>板子屏幕上会显示一个 6 位激活码。</li>
+<li>手机浏览器打开 <code>xiaozhi.me</code>，登录控制台。</li>
+<li>添加设备，输入激活码。</li>
+<li>绑定好就能直接对布比说话。</li>
+</ol>
+</details>
 </section>
 
 <section>
 <h2>Muse</h2>
+<details open>
+<summary>怎样接入 Muse</summary>
+<ol>
+<li>手机装好 Muse App 并登录。板子要能访问海外网络：需要时在下面“代理订阅”里导入订阅。</li>
+<li>App 里打开 设置 › 设备 › 开发者模式。</li>
+<li>设置 › 设备 › 右上角 <b>+</b> 添加设备，选板子的名字（板子 设置 › 蓝牙 里能看到）。</li>
+<li>板子屏幕提示时，按一下板子上面的键确认。</li>
+<li>板子 设置 › 大脑 › Muse 接入与设置 显示“已配对”“已连上”就好了。</li>
+</ol>
+<p class="note">用 App 配对就不用填下面的 token。下面三项是高级选项：已有设备 token 时粘贴在这里，它会代替 App 配对；VM 用来在多台 VM 里选一台；服务器一般不用改。</p>
+</details>
 <label for="token">Token</label>
 <textarea id="token" maxlength="1023" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
 <label for="vm">VM</label>

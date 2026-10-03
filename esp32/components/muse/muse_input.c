@@ -100,7 +100,7 @@ static void power_off(void)
     muse_state_set_progress(0);
     muse_state_set_level(0);
     muse_state_set_mode(MUSE_MODE_OFF);
-    muse_state_set_caption("GOODBYE!");
+    muse_state_set_caption("再见！");
     boopie_sound_play(BOOPIE_SOUND_OFF);
     vTaskDelay(pdMS_TO_TICKS(GOODBYE_MS));
     boopie_clock_save();   /* Boopie: the clock carries on from here next power-up */
@@ -109,7 +109,7 @@ static void power_off(void)
     vTaskDelay(pdMS_TO_TICKS(500));
     ESP_LOGE(TAG, "power-off failed (%s)", esp_err_to_name(err));
     muse_state_set_mode(MUSE_MODE_IDLE);
-    muse_state_set_caption("COULDN'T POWER OFF");
+    muse_state_set_caption("关不了机");
 }
 
 static void set_asleep(bool asleep, const char *why)
