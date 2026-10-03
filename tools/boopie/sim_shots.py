@@ -214,6 +214,8 @@ SETTINGS = [
     ("settings-wifi", ["swipe=left", "tap=230,113", "advance=600"]),
     ("settings-wifi-password", ["swipe=left", "tap=230,113", "advance=600", "tap=230,459", "advance=600"]),
     ("settings-avatar", ["swipe=left", "tap=230,317", "advance=600"]),
+    *[(f"settings-{page}", [f"settings={page}", "advance=600"])
+      for page in ("muse", "bluetooth", "sound", "sleep", "battery", "power")],
 ]
 
 

@@ -74,7 +74,7 @@ static void usage(FILE *out, const char *argv0)
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
             "  tap=X,Y            swipe=left|right|up|down   menu=power|setup\n"
-            "  game=whack         input=TEXT\n"
+            "  game=whack         input=TEXT             settings=PAGE\n"
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
@@ -369,6 +369,11 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
         bool ok = boopie_games_open_locked(value);
         render_for(100, real_time);
         return ok;
+    }
+    if (!strcmp(key, "settings")) {   /* a settings page, as the guide opens one */
+        muse_ui_open_settings(value);
+        render_for(600, real_time);
+        return true;
     }
     if (!strcmp(key, "menu") && !strcmp(value, "setup")) {   /* phone setup, from settings */
         boopie_setup_open(NULL);

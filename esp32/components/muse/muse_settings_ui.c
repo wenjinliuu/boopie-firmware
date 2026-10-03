@@ -1582,7 +1582,8 @@ void muse_settings_ui_open(const char *name)
     static const struct {
         const char *name;
         const page_t *page;
-    } PAGES[] = { { "wifi", &WIFI }, { "muse", &HATCH }, { "avatar", &AVATAR }, { "bluetooth", &BLE } };
+    } PAGES[] = { { "wifi", &WIFI }, { "muse", &HATCH }, { "avatar", &AVATAR }, { "bluetooth", &BLE },
+                  { "sound", &SOUND }, { "sleep", &SLEEP }, { "battery", &BATTERY }, { "power", &POWER } };
     for (size_t i = 0; i < sizeof PAGES / sizeof PAGES[0]; i++) {
         if (strcmp(PAGES[i].name, name) == 0) {
             if (!*PAGES[i].page->obj) {
