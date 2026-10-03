@@ -20,6 +20,7 @@
 #include "boopie_input.h"   /* Boopie: text entry */
 #include "boopie_setup.h"   /* Boopie: phone setup */
 #include "boopie_viewers.h" /* Boopie: looking back */
+#include "boopie_noise_ui.h" /* Boopie: 白噪音 */
 #include "boopie_sound.h"   /* Boopie: goodbye */
 #include "muse_input.h"
 
@@ -150,6 +151,8 @@ static void aux_single(void)
         boopie_games_key(false);   /* leave the game */
     } else if (boopie_viewer_active()) {
         boopie_viewer_close();     /* the chat history, the album, a question */
+    } else if (boopie_noise_ui_active()) {
+        boopie_noise_ui_close();   /* the sound plays on */
     } else if (boopie_setup_active()) {
         muse_board->display_lock(-1);
         boopie_setup_close();      /* the hotspot goes too */

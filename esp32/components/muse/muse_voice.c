@@ -20,6 +20,7 @@
 #include "boopie_history.h"   /* Boopie: notes kept through a power-off */
 #include "boopie_store.h"
 #include "boopie_sound.h"   /* Boopie: its sounds, played here as the speaker's owner */
+#include "boopie_noise.h"   /* Boopie: 白噪音, the same way */
 
 #include <math.h>
 #include <stdio.h>
@@ -888,7 +889,10 @@ static void voice_task(void *arg)
             muse_input_event_t ev;
             bool asleep = muse_state_asleep();
             bool battery = muse_state_on_battery();
-            bool rest = asleep && battery && !s_chirp && !s_mp3test && !s_loopback && !boopie_sound_pending();
+            int64_t now_ms = esp_timer_get_time() / 1000;
+            bool noise = boopie_noise_playing(now_ms, NULL, NULL);   /* Boopie: 白噪音 keeps the speaker up */
+            bool rest = asleep && battery && !s_chirp && !s_mp3test && !s_loopback && !boopie_sound_pending()
+                        && !noise;
 #if HOLD_NOTES
             /* A press goes first: send_held() leaves it queued and returns
              * without backing off, so retrying before it's read would spin. */
@@ -947,6 +951,12 @@ static void voice_task(void *arg)
                 s_loopback = false;
                 muse_audio_loopback_test(muse_settings_volume());
                 pre_reset();
+            }
+            if (noise && muse_settings_speaker_on()) {
+                /* Boopie: 20 ms of 白噪音 a loop, as the read takes 20 ms. */
+                static int16_t chunk[MUSE_AUDIO_CHUNK];
+                boopie_noise_render(chunk, MUSE_AUDIO_CHUNK, now_ms);
+                muse_audio_write(chunk, MUSE_AUDIO_CHUNK);
             }
             /* The 20 ms read paces this loop. */
             idle_capture();

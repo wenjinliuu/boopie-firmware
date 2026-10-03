@@ -1374,6 +1374,23 @@ static char *build_register_json(void) {
                 "puts a question on the screen, and only the user's tap clears them. Tell "
                 "the user to confirm on the screen.",
                 clear_required, nullptr);
+    cJSON *noise_optional = cJSON_CreateObject();
+    cJSON_AddItemToObject(noise_optional, "kind", string_param(
+        "white (白噪音), pink (粉红噪音, softer), rain (雨声, the default) or waves (海浪)."));
+    cJSON *minutes_param = cJSON_CreateObject();
+    cJSON_AddStringToObject(minutes_param, "type", "integer");
+    cJSON_AddStringToObject(minutes_param, "description",
+                            "How long before it fades out, in minutes: 1 to 600, or 0 to play until "
+                            "stopped. Default 30.");
+    cJSON_AddItemToObject(noise_optional, "minutes", minutes_param);
+    add_command(commands, "noise.play",
+                "Play a soothing sound from the device's speaker, to sleep or focus to, when the "
+                "user asks for white noise, rain or the sea. It pauses while you talk and fades "
+                "out when its time is up.",
+                nullptr, noise_optional);
+    add_command(commands, "noise.stop",
+                "Stop the white noise, rain or waves playing.",
+                nullptr, nullptr);
     add_command(commands, "pet.name",
                 "Name the pet on the screen, when the user gives it a name. Without "
                 "name, reports the current one. Call the user's pet by this name.",

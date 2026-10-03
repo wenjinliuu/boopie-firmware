@@ -17,6 +17,7 @@ set(srcs
     "ime/boopie_pinyin_dict.c"
     "store/boopie_assets.c"
     "sound/boopie_sound.c"
+    "sound/boopie_noise.c"
     "boopie_text.c"
     "font/boopie_pixel_font.c"
     "font/boopie_pixel_glyphs.c"

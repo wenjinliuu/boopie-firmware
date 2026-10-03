@@ -76,6 +76,7 @@
 #include "boopie_avatar.h"   /* Boopie: display.avatar */
 #include "boopie_games.h"    /* Boopie: game.start */
 #include "boopie_viewers.h"  /* Boopie: storage.clear */
+#include "boopie_noise_ui.h" /* Boopie: noise.play, noise.stop */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -1941,6 +1942,27 @@ static cJSON *on_ws_command(
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
         cJSON_AddStringToObject(result, "status", "asked on screen; cleared only if the user taps to confirm");
+        return result;
+    }
+    if (strcmp(command, "noise.play") == 0) {
+        char *kind = json_strdup_string(params, "kind");
+        cJSON *mins = cJSON_GetObjectItem(params, "minutes");
+        int minutes = cJSON_IsNumber(mins) ? (int)mins->valuedouble : -1;
+        char said[112];
+        bool ok = minutes <= 600 && boopie_noise_ui_play(kind, minutes, said, sizeof said);
+        free(kind);
+        if (!ok) return command_error("bad_param", "kind: white, pink, rain or waves; minutes: 0 to 600");
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "status", said);
+        return result;
+    }
+    if (strcmp(command, "noise.stop") == 0) {
+        char said[64];
+        boopie_noise_ui_stop(said, sizeof said);
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "status", said);
         return result;
     }
     if (strcmp(command, "pet.name") == 0) {

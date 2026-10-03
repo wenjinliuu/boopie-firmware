@@ -216,7 +216,8 @@ LOOK = [("viewer-chat", ["viewer=chat"]), ("viewer-album", ["viewer=album"]), ("
         ("settings-storage", ["settings=storage", "advance=600"]),
         ("apps-scrolled", ["swipe=right", "advance=600", "swipe=up", "advance=1500"]),
         ("game-catch", ["game=catch", "tap=233,233", "advance=9000"]),
-        ("game-maze", ["game=maze", "tap=233,233", "advance=3000"])]
+        ("game-maze", ["game=maze", "tap=233,233", "advance=3000"]),
+        ("noise", ["noise=rain", "advance=3000"])]
 
 
 def user_data(root: Path) -> Path:

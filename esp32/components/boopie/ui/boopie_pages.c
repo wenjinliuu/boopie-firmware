@@ -14,6 +14,7 @@
 #include "boopie_games.h"
 #include "boopie_heads.h"
 #include "boopie_icons.h"
+#include "boopie_noise_ui.h"
 #include "boopie_viewers.h"
 #include "boopie_input.h"
 #include "boopie_store.h"
@@ -117,11 +118,11 @@ static const app_t APPS[] = {
     { "重力迷宫", "倾斜把小球滚出迷宫", "maze", BOOPIE_ICON_MAZE },
     { "聊天记录", "最近 100 条", "chat", BOOPIE_ICON_CHAT },
     { "相册", "Muse 给你看过的图", "album", BOOPIE_ICON_ALBUM },
+    { "白噪音", "雨声、海浪，助眠专注", "noise", BOOPIE_ICON_NOISE },
 };
 #define APP_COUNT (int)(sizeof APPS / sizeof APPS[0])
 #define APP_ROW_H 112
 #define APP_TILE 92
-static const char SOON[] = "即将推出：白噪音";
 
 static lv_obj_t *s_app_list;
 static lv_obj_t *s_app_head;   /* 戳戳布比's icon: the pet as it is now */
@@ -134,6 +135,8 @@ static void on_app(lv_event_t *e)
         boopie_viewer_chat_locked();
     } else if (strcmp(a->id, "album") == 0) {
         boopie_viewer_album_locked();
+    } else if (strcmp(a->id, "noise") == 0) {
+        boopie_noise_ui_open_locked();
     } else {
         boopie_games_open_locked(a->id);
     }
@@ -202,8 +205,6 @@ static void build_apps(lv_obj_t *page)
         lv_obj_align(d, LV_ALIGN_LEFT_MID, APP_TILE + 26, 20);
         lv_obj_add_event_cb(row, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
     }
-    lv_obj_t *n = text(s_app_list, &lv_font_montserrat_16, COLOR_DIM, SOON);
-    lv_obj_set_style_pad_top(n, 18, 0);
 
     /* The title over the list, on a band the rows pass under. */
     lv_obj_t *band = lv_obj_create(page);
