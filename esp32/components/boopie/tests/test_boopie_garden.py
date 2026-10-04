@@ -79,7 +79,7 @@ class BoopieGardenTest(unittest.TestCase):
         self.assertEqual(s[5]["pots"][1][0], BLOOM)
         self.assertEqual((s[6]["ret"], s[6]["xp"], s[6]["stars"]), (1, 30, 5))
         self.assertEqual(s[6]["pots"][1][0], EMPTY)
-        self.assertEqual(s[6]["harvested"], [0, 0, 0, 1])
+        self.assertEqual(s[6]["harvested"], [0, 0, 0, 1, 0, 0, 0])
         self.assertEqual(s[7]["ret"], 0)
         self.assertEqual((s[8]["ret"], s[8]["pots"][1][0]), (1, SEED))
 
@@ -92,6 +92,22 @@ class BoopieGardenTest(unittest.TestCase):
         s = self.run_g("plant:0:1", "plant:2:3", "at:30", "v1", "at:40")
         self.assertEqual(s[3]["ret"], 2)
         self.assertEqual([p[0] for p in s[4]["pots"]], [LEAVES, EMPTY, SPROUT, EMPTY, EMPTY, EMPTY])
+
+    def test_six_plots_saved_by_version_2_come_through(self) -> None:
+        s = self.run_g("plant:0:1", "plant:5:4", "at:24", "water:0", "at:48", "water:0", "at:80", "harvest:0", "v2",
+                       "at:90")
+        self.assertEqual(s[8]["ret"], 2)
+        self.assertEqual(s[9]["harvested"][0], 1)
+        self.assertEqual([p[0] for p in s[9]["pots"]][:5], [EMPTY] * 5)
+        self.assertNotEqual(s[9]["pots"][5][0], EMPTY)
+
+    def test_rare_seeds_grow_and_pay_more(self) -> None:
+        # 南瓜 5 days (a watering lasts 36 h), 西瓜 6, 蓝玫瑰 7.
+        s = self.run_g("plant:0:5", "plant:1:6", "plant:2:7",
+                       *[x for d in range(8) for x in (f"at:{d * 24}", "water:0", "water:1", "water:2")],
+                       "at:200", "harvest:0", "harvest:1", "harvest:2")
+        self.assertEqual([x["stars"] for x in s[-3:]], [6, 7, 9])
+        self.assertEqual(s[-1]["harvested"][4:], [1, 1, 1])
 
     def test_six_plots(self) -> None:
         s = self.run_g("plant:5:4", "plant:6:1")

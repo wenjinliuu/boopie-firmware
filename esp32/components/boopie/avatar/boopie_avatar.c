@@ -115,6 +115,7 @@ static struct {
     int32_t spot_day[WOODS_SPOTS];
     uint16_t items[BAG_ITEMS];
     uint32_t furni_owned, furni_away;
+    uint8_t seeds[16];   /* rare seeds bought, by boopie_plant_t */
 } s_woods;
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
 static bool s_pet_resumed, s_pet_dirty;
@@ -441,6 +442,7 @@ static void load(void)
         s_woods.items[1] = 2;   /* mushrooms */
         s_woods.items[2] = 4;   /* shells */
         s_woods.items[3] = 1;   /* fish */
+        s_woods.seeds[5] = 2;   /* pumpkin seeds */
     }
     const char *name = getenv("BOOPIE_NAME");
     if (name) {
@@ -1024,6 +1026,44 @@ void boopie_avatar_world_reward(int item, int count, int xp, int stars, int *got
         *got_stars = ev.stars;
     }
     save();
+}
+
+int boopie_avatar_seeds(int plant)
+{
+    ensure_loaded();
+    return plant > 0 && plant < 16 ? s_woods.seeds[plant] : 0;
+}
+
+bool boopie_avatar_buy_seed(int plant, int price, const char **error)
+{
+    ensure_loaded();
+    if (plant <= 0 || plant >= 16 || price <= 0) {
+        *error = "没有这种种子";
+        return false;
+    }
+    if (s_woods.seeds[plant] >= 99) {
+        *error = "种子装不下啦";
+        return false;
+    }
+    if (s_pet_state.stars < (uint32_t)price) {
+        *error = "星星不够";
+        return false;
+    }
+    s_pet_state.stars -= (uint32_t)price;
+    s_woods.seeds[plant]++;
+    save();
+    return true;
+}
+
+bool boopie_avatar_use_seed(int plant)
+{
+    ensure_loaded();
+    if (plant <= 0 || plant >= 16 || !s_woods.seeds[plant]) {
+        return false;
+    }
+    s_woods.seeds[plant]--;
+    save();
+    return true;
 }
 
 uint32_t boopie_avatar_furniture(void)

@@ -484,10 +484,63 @@ static void furni_panel(void)
     note(box, "点一下看价格，再点一次买，买了就摆好；已有的点一下收起或摆出来。");
 }
 
+/* ---- 商店: rare seeds, one at a time ---- */
+
+static void seed_shop_panel(void);
+static int s_seed_rows[8], s_seed_count;
+
+static void on_seed_shop(int i)
+{
+    if (i < 0 || i >= s_seed_count) {
+        return;
+    }
+    boopie_plant_t p = (boopie_plant_t)s_seed_rows[i];
+    if (arm(i)) {
+        return;
+    }
+    const char *error = NULL;
+    if (boopie_avatar_buy_seed(p, boopie_plant_price(p), &error)) {
+        boopie_sound_play(BOOPIE_SOUND_GOLD);
+        say("买到%s种子！去农场种吧", boopie_plant_name(p));
+    } else {
+        boopie_sound_play(BOOPIE_SOUND_ERROR);
+        say("%s", error ? error : "买不了");
+    }
+    s_armed = -1;
+    seed_shop_panel();
+}
+
+static void seed_shop_panel(void)
+{
+    int armed = s_armed;
+    lv_obj_t *box = panel("种子", on_seed_shop);
+    s_armed = armed;
+    boopie_pet_status_t st;
+    boopie_avatar_pet_status(&st);
+    char v[48];
+    snprintf(v, sizeof v, "你有 ★ %u", (unsigned)st.stars);
+    note(box, v);
+    s_seed_count = 0;
+    for (int p = 1; p < BOOPIE_PLANT_COUNT && s_seed_count < 8; p++) {
+        int price = boopie_plant_price((boopie_plant_t)p);
+        if (!price) {
+            continue;
+        }
+        char name[48];
+        snprintf(name, sizeof name, "%s种子 ×%d", boopie_plant_name((boopie_plant_t)p), boopie_avatar_seeds(p));
+        snprintf(v, sizeof v, "★ %d", price);
+        row(box, s_seed_count, name, v, true);
+        s_seed_rows[s_seed_count++] = p;
+    }
+    note(box, "一次买一颗，收获的星星比种子价钱多，经验也多。普通种子不用买。");
+}
+
 static void on_shop_menu(int i)
 {
     if (i == 0) {
         furni_panel();
+    } else if (i == 1) {
+        seed_shop_panel();
     } else {
         skins_panel();
     }
@@ -502,8 +555,9 @@ static void shop_panel(void)
     snprintf(v, sizeof v, "你有 ★ %u", (unsigned)st.stars);
     note(box, v);
     row(box, 0, "家具", NULL, true);
-    row(box, 1, "皮肤", NULL, true);
-    note(box, "家具摆进家里、院子和农场；皮肤给现在的伙伴穿。");
+    row(box, 1, "种子", NULL, true);
+    row(box, 2, "皮肤", NULL, true);
+    note(box, "家具摆进家里、院子和农场；稀有种子拿去农场种；皮肤给现在的伙伴穿。");
 }
 
 /* ---- the desk: the pet's status ---- */
@@ -549,8 +603,16 @@ static void on_seed(int i)
     int minute;
     boopie_garden_t *g = boopie_avatar_garden(&now, &minute);
     boopie_plant_t plant = (boopie_plant_t)(i + 1);
+    bool rare = boopie_plant_price(plant) > 0;
+    if (rare && !boopie_avatar_seeds(plant)) {
+        say("没有%s种子了，去商店买吧", boopie_plant_name(plant));
+        return;
+    }
     close_panel();
     if (g && s_plot >= 0 && boopie_garden_plant(g, s_plot, plant, now)) {
+        if (rare) {
+            boopie_avatar_use_seed(plant);
+        }
         boopie_avatar_garden_changed(0, 0);
         boopie_sound_play(BOOPIE_SOUND_WATER);
         say("种下%s啦！每天浇一次水", boopie_plant_name(plant));
@@ -563,11 +625,19 @@ static void seeds_panel(int plot)
     lv_obj_t *box = panel("种什么？", on_seed);
     s_plot = plot;
     for (int p = 1; p < BOOPIE_PLANT_COUNT; p++) {
-        char v[16];
-        snprintf(v, sizeof v, "%d 天", boopie_plant_days((boopie_plant_t)p));
+        char v[24];
+        if (boopie_plant_price((boopie_plant_t)p) > 0) {
+            int n = boopie_avatar_seeds(p);
+            if (!n) {
+                continue;   /* rare, and none bought */
+            }
+            snprintf(v, sizeof v, "%d 天 · 剩 %d", boopie_plant_days((boopie_plant_t)p), n);
+        } else {
+            snprintf(v, sizeof v, "%d 天", boopie_plant_days((boopie_plant_t)p));
+        }
         row(box, p - 1, boopie_plant_name((boopie_plant_t)p), v, true);
     }
-    note(box, "种下就浇好了水。土干了它就停下来等你，不会枯死。");
+    note(box, "种下就浇好了水。土干了它就停下来等你，不会枯死。南瓜、西瓜、蓝玫瑰的种子在商店里买。");
 }
 
 static void use_plot(int plot)
@@ -1073,7 +1143,8 @@ bool boopie_world_ui_go(const char *room)
 void boopie_world_ui_farm_status(char *out, size_t cap)
 {
     static const char *const STAGES[] = { "a seed", "a sprout", "in leaf", "in bud", "in bloom, ready to pick" };
-    static const char *const PLANTS[] = { "", "sunflower", "tulip", "strawberry", "cactus" };
+    static const char *const PLANTS[BOOPIE_PLANT_COUNT] = { "", "sunflower", "tulip", "strawberry", "cactus",
+                                                            "pumpkin", "watermelon", "blue rose" };
     muse_board->display_lock(-1);
     int64_t now;
     int minute;

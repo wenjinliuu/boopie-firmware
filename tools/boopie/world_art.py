@@ -619,6 +619,53 @@ def crop_tulip(L, x, y):
     L.ell(x - 7, y - 4, x - 3, y - 1, (112, 192, 88)); L.ell(x + 3, y - 5, x + 7, y - 2, (112, 192, 88))
 
 
+
+def vine(L, x, y):
+    for k in range(-9, 10):
+        L.put(x + k, y - 2 + int(1.5 * math.sin(k * 0.8)), (88, 152, 72))
+    for dx in (-7, 0, 6):
+        L.ell(x + dx - 3, y - 7, x + dx + 3, y - 3, (112, 192, 88))
+
+
+def crop_bud_pumpkin(L, x, y):
+    vine(L, x, y)
+    L.ell(x - 3, y - 6, x + 3, y, (176, 200, 96))
+
+
+def crop_pumpkin(L, x, y):
+    vine(L, x, y)
+    L.ell(x - 9, y - 12, x + 9, y, (240, 140, 48))
+    for k in (-4, 0, 4):
+        L.rect(x + k, y - 11, x + k, y - 1, (212, 112, 36))
+    L.rect(x - 1, y - 15, x + 1, y - 12, (112, 140, 64))
+
+
+def crop_bud_melon(L, x, y):
+    vine(L, x, y)
+    L.ell(x - 3, y - 6, x + 3, y, (112, 176, 96))
+
+
+def crop_melon(L, x, y):
+    vine(L, x, y)
+    L.ell(x - 10, y - 12, x + 10, y, (64, 152, 72))
+    for k in (-6, -2, 2, 6):
+        L.rect(x + k, y - 11, x + k + 1, y - 1, (40, 112, 56))
+    L.ell(x - 7, y - 10, x - 3, y - 7, (120, 200, 112))
+
+
+def crop_bud_rose(L, x, y):
+    bud(L, x, y, (88, 120, 216))
+
+
+def crop_rose(L, x, y):
+    L.rect(x, y - 16, x, y, (72, 136, 64))
+    L.ell(x - 5, y - 9, x - 1, y - 6, (96, 168, 80)); L.ell(x + 1, y - 12, x + 5, y - 9, (96, 168, 80))
+    L.ell(x - 5, y - 24, x + 5, y - 15, (72, 104, 216))
+    L.ell(x - 3, y - 23, x + 3, y - 17, (112, 148, 240))
+    L.ell(x - 1, y - 21, x + 1, y - 19, (60, 84, 192))
+    L.put(x + 4, y - 25, (232, 240, 255))
+
+
 def crop_strawberry(L, x, y):
     L.ell(x - 9, y - 12, x + 9, y, (96, 176, 88))
     L.ell(x - 7, y - 12, x + 2, y - 6, (128, 204, 104))
@@ -1263,6 +1310,9 @@ SPRITES = [
     ("crop_cactus_m", crop_cactus_m, False), ("crop_cactus_l", crop_cactus_l, False),
     ("crop_sunflower", crop_sunflower, False), ("crop_tulip", crop_tulip, False),
     ("crop_strawberry", crop_strawberry, False), ("crop_cactus", crop_cactus, False),
+    ("crop_bud_pumpkin", crop_bud_pumpkin, False), ("crop_pumpkin", crop_pumpkin, False),
+    ("crop_bud_melon", crop_bud_melon, False), ("crop_melon", crop_melon, False),
+    ("crop_bud_rose", crop_bud_rose, False), ("crop_rose", crop_rose, False),
     ("oak", oak, False), ("bush", bush, False), ("berry_bush", berry_bush, False), ("fern", fern, False),
     ("mushroom", mushroom, False), ("mushroom_ring", mushroom_ring, False), ("log", log, False),
     ("stump", stump, False), ("chest_shut", chest_shut, False), ("chest_open", chest_open, False),

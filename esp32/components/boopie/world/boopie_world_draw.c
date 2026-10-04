@@ -242,6 +242,14 @@ static void fireflies(float t)
 static boopie_art_id_t crop_art(boopie_plant_t plant, boopie_stage_t st)
 {
     bool cactus = plant == BOOPIE_PLANT_CACTUS;
+    static const boopie_art_id_t RARE[][2] = {   /* bud, bloom */
+        [BOOPIE_PLANT_PUMPKIN - BOOPIE_PLANT_PUMPKIN] = { BOOPIE_ART_CROP_BUD_PUMPKIN, BOOPIE_ART_CROP_PUMPKIN },
+        [BOOPIE_PLANT_MELON - BOOPIE_PLANT_PUMPKIN] = { BOOPIE_ART_CROP_BUD_MELON, BOOPIE_ART_CROP_MELON },
+        [BOOPIE_PLANT_ROSE - BOOPIE_PLANT_PUMPKIN] = { BOOPIE_ART_CROP_BUD_ROSE, BOOPIE_ART_CROP_ROSE },
+    };
+    if (plant >= BOOPIE_PLANT_PUMPKIN && (st == BOOPIE_STAGE_BUD || st == BOOPIE_STAGE_BLOOM)) {
+        return RARE[plant - BOOPIE_PLANT_PUMPKIN][st == BOOPIE_STAGE_BLOOM];
+    }
     switch (st) {
     case BOOPIE_STAGE_SEED: return BOOPIE_ART_CROP_SEED;
     case BOOPIE_STAGE_SPROUT: return cactus ? BOOPIE_ART_CROP_CACTUS_S : BOOPIE_ART_CROP_SPROUT;

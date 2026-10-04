@@ -88,6 +88,12 @@ typedef enum {
     BOOPIE_ART_CROP_TULIP,
     BOOPIE_ART_CROP_STRAWBERRY,
     BOOPIE_ART_CROP_CACTUS,
+    BOOPIE_ART_CROP_BUD_PUMPKIN,
+    BOOPIE_ART_CROP_PUMPKIN,
+    BOOPIE_ART_CROP_BUD_MELON,
+    BOOPIE_ART_CROP_MELON,
+    BOOPIE_ART_CROP_BUD_ROSE,
+    BOOPIE_ART_CROP_ROSE,
     BOOPIE_ART_OAK,
     BOOPIE_ART_BUSH,
     BOOPIE_ART_BERRY_BUSH,
@@ -159,7 +165,7 @@ typedef enum {
     BOOPIE_ART_COUNT,
 } boopie_art_id_t;
 
-#define BOOPIE_ART_COLOURS 244
+#define BOOPIE_ART_COLOURS 236
 extern const uint32_t boopie_art_palette[BOOPIE_ART_COLOURS];   /* 0xRRGGBB */
 extern const boopie_art_t boopie_art[BOOPIE_ART_COUNT];
 

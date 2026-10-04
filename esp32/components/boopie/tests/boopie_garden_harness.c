@@ -5,7 +5,7 @@
  * Drives pet/boopie_garden.c for test_boopie_garden.py. Each argument is a
  * step at the hour set by the last "at:H": "plant:POT:KIND", "water:POT",
  * "harvest:POT", "save" (round trips the blob), "v1" (saves the first three pots
- * as version 1 did and loads that) or "at:H". After each, a JSON
+ * as version 1 did and loads that), "v2" (all six, as version 2) or "at:H". After each, a JSON
  * line: what the step returned, and each pot's stage, hours grown, dry, and
  * hours left.
  */
@@ -44,7 +44,7 @@ int main(int argc, char **argv)
                 uint8_t version;
                 uint8_t pad[3];
                 boopie_pot_t pots[3];
-                uint16_t harvested[BOOPIE_PLANT_COUNT];
+                uint16_t harvested[5];
             } old = { .version = 1 };
             memcpy(old.pots, g.pots, sizeof old.pots);
             memcpy(old.harvested, g.harvested, sizeof old.harvested);
@@ -52,6 +52,20 @@ int main(int argc, char **argv)
             ret = boopie_garden_load(&back, &old, sizeof old);
             ret += back.version == BOOPIE_GARDEN_VERSION && memcmp(back.pots, g.pots, sizeof old.pots) == 0
                    && back.pots[3].plant == 0 && back.pots[5].plant == 0;
+            g = back;
+        } else if (strcmp(op, "v2") == 0) {
+            struct {
+                uint8_t version;
+                uint8_t pad[3];
+                boopie_pot_t pots[6];
+                uint16_t harvested[5];
+            } old = { .version = 2 };
+            memcpy(old.pots, g.pots, sizeof old.pots);
+            memcpy(old.harvested, g.harvested, sizeof old.harvested);
+            boopie_garden_t back;
+            ret = boopie_garden_load(&back, &old, sizeof old);
+            ret += back.version == BOOPIE_GARDEN_VERSION && memcmp(back.pots, g.pots, sizeof old.pots) == 0
+                   && memcmp(back.harvested, g.harvested, sizeof old.harvested) == 0 && back.harvested[7] == 0;
             g = back;
         } else if (strcmp(op, "save") == 0) {
             boopie_garden_t back;
@@ -68,7 +82,8 @@ int main(int argc, char **argv)
             printf("%s[%d, %.2f, %d, %.2f]", p ? ", " : "", (int)boopie_garden_stage(&g, p),
                    g.pots[p].grown_s / 3600.0, boopie_garden_dry(&g, p, now), boopie_garden_left_s(&g, p) / 3600.0);
         }
-        printf("], \"harvested\": [%d, %d, %d, %d]}\n", g.harvested[1], g.harvested[2], g.harvested[3], g.harvested[4]);
+        printf("], \"harvested\": [%d, %d, %d, %d, %d, %d, %d]}\n", g.harvested[1], g.harvested[2], g.harvested[3],
+               g.harvested[4], g.harvested[5], g.harvested[6], g.harvested[7]);
     }
     return 0;
 }

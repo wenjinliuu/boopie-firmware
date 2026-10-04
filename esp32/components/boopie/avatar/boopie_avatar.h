@@ -161,6 +161,12 @@ void boopie_avatar_world_reward(int item, int count, int xp, int stars, int *got
 /* Furniture (boopie_furni_t): what's out (bought and not put away, bit f),
  * whether one's bought, buying one for `price` stars (then it's out; false
  * with *error, in Chinese, when it can't), and putting one away or out. */
+/* Rare seeds (boopie_plant_t with a price): how many are to hand, buying one
+ * for `price` stars (false with *error, in Chinese), and using one to plant. */
+int boopie_avatar_seeds(int plant);
+bool boopie_avatar_buy_seed(int plant, int price, const char **error);
+bool boopie_avatar_use_seed(int plant);
+
 uint32_t boopie_avatar_furniture(void);
 bool boopie_avatar_furni_owned(int f);
 bool boopie_avatar_buy_furni(int f, int price, const char **error);

@@ -26,6 +26,10 @@ typedef enum {
     BOOPIE_PLANT_TULIP,        /* 郁金香: 4 */
     BOOPIE_PLANT_STRAWBERRY,   /* 草莓: 5 */
     BOOPIE_PLANT_CACTUS,       /* 仙人掌: 6, a watering lasts 3 days */
+    /* Rare, their seeds bought in the shop: */
+    BOOPIE_PLANT_PUMPKIN,      /* 南瓜: 5, a watering lasts 36 h */
+    BOOPIE_PLANT_MELON,        /* 西瓜: 6 */
+    BOOPIE_PLANT_ROSE,         /* 蓝玫瑰: 7 */
     BOOPIE_PLANT_COUNT,
 } boopie_plant_t;
 
@@ -47,12 +51,13 @@ typedef struct {
 } boopie_pot_t;
 
 /* Kept in NVS as it is: only ever append, and bump version on a change. */
-#define BOOPIE_GARDEN_VERSION 2   /* 2: six plots (1 had three: loaded into the first three) */
+#define BOOPIE_GARDEN_VERSION 3   /* 3: room for 16 kinds; 2: six plots (1 had three: loaded into the first three) */
+#define BOOPIE_GARDEN_KINDS 16    /* kinds the harvest count keeps room for */
 typedef struct boopie_garden {
     uint8_t version;
     uint8_t pad[3];
     boopie_pot_t pots[BOOPIE_GARDEN_POTS];
-    uint16_t harvested[BOOPIE_PLANT_COUNT];
+    uint16_t harvested[BOOPIE_GARDEN_KINDS];
 } boopie_garden_t;
 
 void boopie_garden_init(boopie_garden_t *g);
@@ -61,6 +66,8 @@ bool boopie_garden_load(boopie_garden_t *g, const void *blob, size_t n);
 
 const char *boopie_plant_name(boopie_plant_t p);   /* "向日葵" */
 int boopie_plant_days(boopie_plant_t p);           /* days of damp soil to bloom */
+int boopie_plant_price(boopie_plant_t p);          /* a seed's stars in the shop; 0: free, always to hand */
+int boopie_plant_stars(boopie_plant_t p);          /* what a harvest gives */
 
 /* Counts growth up to now. Call before reading or changing it. */
 void boopie_garden_update(boopie_garden_t *g, int64_t now);

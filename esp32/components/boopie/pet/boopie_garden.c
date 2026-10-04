@@ -15,12 +15,16 @@ static const struct {
     uint8_t damp_h;   /* how long a watering lasts */
     uint8_t stars;
     uint8_t xp;
+    uint8_t price;    /* a seed, in the shop; 0: free */
 } PLANTS[BOOPIE_PLANT_COUNT] = {
-    [BOOPIE_PLANT_NONE] = { "", 0, 0, 0, 0 },
-    [BOOPIE_PLANT_SUNFLOWER] = { "向日葵", 3, 30, 2, 15 },
-    [BOOPIE_PLANT_TULIP] = { "郁金香", 4, 30, 3, 20 },
-    [BOOPIE_PLANT_STRAWBERRY] = { "草莓", 5, 30, 4, 25 },
-    [BOOPIE_PLANT_CACTUS] = { "仙人掌", 6, 72, 5, 30 },
+    [BOOPIE_PLANT_NONE] = { "", 0, 0, 0, 0, 0 },
+    [BOOPIE_PLANT_SUNFLOWER] = { "向日葵", 3, 30, 2, 15, 0 },
+    [BOOPIE_PLANT_TULIP] = { "郁金香", 4, 30, 3, 20, 0 },
+    [BOOPIE_PLANT_STRAWBERRY] = { "草莓", 5, 30, 4, 25, 0 },
+    [BOOPIE_PLANT_CACTUS] = { "仙人掌", 6, 72, 5, 30, 0 },
+    [BOOPIE_PLANT_PUMPKIN] = { "南瓜", 5, 36, 6, 35, 4 },
+    [BOOPIE_PLANT_MELON] = { "西瓜", 6, 30, 7, 40, 5 },
+    [BOOPIE_PLANT_ROSE] = { "蓝玫瑰", 7, 30, 9, 45, 6 },
 };
 
 void boopie_garden_init(boopie_garden_t *g)
@@ -29,19 +33,31 @@ void boopie_garden_init(boopie_garden_t *g)
     g->version = BOOPIE_GARDEN_VERSION;
 }
 
-/* Version 1: three pots. */
+/* Version 1: three pots; 2: six, both with five kinds. */
 typedef struct {
     uint8_t version;
     uint8_t pad[3];
     boopie_pot_t pots[3];
-    uint16_t harvested[BOOPIE_PLANT_COUNT];
+    uint16_t harvested[5];
 } garden_v1_t;
+typedef struct {
+    uint8_t version;
+    uint8_t pad[3];
+    boopie_pot_t pots[6];
+    uint16_t harvested[5];
+} garden_v2_t;
 
 bool boopie_garden_load(boopie_garden_t *g, const void *blob, size_t n)
 {
     boopie_garden_t saved;
     if (n == sizeof(garden_v1_t) && ((const uint8_t *)blob)[0] == 1) {
         garden_v1_t old;
+        memcpy(&old, blob, n);
+        boopie_garden_init(&saved);
+        memcpy(saved.pots, old.pots, sizeof old.pots);
+        memcpy(saved.harvested, old.harvested, sizeof old.harvested);
+    } else if (n == sizeof(garden_v2_t) && ((const uint8_t *)blob)[0] == 2) {
+        garden_v2_t old;
         memcpy(&old, blob, n);
         boopie_garden_init(&saved);
         memcpy(saved.pots, old.pots, sizeof old.pots);
@@ -71,6 +87,16 @@ const char *boopie_plant_name(boopie_plant_t p)
 int boopie_plant_days(boopie_plant_t p)
 {
     return (int)p > 0 && p < BOOPIE_PLANT_COUNT ? PLANTS[p].days : 0;
+}
+
+int boopie_plant_price(boopie_plant_t p)
+{
+    return (int)p > 0 && p < BOOPIE_PLANT_COUNT ? PLANTS[p].price : 0;
+}
+
+int boopie_plant_stars(boopie_plant_t p)
+{
+    return (int)p > 0 && p < BOOPIE_PLANT_COUNT ? PLANTS[p].stars : 0;
 }
 
 static bool valid(const boopie_garden_t *g, int pot)
