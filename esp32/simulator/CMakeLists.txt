@@ -229,6 +229,16 @@ target_link_libraries(muse_simulator PRIVATE
 
 target_link_libraries(muse_simulator PRIVATE m)
 
+# Boopie: what the board does for an AI (tool=NAME:JSON), when cJSON is
+# fetched (idf.py reconfigure); without it the simulator goes without.
+set(BOOPIE_CJSON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../managed_components/espressif__cjson/cJSON")
+if(EXISTS "${BOOPIE_CJSON_DIR}/cJSON.c")
+    target_sources(muse_simulator PRIVATE "${BOOPIE_CJSON_DIR}/cJSON.c"
+        "${BOOPIE_COMPONENT_DIR}/tools/boopie_tools_spec.c" "${BOOPIE_COMPONENT_DIR}/tools/boopie_tools.c")
+    target_include_directories(muse_simulator PRIVATE "${BOOPIE_CJSON_DIR}" "${BOOPIE_COMPONENT_DIR}/tools")
+    target_compile_definitions(muse_simulator PRIVATE BOOPIE_SIM_TOOLS=1)
+endif()
+
 # Boopie: strdup for the settings pages, localtime_r for the clock and the chat history.
 set_source_files_properties("${MUSE_COMPONENT_DIR}/muse_settings_ui.c" "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_viewers.c" "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c"

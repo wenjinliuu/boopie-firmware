@@ -43,6 +43,9 @@
 #include "boopie_world_ui.h"
 #include "boopie_pages.h"
 #include "sim_platform.h"
+#if BOOPIE_SIM_TOOLS
+#include "boopie_tools.h"
+#endif
 #include "sim_services.h"
 
 #define FRAME_STEP_MS 5
@@ -81,6 +84,7 @@ static void usage(FILE *out, const char *argv0)
             "  antic=tv|dance|mirror|love|swing|butterfly|swim (in 小窝)\n"
             "  game=whack         input=TEXT             settings=PAGE\n"
             "  viewer=chat|album  ask=chat|album|notes|all\n"
+            "  tool=NAME[:JSON]   (an AI's call: tool=pet.name:{\"name\":\"豆豆\"})\n"
             "\n"
             "Interactive keys: F1..F7 select face states, H is happy, Space is\n"
             "push-to-talk, +/- change level, [/] change progress, S sleeps,\n"
@@ -430,6 +434,22 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
         render_for(600, real_time);
         return true;
     }
+#if BOOPIE_SIM_TOOLS
+    if (!strcmp(key, "tool")) {   /* an AI's call, as Muse or 小智 makes it */
+        char name[64];
+        const char *colon = strchr(value, ':');
+        snprintf(name, sizeof name, "%.*s", colon ? (int)(colon - value) : (int)strlen(value), value);
+        cJSON *params = colon ? cJSON_Parse(colon + 1) : NULL;
+        cJSON *r = boopie_tools_call(name, params);
+        char *text = r ? cJSON_PrintUnformatted(r) : NULL;
+        fprintf(stderr, "tool %s: %s\n", name, text ? text : "(no such tool)");
+        cJSON_free(text);
+        cJSON_Delete(r);
+        cJSON_Delete(params);
+        render_for(300, real_time);
+        return true;
+    }
+#endif
     if (!strcmp(key, "ask")) {   /* the AI asked to clear something */
         bool ok = boopie_viewer_ask_clear(value);
         render_for(300, real_time);

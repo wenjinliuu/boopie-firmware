@@ -112,6 +112,10 @@ bool boopie_avatar_set_pet_name(const char *name, const char **error);
  * and the caller shows Muse's pet reaction). */
 bool boopie_avatar_tap(int gx, int gy);
 
+/* Fed as the bowl's tap feeds it, for the AI's pet.feed: false (and nothing
+ * done) if it isn't hungry. */
+bool boopie_avatar_feed(void);
+
 typedef struct {
     int level;
     uint32_t xp, xp_into, xp_need;   /* all, into this level, this level takes */

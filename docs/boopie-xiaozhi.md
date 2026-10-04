@@ -17,7 +17,8 @@
   - 字幕：识别出的话（stt）→ 每句回复（sentence_start），按播放进度切换；回复的情绪（llm emotion）说完后让宠物开心/难过/犯困/惊讶几秒。
   - 再按一下打断：发 `abort`，丢掉还没播的回复。
   - 出错提示：连不上（10 秒没 hello）、没听清（松开 10 秒没回应）、没有回应（20 秒没动静）、断开。
-  - MCP：回 `initialize` 和空的 `tools/list`；工具留到步骤 3。服务器的 `system` 等指令一律不执行。
+  - MCP：回 `initialize`；服务器的 `system` 等指令一律不执行。
+- **步骤 3（MCP 工具）已写好，待上板验证**：和 Muse 共用一份能力清单，见 [AI 能操控的本地功能](boopie-tools.md)。
   - 选小智时不存断网留言（Muse 的留言照旧等 Muse）。
   - Opus 放在单独的任务里，24 KB 栈放 PSRAM；WebSocket 任务 6 KB 内部内存。模拟器用 `BOOPIE_XZ_CODE=123456` / `BOOPIE_XZ_READY=1` 看设置页。
 - 官方仓库**正式支持我们这块板**（`waveshare/esp32-s3-touch-amoled-1.75`，含 1.75C 变体），也用 ESP-IDF 6.0.1，音频芯片同样是 ES8311（喇叭）+ ES7210（麦克风，带回采），官方配置 24 kHz。
@@ -48,13 +49,7 @@
      - `llm`：带 `emotion`，用来驱动表情。
      - `tts`：`start` / `sentence_start`（附文字）/ `stop`，中间是二进制 Opus 语音。
    - 打断说话：发 `{"type":"abort"}`。
-3. **MCP 工具**：`{"type":"mcp","payload":<JSON-RPC 2.0>}`。服务器依次发 `initialize`、`tools/list`、`tools/call`，工具名形如 `self.xxx`。我们把现有命令报上去：
-   - 宠物改名、换装
-   - 白噪音
-   - 农场状态
-   - 今天的天气
-   - 开小游戏
-   - 音量
+3. **MCP 工具**：`{"type":"mcp","payload":<JSON-RPC 2.0>}`。服务器依次发 `initialize`、`tools/list`、`tools/call`，工具名形如 `self.xxx`。报上去的是和 Muse 共用的能力清单（[boopie-tools.md](boopie-tools.md)）。
 
 ## 必须注意
 - **不能自动升级**：回复里的 `firmware` 是官方小智固件，照做会把布比固件整个覆盖掉。我们只读激活码、`websocket` 和 `server_time`，`firmware` 一律忽略。应用名报我们自己的（`boopie`），不报官方板子名。

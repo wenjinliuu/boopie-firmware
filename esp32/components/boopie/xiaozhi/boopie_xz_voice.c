@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "boopie_avatar.h"
+#include "boopie_tools.h"
 #include "boopie_xiaozhi.h"
 #include "boopie_xz_proto.h"
 #include "esp_crt_bundle.h"
@@ -467,17 +468,64 @@ static void decode(void)
     }
 }
 
+/* A tools/call, done on its own short task: some tools write to NVS, which
+ * this task's PSRAM stack can't. Its answer comes back through s_replies. */
+typedef struct {
+    int id;
+    char session[BOOPIE_XZ_SESSION_MAX];
+    char name[64];
+    char args[512];
+} tool_job_t;
+
+static QueueHandle_t s_replies;   /* char *, JSON to send; the codec task frees */
+
+static void tool_task(void *arg)
+{
+    tool_job_t *j = arg;
+    cJSON *params = cJSON_Parse(j->args);
+    cJSON *r = boopie_tools_call(j->name, params);
+    cJSON_Delete(params);
+    char *text = r ? cJSON_PrintUnformatted(r) : NULL;
+    bool error = !r || !cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(r, "ok"));
+    cJSON_Delete(r);
+    ESP_LOGI(TAG, "tool %s: %s", j->name, error ? "failed" : "done");
+    size_t cap = (text ? strlen(text) : 0) + 512;
+    char *out = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (out && boopie_xz_mcp_result(j->session, j->id, text ? text : "no such tool", error, out, cap) > 0
+        && xQueueSend(s_replies, &out, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        out = NULL;
+    }
+    free(out);
+    cJSON_free(text);
+    free(j);
+    vTaskDelete(NULL);
+}
+
 static void answer_mcp(const char *json)
 {
-    static char out[1024];
-    char sid[BOOPIE_XZ_SESSION_MAX], name[64], args[256];
-    int id = 0;
-    session(sid, sizeof sid);
-    int n = boopie_xz_mcp_reply(json, sid, "[]", out, sizeof out, name, sizeof name, args, sizeof args, &id);
-    if (n == -2) {
-        /* No tools offered yet (step 3), so none should be called. */
-        n = boopie_xz_mcp_result(sid, id, "没有这个功能", true, out, sizeof out);
+    static char *tools, *out;
+    const size_t out_cap = 12 * 1024;
+    if (!tools) {
+        tools = boopie_tools_mcp_json();
     }
+    if (!out) {
+        out = heap_caps_malloc(out_cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    }
+    tool_job_t *j = calloc(1, sizeof *j);
+    if (!out || !j) {
+        free(j);
+        return;
+    }
+    session(j->session, sizeof j->session);
+    int n = boopie_xz_mcp_reply(json, j->session, tools ? tools : "[]", out, out_cap, j->name, sizeof j->name, j->args,
+                                sizeof j->args, &j->id);
+    if (n == -2) {
+        if (xTaskCreate(tool_task, "boopie_xz_tool", 6144, j, 4, NULL) == pdPASS) {
+            return;   /* it frees j */
+        }
+        n = boopie_xz_mcp_result(j->session, j->id, "busy", true, out, out_cap);
+    }
+    free(j);
     if (n > 0) {
         send_text(out, n);
     }
@@ -550,6 +598,10 @@ static void codec_task(void *arg)
             answer_mcp(m);
             free(m);
         }
+        while (xQueueReceive(s_replies, &m, 0) == pdTRUE) {
+            send_text(m, strlen(m));
+            free(m);
+        }
         encode();
         flush_outbox();
         decode();
@@ -580,6 +632,7 @@ static bool init(void)
     s_cmds = xQueueCreate(8, sizeof(cmd_t));
     s_events = xQueueCreateWithCaps(16, sizeof(event_t), ps);
     s_mcp = xQueueCreate(4, sizeof(char *));
+    s_replies = xQueueCreate(4, sizeof(char *));
     s_pcm_in = xStreamBufferCreateWithCaps(PCM_IN_BYTES, 1, ps);
     s_pcm_out = xStreamBufferCreateWithCaps(PCM_OUT_BYTES, 1, ps);
     s_outbox = xMessageBufferCreateWithCaps(OUTBOX_BYTES, ps);
@@ -588,7 +641,7 @@ static bool init(void)
     s_bin = heap_caps_malloc(PKT_MAX, ps);
     s_frame = heap_caps_malloc(FRAME * 2, ps);
     s_pcm = heap_caps_malloc(DEC_MAX * 2, ps);
-    if (!s_lock || !s_cmds || !s_events || !s_mcp || !s_pcm_in || !s_pcm_out || !s_outbox || !s_down || !s_txt
+    if (!s_lock || !s_cmds || !s_events || !s_mcp || !s_replies || !s_pcm_in || !s_pcm_out || !s_outbox || !s_down || !s_txt
         || !s_bin || !s_frame || !s_pcm) {
         ESP_LOGE(TAG, "no memory");
         return false;   /* leaked: it isn't tried again */

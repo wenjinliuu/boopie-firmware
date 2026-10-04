@@ -1003,6 +1003,15 @@ bool boopie_avatar_tap(int gx, int gy)
     return fed;
 }
 
+bool boopie_avatar_feed(void)
+{
+    ensure_loaded();
+    if (!s_pet_state.hungry) {
+        return false;
+    }
+    return boopie_avatar_tap((BOOPIE_FOOD_X0 + BOOPIE_FOOD_X1) / 2, (BOOPIE_FOOD_Y0 + BOOPIE_FOOD_Y1) / 2);
+}
+
 void boopie_avatar_stroke(int strokes, bool hug)
 {
     ensure_loaded();

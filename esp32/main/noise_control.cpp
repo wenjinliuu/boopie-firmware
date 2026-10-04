@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "boopie_tools.h"   // Boopie: what the board does for the AI
 #include "noise_control.h"
 #include "stack_monitor.h"
 #include "noise_upgrade.h"
@@ -1328,91 +1329,9 @@ static char *build_register_json(void) {
 #endif
 
 #if CONFIG_MUSE_ENABLED
-    // Boopie: the on-screen character.
-    cJSON *avatar_optional = cJSON_CreateObject();
-    cJSON_AddItemToObject(avatar_optional, "avatar", string_param(
-        "Character: muse, boopie, gpt, codex, klaude, whale or doubao; kept across restarts."));
-    cJSON_AddItemToObject(avatar_optional, "colour", string_param(
-        "Body colour as RRGGBB, or \"default\"; not for muse. Kept per character."));
-    cJSON_AddItemToObject(avatar_optional, "expression", string_param(
-        "Pet expression shown while idle: hungry, eating, sleepy, sad or dizzy; idle clears it."));
-    cJSON_AddItemToObject(avatar_optional, "reaction", string_param(
-        "Effect over any expression: surprise, blush, confetti or hearts. Turned on, or off with on=false."));
-    cJSON_AddItemToObject(avatar_optional, "background", string_param(
-        "Idle background: default, stars, fireflies, snow, petals, bubbles, matrix, neon_grid or glitch."));
-    cJSON_AddItemToObject(avatar_optional, "skin", string_param(
-        "A skin the user has bought, by id (such as boopie_starry), or none."));
-    cJSON_AddItemToObject(avatar_optional, "accessory", string_param(
-        "An accessory for this character, unlocked by level: bow, crown, scarf or party_hat. "
-        "Put on, or taken off with on=false; one hat at a time."));
-    cJSON *avatar_on = cJSON_CreateObject();
-    cJSON_AddStringToObject(avatar_on, "type", "boolean");
-    cJSON_AddStringToObject(avatar_on, "description", "With reaction or accessory: on (default) or off.");
-    cJSON_AddItemToObject(avatar_optional, "on", avatar_on);
-    add_command(commands, "pet.status",
-                "How the pet on the screen is: its name, hungry or not, its mood, "
-                "level, experience and stars.",
-                nullptr, nullptr);
-    cJSON *name_optional = cJSON_CreateObject();
-    cJSON_AddItemToObject(name_optional, "name", string_param(
-        "The pet's new name, up to 8 characters (Chinese is fine); empty goes back to "
-        "its character's own name (布比, 小克 ...)."));
-    cJSON *game_optional = cJSON_CreateObject();
-    cJSON_AddItemToObject(game_optional, "game", string_param(
-        "Which game: whack (戳戳布比, poke the pet as it pops up; the default), "
-        "catch (接零食, tilt to catch falling snacks), maze (重力迷宫, tilt a ball out of a maze) "
-        "or hop (跳跳布比, tap to hop the pet through the gaps between pillars)."));
-    add_command(commands, "game.start",
-                "Open a game on the screen for the user to play, when they want to play "
-                "with their pet. Rounds earn the pet experience and stars.",
-                nullptr, game_optional);
-    cJSON *clear_required = cJSON_CreateObject();
-    cJSON_AddItemToObject(clear_required, "what", string_param(
-        "What to clear: chat (the chat history), album (pictures shown), notes "
-        "(voice notes waiting for the network) or all."));
-    add_command(commands, "storage.clear",
-                "When the user asks to delete their chat history, pictures or saved notes: "
-                "puts a question on the screen, and only the user's tap clears them. Tell "
-                "the user to confirm on the screen.",
-                clear_required, nullptr);
-    cJSON *noise_optional = cJSON_CreateObject();
-    cJSON_AddItemToObject(noise_optional, "kind", string_param(
-        "white (白噪音), pink (粉红噪音, softer), rain (雨声, the default) or waves (海浪)."));
-    cJSON *minutes_param = cJSON_CreateObject();
-    cJSON_AddStringToObject(minutes_param, "type", "integer");
-    cJSON_AddStringToObject(minutes_param, "description",
-                            "How long before it fades out, in minutes: 1 to 600, or 0 to play until "
-                            "stopped. Default 30.");
-    cJSON_AddItemToObject(noise_optional, "minutes", minutes_param);
-    add_command(commands, "noise.play",
-                "Play a soothing sound from the device's speaker, to sleep or focus to, when the "
-                "user asks for white noise, rain or the sea. It pauses while you talk and fades "
-                "out when its time is up.",
-                nullptr, noise_optional);
-    add_command(commands, "garden.status",
-                "How the pet's farm (农场, outside its home 小窝) is doing: what's planted in each "
-                "plot, how far grown, and whether it's thirsty or ready to pick. Planting, watering "
-                "and picking are done by the user on the screen.",
-                nullptr, nullptr);
-    cJSON *weather_required = cJSON_CreateObject();
-    cJSON_AddItemToObject(weather_required, "kind", string_param(
-        "sunny, cloudy, rain or snow: today's weather where the user is."));
-    add_command(commands, "world.weather",
-                "Whenever you tell the user today's weather, also set it here, so it rains or "
-                "snows in the pet's little world on the screen too. It lasts the day.",
-                weather_required, nullptr);
-    add_command(commands, "noise.stop",
-                "Stop the white noise, rain or waves playing.",
-                nullptr, nullptr);
-    add_command(commands, "pet.name",
-                "Name the pet on the screen, when the user gives it a name. Without "
-                "name, reports the current one. Call the user's pet by this name.",
-                nullptr, name_optional);
-    add_command(commands, "display.avatar",
-                "Change the character on screen, its colour, its background, its skin, "
-                "its accessories, its pet expression or a reaction. Without parameters, "
-                "reports the current ones.",
-                nullptr, avatar_optional);
+    // Boopie: what the board can do, listed once (boopie_tools.h) for Muse
+    // and 小智 alike.
+    boopie_tools_describe(commands);
 #endif
 
 #if CONFIG_HOMEHUB_SENSECAP_SENSORS

@@ -73,11 +73,7 @@
 #endif
 #if CONFIG_MUSE_ENABLED
 #include "muse_glue.h"
-#include "boopie_avatar.h"   /* Boopie: display.avatar */
-#include "boopie_games.h"    /* Boopie: game.start */
-#include "boopie_viewers.h"  /* Boopie: storage.clear */
-#include "boopie_noise_ui.h" /* Boopie: noise.play, noise.stop */
-#include "boopie_world_ui.h" /* Boopie: garden.status, world.weather */
+#include "boopie_tools.h"    /* Boopie: what the board does for the AI */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -1871,132 +1867,9 @@ static cJSON *on_ws_command(
     }
 #endif
 #if CONFIG_MUSE_ENABLED
-    /* Boopie: which character is on screen, its colour, a pet expression or
-     * a reaction. */
-    if (strcmp(command, "display.avatar") == 0) {
-        cJSON *on = params ? cJSON_GetObjectItem(params, "on") : NULL;
-        char *avatar = json_strdup_string(params, "avatar");
-        char *colour = json_strdup_string(params, "colour");
-        char *pet = json_strdup_string(params, "expression");
-        char *reaction = json_strdup_string(params, "reaction");
-        char *scene = json_strdup_string(params, "background");
-        char *skin = json_strdup_string(params, "skin");
-        char *accessory = json_strdup_string(params, "accessory");
-        const char *error = NULL;
-        bool ok = boopie_avatar_command(avatar, colour, pet, reaction, scene, skin, accessory,
-                                        !cJSON_IsFalse(on), &error);
-        free(accessory);
-        free(scene);
-        free(skin);
-        free(avatar);
-        free(colour);
-        free(pet);
-        free(reaction);
-        if (!ok) return command_error("bad_param", error);
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "avatar", boopie_avatar_key(boopie_avatar_current()));
-        cJSON_AddStringToObject(result, "expression", boopie_expr_name(boopie_avatar_pet()));
-        cJSON_AddStringToObject(result, "background", boopie_scene_key(boopie_avatar_scene()));
-        int worn = boopie_avatar_skin();
-        cJSON_AddStringToObject(result, "skin", worn >= 0 ? boopie_skin_key(worn) : "none");
-        cJSON *accessories = cJSON_AddArrayToObject(result, "accessories");
-        for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
-            if (boopie_avatar_accessories() & BOOPIE_ACC_BIT(i)) {
-                cJSON_AddItemToArray(accessories, cJSON_CreateString(boopie_acc_key((boopie_acc_t)i)));
-            }
-        }
-        return result;
-    }
-#endif
-#if CONFIG_MUSE_ENABLED
-    /* Boopie: the pet. */
-    if (strcmp(command, "pet.status") == 0) {
-        boopie_pet_status_t st;
-        boopie_avatar_pet_status(&st);
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "name", boopie_avatar_pet_name());
-        cJSON_AddBoolToObject(result, "hungry", st.hungry);
-        cJSON_AddStringToObject(result, "mood", boopie_expr_name(st.mood));
-        cJSON_AddNumberToObject(result, "level", st.level);
-        cJSON_AddNumberToObject(result, "xp_into_level", st.xp_into);
-        cJSON_AddNumberToObject(result, "xp_for_level", st.xp_need);
-        cJSON_AddNumberToObject(result, "stars", st.stars);
-        return result;
-    }
-    if (strcmp(command, "game.start") == 0) {
-        char *game = json_strdup_string(params, "game");
-        bool ok = boopie_games_open(game ? game : "whack");
-        free(game);
-        if (!ok) return command_error("bad_param", "unknown game");
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        return result;
-    }
-    if (strcmp(command, "storage.clear") == 0) {
-        /* Boopie: never straight away: the screen asks, and only a tap clears. */
-        char *what = json_strdup_string(params, "what");
-        bool ok = boopie_viewer_ask_clear(what ? what : "");
-        free(what);
-        if (!ok) return command_error("bad_param", "what: chat, album, notes or all");
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "status", "asked on screen; cleared only if the user taps to confirm");
-        return result;
-    }
-    if (strcmp(command, "noise.play") == 0) {
-        char *kind = json_strdup_string(params, "kind");
-        cJSON *mins = cJSON_GetObjectItem(params, "minutes");
-        int minutes = cJSON_IsNumber(mins) ? (int)mins->valuedouble : -1;
-        char said[112];
-        bool ok = minutes <= 600 && boopie_noise_ui_play(kind, minutes, said, sizeof said);
-        free(kind);
-        if (!ok) return command_error("bad_param", "kind: white, pink, rain or waves; minutes: 0 to 600");
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "status", said);
-        return result;
-    }
-    if (strcmp(command, "world.weather") == 0) {
-        char *kind = json_strdup_string(params, "kind");
-        char said[64];
-        bool ok = boopie_world_ui_set_weather(kind, said, sizeof said);
-        free(kind);
-        if (!ok) return command_error("bad_param", "kind: sunny, cloudy, rain or snow (and the clock set)");
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "status", said);
-        return result;
-    }
-    if (strcmp(command, "garden.status") == 0) {
-        char said[720];
-        boopie_world_ui_farm_status(said, sizeof said);
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "garden", said);
-        return result;
-    }
-    if (strcmp(command, "noise.stop") == 0) {
-        char said[64];
-        boopie_noise_ui_stop(said, sizeof said);
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "status", said);
-        return result;
-    }
-    if (strcmp(command, "pet.name") == 0) {
-        char *name = json_strdup_string(params, "name");
-        const char *error = NULL;
-        bool ok = !name || boopie_avatar_set_pet_name(name, &error);
-        free(name);
-        if (!ok) return command_error("bad_param", error);
-        cJSON *result = cJSON_CreateObject();
-        cJSON_AddBoolToObject(result, "ok", true);
-        cJSON_AddStringToObject(result, "name", boopie_avatar_pet_name());
-        cJSON_AddBoolToObject(result, "own_name", boopie_avatar_has_own_name());
-        return result;
-    }
+    /* Boopie: the pet, the screen, sounds and pages (boopie_tools.h). */
+    cJSON *boopie = boopie_tools_call(command, params);
+    if (boopie) return boopie;
 #endif
 #if CONFIG_MUSE_WATCHER_CAMERA
     if (strcmp(command, "camera.capture") == 0) {
