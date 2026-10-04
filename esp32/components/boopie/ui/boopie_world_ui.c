@@ -881,6 +881,18 @@ static void use_furni(int f)
         say("荡秋千～ 好高呀！");
         break;
     case BOOPIE_FURNI_WINDMILL: say("风车呼呼地转"); break;
+    case BOOPIE_FURNI_GRILL:
+        boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
+        say("烤棉花糖～ 好香！");
+        break;
+    case BOOPIE_FURNI_CAMPFIRE:
+        boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
+        say("围着营火，暖暖的");
+        break;
+    case BOOPIE_FURNI_TENT: say("在帐篷里躲一会儿，听风吹树叶"); break;
+    case BOOPIE_FURNI_GNOME: say("小矮人在看着农场"); break;
+    case BOOPIE_FURNI_SURFBOARD: say("等浪大一点就去冲浪！"); break;
+    case BOOPIE_FURNI_KITE: say("风筝飞得好高"); break;
     default: say("好漂亮"); break;
     }
 }

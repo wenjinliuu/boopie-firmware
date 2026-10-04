@@ -124,6 +124,13 @@ typedef enum {
     BOOPIE_ART_SWING,
     BOOPIE_ART_WINDMILL_A,
     BOOPIE_ART_WINDMILL_B,
+    BOOPIE_ART_GNOME,
+    BOOPIE_ART_GRILL,
+    BOOPIE_ART_CAMPFIRE_A,
+    BOOPIE_ART_CAMPFIRE_B,
+    BOOPIE_ART_TENT,
+    BOOPIE_ART_SURFBOARD,
+    BOOPIE_ART_KITE,
     BOOPIE_ART_PIER,
     BOOPIE_ART_PALM,
     BOOPIE_ART_UMBRELLA,
@@ -177,7 +184,7 @@ typedef enum {
     BOOPIE_ART_COUNT,
 } boopie_art_id_t;
 
-#define BOOPIE_ART_COLOURS 235
+#define BOOPIE_ART_COLOURS 243
 extern const uint32_t boopie_art_palette[BOOPIE_ART_COLOURS];   /* 0xRRGGBB */
 extern const boopie_art_t boopie_art[BOOPIE_ART_COUNT];
 

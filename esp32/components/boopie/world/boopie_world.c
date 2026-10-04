@@ -123,6 +123,8 @@ static const boopie_thing_t OUTSIDE[] = {
     { A(BIRD_BATH), 66, 122, 7, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(SWING), 122, 108, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), 0, 2, BOOPIE_FURNI_SWING },
     { A(WINDMILL_A), 228, 58, 1, 0, STAND, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_WINDMILL },
+    { A(GNOME), 300, 96, 1, 0, STAND, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_GNOME },
+    { A(GRILL), 166, 118, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), -12, 2, BOOPIE_FURNI_GRILL },
 };
 
 /*
@@ -160,6 +162,8 @@ static const boopie_thing_t WOODS[] = {
     { A(FROG), 444, 120, 14, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(CHEST_SHUT), 248, 76, 1, 0, STAND, BOOPIE_DO_CHEST, A(HINT_KEY), 0, 6, 0 },
     { A(CHEST_SHUT), 500, 112, 8, 0, STAND, BOOPIE_DO_CHEST, A(HINT_KEY), -10, 2, 1 },
+    { A(CAMPFIRE_A), 320, 120, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), -12, 2, BOOPIE_FURNI_CAMPFIRE },
+    { A(TENT), 428, 90, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_ZZZ), 0, 4, BOOPIE_FURNI_TENT },
 };
 
 /*
@@ -187,6 +191,8 @@ static const boopie_thing_t BEACH[] = {
     { A(SHELL), 194, 124, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_SHELL), 8, 0, 5 },
     { A(SHELL), 340, 98, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_SHELL), 8, 0, 6 },
     { A(SHELL), 66, 94, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_SHELL), 8, 0, 7 },
+    { A(SURFBOARD), 92, 98, 1, 0, STAND, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_SURFBOARD },
+    { A(KITE), 246, 62, 1, 0, WALL, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_KITE },
 };
 
 /* Where each slime keeps to: its patch's middle, and how far it strays. */
@@ -255,6 +261,9 @@ static const struct {
     [BOOPIE_FURNI_CLOCK] = { "挂钟", "客厅", 15 },     [BOOPIE_FURNI_RECORD] = { "唱片机", "客厅", 25 },
     [BOOPIE_FURNI_LIGHTS] = { "星星串灯", "卧室", 20 }, [BOOPIE_FURNI_TEDDY] = { "小熊玩偶", "卧室", 15 },
     [BOOPIE_FURNI_SWING] = { "秋千", "院子", 40 },     [BOOPIE_FURNI_WINDMILL] = { "风车", "农场", 60 },
+    [BOOPIE_FURNI_GNOME] = { "花园小矮人", "农场", 30 }, [BOOPIE_FURNI_GRILL] = { "烧烤架", "院子", 55 },
+    [BOOPIE_FURNI_CAMPFIRE] = { "营火", "森林", 60 },  [BOOPIE_FURNI_TENT] = { "帐篷", "森林", 120 },
+    [BOOPIE_FURNI_SURFBOARD] = { "冲浪板", "海边", 40 }, [BOOPIE_FURNI_KITE] = { "风筝", "海边", 70 },
 };
 static uint32_t s_furniture;   /* out now */
 static boopie_fest_t s_fest;

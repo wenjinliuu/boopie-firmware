@@ -91,6 +91,12 @@ typedef enum {
     BOOPIE_FURNI_TEDDY,       /* 小熊玩偶 */
     BOOPIE_FURNI_SWING,       /* 秋千 */
     BOOPIE_FURNI_WINDMILL,    /* 风车, turning */
+    BOOPIE_FURNI_GNOME,       /* 花园小矮人, by the farm */
+    BOOPIE_FURNI_GRILL,       /* 烧烤架, in the yard */
+    BOOPIE_FURNI_CAMPFIRE,    /* 营火, in the woods, flickering */
+    BOOPIE_FURNI_TENT,        /* 帐篷, in the woods */
+    BOOPIE_FURNI_SURFBOARD,   /* 冲浪板, on the beach */
+    BOOPIE_FURNI_KITE,        /* 风筝, over the beach */
     BOOPIE_FURNI_COUNT,
 } boopie_furni_t;
 const char *boopie_furni_name(boopie_furni_t f);

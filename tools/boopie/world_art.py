@@ -747,6 +747,66 @@ def windmill(L, x, y, turn):
     L.ell(cx - 2, cy - 2, cx + 2, cy + 2, (120, 84, 56))
 
 
+def gnome(L, x, y):
+    L.poly([(x - 4, y - 12), (x, y - 22), (x + 4, y - 12)], (216, 60, 60))     # the hat
+    L.ell(x - 4, y - 14, x + 4, y - 8, (248, 212, 180))                         # the face
+    L.put(x - 2, y - 12, (40, 32, 32)); L.put(x + 2, y - 12, (40, 32, 32))
+    L.poly([(x - 4, y - 10), (x, y - 3), (x + 4, y - 10)], (244, 244, 244))     # the beard
+    L.rect(x - 4, y - 6, x + 4, y - 1, (72, 120, 200))
+    L.rect(x - 4, y, x - 1, y, (96, 64, 40)); L.rect(x + 1, y, x + 4, y, (96, 64, 40))
+
+
+def grill(L, x, y):
+    L.rect(x - 6, y - 6, x - 6, y, (60, 60, 68)); L.rect(x + 6, y - 6, x + 6, y, (60, 60, 68))
+    L.ell(x - 8, y - 12, x + 8, y - 4, (48, 48, 56))
+    L.rect(x - 8, y - 9, x + 8, y - 9, (120, 120, 132))
+    for k in (-5, -1, 3):
+        L.rect(x + k, y - 11, x + k + 2, y - 10, (232, 120, 72))                # something cooking
+    L.put(x - 2, y - 15, (200, 200, 210)); L.put(x + 1, y - 17, (200, 200, 210)); L.put(x + 3, y - 15, (200, 200, 210))
+
+
+def campfire(L, x, y, k):
+    L.rect(x - 8, y - 2, x + 8, y, (120, 80, 48)); L.rect(x - 6, y - 4, x + 6, y - 3, (150, 100, 60))
+    for dx in (-9, -5, 5, 9):
+        L.ell(x + dx - 2, y - 2, x + dx + 2, y + 1, (140, 140, 150))            # stones
+    sway = 1 if k else -1
+    L.poly([(x - 5, y - 4), (x + sway, y - 16), (x + 5, y - 4)], (240, 120, 40))
+    L.poly([(x - 3, y - 4), (x - sway, y - 12), (x + 3, y - 4)], (255, 200, 70))
+    L.put(x + sway * 2, y - 18 - k, (255, 160, 60))
+
+
+def campfire_a(L, x, y):
+    campfire(L, x, y, 0)
+
+
+def campfire_b(L, x, y):
+    campfire(L, x, y, 1)
+
+
+def tent(L, x, y):
+    L.poly([(x - 14, y), (x, y - 20), (x + 14, y)], (232, 140, 64))
+    L.poly([(x - 4, y), (x, y - 12), (x + 4, y)], (90, 56, 40))                 # the way in
+    L.rect(x, y - 23, x, y - 20, (120, 90, 60))
+    L.poly([(x, y - 23), (x + 5, y - 22), (x, y - 21)], (232, 72, 72))          # a pennant
+    L.rect(x - 14, y, x + 14, y, (150, 90, 40))
+
+
+def surfboard(L, x, y):
+    L.ell(x - 3, y - 24, x + 3, y, (90, 190, 230))
+    L.rect(x, y - 22, x, y - 2, (250, 250, 250))
+    L.rect(x - 2, y - 12, x + 2, y - 11, (255, 200, 80))
+
+
+def kite(L, x, y):
+    L.poly([(x, y - 30), (x + 7, y - 22), (x, y - 12), (x - 7, y - 22)], (240, 90, 120))
+    L.poly([(x, y - 30), (x + 7, y - 22), (x, y - 22)], (255, 210, 90))
+    L.rect(x - 7, y - 22, x + 7, y - 22, (120, 60, 80)); L.rect(x, y - 30, x, y - 12, (120, 60, 80))
+    for k in range(12):                                                         # its tail
+        L.put(x + int(2 * math.sin(k * 0.9)), y - 11 + k, (120, 60, 80))
+        if k % 4 == 2:
+            L.rect(x + int(2 * math.sin(k * 0.9)) - 1, y - 11 + k, x + int(2 * math.sin(k * 0.9)) + 1, y - 11 + k, (100, 200, 255))
+
+
 def windmill_a(L, x, y):
     windmill(L, x, y, 0.3)
 
@@ -1437,6 +1497,8 @@ SPRITES = [
     ("wall_clock", wall_clock, False), ("record_player", record_player, False),
     ("fairy_lights", fairy_lights, True), ("teddy", teddy, False), ("swing", swing, False),
     ("windmill_a", windmill_a, False), ("windmill_b", windmill_b, False),
+    ("gnome", gnome, False), ("grill", grill, False), ("campfire_a", campfire_a, False),
+    ("campfire_b", campfire_b, False), ("tent", tent, False), ("surfboard", surfboard, False), ("kite", kite, False),
     ("pier", pier, True), ("palm", palm, False), ("umbrella", umbrella, False), ("beach_chair", beach_chair, False),
     ("sandcastle", sandcastle, False), ("lighthouse", lighthouse, False), ("boat", boat, False),
     ("hammock", hammock, False), ("tide_pool", tide_pool, True), ("shell", shell, False), ("starfish", starfish, False),

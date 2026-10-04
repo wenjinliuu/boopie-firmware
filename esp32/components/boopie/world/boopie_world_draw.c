@@ -531,6 +531,9 @@ static boopie_art_id_t art_of(const boopie_thing_t *t, const boopie_world_look_t
     if (t->art == BOOPIE_ART_BERRY_BUSH && (look->gathered >> t->arg & 1)) {
         return BOOPIE_ART_BUSH;   /* picked today */
     }
+    if (t->art == BOOPIE_ART_CAMPFIRE_A && ((int)(look->t * 4) & 1)) {
+        return BOOPIE_ART_CAMPFIRE_B;   /* flickering */
+    }
     if (t->art == BOOPIE_ART_WINDMILL_A && ((int)(look->t * 3) & 1)) {
         return BOOPIE_ART_WINDMILL_B;   /* turning */
     }
