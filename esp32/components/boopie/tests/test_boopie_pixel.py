@@ -121,7 +121,7 @@ class BoopiePixelTest(unittest.TestCase):
         # Drafts are designs still under review, not in the firmware yet; Muse's
         # are drawn by Muse's own renderer, so aren't compared here.
         done = [k for k, sk in ap.SKINS.items() if not sk.draft and sk.rig != "muse"]
-        self.assertEqual(len(done), 23)
+        self.assertEqual(len(done), 33)
         rigs = {R.key: R for R in ap.CHARACTERS}
         for key in done:
             skin = ap.SKINS[key]
@@ -131,12 +131,13 @@ class BoopiePixelTest(unittest.TestCase):
                 self.compare(jobs, skin=key)
 
     def test_accessories(self) -> None:
-        self.assertEqual(list(ap.ACCESSORIES), ["bow", "party_hat", "crown", "scarf"])
-        for hat in ("bow", "party_hat", "crown"):
+        self.assertEqual(list(ap.ACCESSORIES), ["bow", "party_hat", "crown", "scarf", "straw_hat", "halo", "medal"])
+        for hat, neck in (("bow", "scarf"), ("party_hat", "scarf"), ("crown", "scarf"), ("straw_hat", "medal"),
+                          ("halo", "medal")):
             jobs = [(R, name, i / ap.FPS, None) for R in ap.CHARACTERS
                     for name, length, _ in ap.EXPRESSIONS for i in range(0, round(length * ap.FPS), 6)]
             with self.subTest(wear=hat):
-                self.compare(jobs, wear=(hat, "scarf"))
+                self.compare(jobs, wear=(hat, neck))
 
     def test_foods(self) -> None:
         self.assertEqual(ap.FOODS, ["rice", "drumstick", "onigiri", "fish", "big_cookie"])

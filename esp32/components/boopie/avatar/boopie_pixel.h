@@ -153,6 +153,9 @@ typedef enum {
     BOOPIE_ACC_CROWN,
     BOOPIE_ACC_SCARF,
     BOOPIE_ACC_PARTY_HAT,
+    BOOPIE_ACC_STRAW_HAT,   /* earned: 收获 50 次 */
+    BOOPIE_ACC_HALO,        /* earned: 连续 7 天来看它 */
+    BOOPIE_ACC_MEDAL,       /* earned: 破纪录 10 次; worn at the neck, as the scarf */
     BOOPIE_ACC_COUNT,
 } boopie_acc_t;
 

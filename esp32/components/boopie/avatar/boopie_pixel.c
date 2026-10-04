@@ -24,6 +24,7 @@
 
 #define N BOOPIE_PX
 #define PI 3.14159265358979f
+#define M_PI_D 3.141592653589793
 #define TAU 6.28318530717959f
 
 typedef struct {
@@ -1789,8 +1790,14 @@ static bool s_klaude_eye_set;               /* a skin's eye colour for Klaude */
 /* Themed extras, each its character's: 海绵宝宝's holes and shorts (小克),
  * 蕾姆's headband, ribbon and fringe (豆包), 珍珍's ponytail (小鲸鱼), 凯伦's
  * line of a face (Codex). As the prototype's rig attributes of those names. */
-enum { LOOK_NONE = 0, LOOK_SPONGE, LOOK_REM, LOOK_PEARL, LOOK_KAREN };
+enum {
+    LOOK_NONE = 0, LOOK_SPONGE, LOOK_REM, LOOK_PEARL, LOOK_KAREN,
+    LOOK_LANTERN, LOOK_MUMMY, LOOK_GHOST,                       /* 小克 */
+    LOOK_TANGYUAN, LOOK_JELLYFISH, LOOK_SLIME, LOOK_WEATHER,    /* 布比 */
+    LOOK_DONUT, LOOK_NEON, LOOK_KALEIDO, LOOK_CHROME,           /* GPT */
+};
 static uint8_t s_look;
+static rgb_t s_mouth_inside = { 255, 122, 152 };   /* CHEEK, or 汤圆's black sesame */
 static rgb_t s_whale_belly[2] = { { 214, 224, 255 }, { 240, 244, 255 } };   /* shade, light */
 
 typedef struct rig rig_t;
@@ -1820,7 +1827,7 @@ static void face_default(const rig_t *r, int fx, int fy, const pose_t *p)
         eye(fx + side * 7, fy, p, side, false);
     }
     blush(fx, fy, p, 11, s_cheek);
-    mouth(fx + floordiv(p->lookx, 2), fy + 5, p, s_eye, CHEEK);
+    mouth(fx + floordiv(p->lookx, 2), fy + 5, p, s_eye, s_mouth_inside);
 }
 
 static frame_t rig_frame(const rig_t *r, const pose_t *p, float cx, float base)
@@ -1865,15 +1872,84 @@ static bool feet_on(const pose_t *p)
     return p->feet && p->scale > 0.6f;
 }
 
+/* 天气精灵's colour for the day's weather (as the ambient knows it; sunny without). */
+static const uint32_t WEATHER_COLOUR[4] = { 0xffd36a, 0xc4cad6, 0x8aa4c8, 0xf2f6ff };
+
+static void boopie_extras(const frame_t *f, const pose_t *p, float cx, float cy, float ry)
+{
+    double t = p->t;
+    float x, y;
+    if (s_look == LOOK_TANGYUAN) {               /* steam rising off it */
+        static const float DX[3] = { -6, 0, 6 };
+        for (int i = 0; i < 3; i++) {
+            pt(f, cx + DX[i], cy - ry - 2, &x, &y);
+            for (int k = 0; k < 6; k += 2) {
+                putd(x + rint(sin(t * 3 + i + k * 0.7)), y - k - (i % 2), (rgb_t){ 226, 226, 236 });
+            }
+        }
+    } else if (s_look == LOOK_JELLYFISH) {       /* tentacles, swaying, and specks of light inside */
+        static const int DX[5] = { -10, -5, 0, 5, 10 };
+        for (int i = 0; i < 5; i++) {
+            pt(f, cx + DX[i], cy + 7, &x, &y);
+            for (int k = 0; k < 10 - abs(DX[i]) / 3; k++) {
+                putd(x + rint(sin(t * 2.2 + i + k * 0.5) * 1.2), y + k, (k + i) % 3 ? s_rp.light : s_rp.mid);
+            }
+        }
+        for (int i = 0; i < 5; i++) {
+            pt(f, cx - 10 + (float)h01(2, i, 81, 0) * 20, cy - 8 + (float)h01(2, i, 82, 0) * 10, &x, &y);
+            if (sin(t * 2 + i * 1.7) > 0) {
+                put(x, y, s_rp.high);
+            }
+        }
+    } else if (s_look == LOOK_SLIME) {           /* a wet shine */
+        pt(f, cx - 9, cy - 8, &x, &y);
+        static const int8_t SHINE[4][2] = { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 2, -1 } };
+        for (int i = 0; i < 4; i++) {
+            put(x + SHINE[i][0], y + SHINE[i][1], WHITE);
+        }
+    } else if (s_look == LOOK_WEATHER) {
+        int w = s_amb.on ? (int)s_amb.weather : BOOPIE_AMB_SUNNY;
+        if (w == BOOPIE_AMB_SUNNY) {             /* rays round it, turning */
+            for (int k = 0; k < 8; k++) {
+                double an = k * M_PI_D / 4 + t * 0.6;
+                pt(f, cx + (float)(cos(an) * 21), cy + (float)(sin(an) * 19), &x, &y);
+                put(x, y, s_rp.glow);
+            }
+        } else if (w == BOOPIE_AMB_RAIN) {       /* drops falling from it */
+            static const float DX[3] = { -8, 0, 8 };
+            for (int i = 0; i < 3; i++) {
+                pt(f, cx + DX[i], cy + 15 + (float)pymodd(t * 9 + i * 3, 9), &x, &y);
+                put(x, y, (rgb_t){ 120, 170, 240 });
+                put(x, y + 1, (rgb_t){ 120, 170, 240 });
+            }
+        } else if (w == BOOPIE_AMB_SNOW) {       /* flakes settled on top */
+            for (int i = 0; i < 6; i++) {
+                pt(f, cx - 12 + i * 5, cy - 13 + fabsf(i - 2.5f) * 1.2f, &x, &y);
+                put(x, y, WHITE);
+            }
+        }
+    }
+}
+
 /* 布比: a round mochi sprite, one antenna leaning right with a glowing bulb. */
 static void draw_boopie(const rig_t *r, const pose_t *p, anchors_t *a)
 {
     const float cx = 32, cy = 40, rx = 17, ry = 15;
     frame_t f = rig_frame(r, p, cx, cy + ry);
+    if (s_look == LOOK_WEATHER) {
+        s_rp = ramp(WEATHER_COLOUR[s_amb.on ? s_amb.weather & 3 : 0]);
+    }
     mask_t body;
     m_clear(body);
     ell(&f, cx, cy, rx, ry, body);
-    if (feet_on(p)) {
+    if (s_look == LOOK_JELLYFISH) {              /* a bell, its rim straight */
+        for (int y = 0; y < N; y++) {
+            if (f_ry(&f, y) > cy + 6) {
+                body[y] = 0;
+            }
+        }
+    }
+    if (feet_on(p) && s_look != LOOK_JELLYFISH && s_look != LOOK_SLIME) {
         ell(&f, cx - 7, cy + ry - 1, 4, 2.5f, body);
         ell(&f, cx + 7, cy + ry - 1, 4, 2.5f, body);
     }
@@ -1882,8 +1958,14 @@ static void draw_boopie(const rig_t *r, const pose_t *p, anchors_t *a)
             ell(&f, cx + p->hands[i].side * rx, cy + p->hands[i].dy, 3 / p->squash, 2.6f * p->squash, body);
         }
     }
+    if (s_look == LOOK_SLIME) {                  /* drips along the bottom */
+        ell(&f, cx - 9, cy + ry - 1, 2.2f, 2.4f, body);
+        ell(&f, cx + 1, cy + ry - 1, 2.6f, 2.4f, body);
+        ell(&f, cx + 10, cy + ry - 1, 2.0f, 2.4f, body);
+    }
     shaded(body, &s_rp);
     outline(body, s_rp.out);
+    boopie_extras(&f, p, cx, cy, ry);
     antenna(&f, cx + 3, cy - ry + 1, p, s_rp.out, 2.4f, light_colour(p), s_rp.out, &a->light_x, &a->light_y);
     pt(&f, cx, cy - 1, &a->face_x, &a->face_y);
     slots(&f, a, 27, 27, cx, 47, 26);
@@ -1915,6 +1997,63 @@ static float knot_at(bool all, float gx, float gy)
     return K(x0, y0) * (1 - fx) * (1 - fy) + K(x1, y0) * fx * (1 - fy) + K(x0, y1) * (1 - fx) * fy
            + K(x1, y1) * fx * fy;
 #undef K
+}
+
+/* A pastel of hue h (0..1) at brightness v: the hue, a third white. As the prototype's hue_colour(). */
+static rgb_t hue_colour(double h, double v)
+{
+    double c[3] = { fabs(h * 6 - 3) - 1, 2 - fabs(h * 6 - 2), 2 - fabs(h * 6 - 4) };
+    uint8_t o[3];
+    for (int i = 0; i < 3; i++) {
+        double k = c[i] < 0 ? 0 : c[i] > 1 ? 1 : c[i];
+        o[i] = (uint8_t)rint((k + (1 - k) * 0.35) * v * 255);
+    }
+    return (rgb_t){ o[0], o[1], o[2] };
+}
+
+static bool rgb_eq(rgb_t a, rgb_t b)
+{
+    return a.r == b.r && a.g == b.g && a.b == b.b;
+}
+
+static void gpt_extras(const frame_t *f, const pose_t *p, const mask_t bands, float cx, float cy)
+{
+    double t = p->t;
+    if (s_look == LOOK_DONUT) {                  /* sprinkles on the glaze */
+        static const rgb_t COLS[4] = { { 255, 255, 255 }, { 255, 220, 80 }, { 110, 200, 255 }, { 140, 230, 120 } };
+        for (int i = 0; i < 22; i++) {
+            float x, y;
+            pt(f, cx + ((float)h01(2, i, 71, 0) - 0.5f) * 40, cy + ((float)h01(2, i, 72, 0) - 0.5f) * 40, &x, &y);
+            int xi = (int)rint(x), yi = (int)rint(y);
+            if (xi >= 0 && xi < N && yi >= 0 && yi < N && m_get(bands, xi, yi)) {
+                s_img[yi][xi] = COLS[i % 4];
+            }
+        }
+    } else if (s_look == LOOK_KALEIDO) {         /* the colours going round */
+        static const double V[4] = { 0.62, 0.78, 0.9, 1.0 };
+        for (int y = 0; y < N; y++) {
+            for (uint64_t row = bands[y]; row; row &= row - 1) {
+                int x = __builtin_ctzll(row);
+                rgb_t c = s_img[y][x];
+                int role = rgb_eq(c, s_rp.dark) ? 0 : rgb_eq(c, s_rp.mid) ? 1 : rgb_eq(c, s_rp.light) ? 2
+                         : rgb_eq(c, s_rp.high) ? 3 : 1;
+                double hue = pymodd(atan2(y + 0.5 - cy, x + 0.5 - cx) / (2 * M_PI_D) + t * 0.15, 1.0);
+                s_img[y][x] = hue_colour(hue, V[role]);
+            }
+        }
+    } else if (s_look == LOOK_CHROME) {          /* a gleam sweeping across */
+        for (int y = 0; y < N; y++) {
+            for (uint64_t row = bands[y]; row; row &= row - 1) {
+                int x = __builtin_ctzll(row);
+                double k = pymodd(x + y * 0.5 - t * 24, 70);
+                if (k < 3) {
+                    s_img[y][x] = WHITE;
+                } else if (k < 5) {
+                    s_img[y][x] = s_rp.high;
+                }
+            }
+        }
+    }
 }
 
 static void draw_gpt(const rig_t *r, const pose_t *p, anchors_t *a)
@@ -1957,7 +2096,12 @@ static void draw_gpt(const rig_t *r, const pose_t *p, anchors_t *a)
     flat(m, s_gpt_holes);
     m_andnot(band, face);
     shaded(band, &s_rp);
-    outline(band, s_gpt_line);
+    rgb_t line = s_gpt_line;
+    if (s_look == LOOK_NEON && (int)(p->t * 7) % 23 == 0) {
+        line = mix(line, (rgb_t){ 0, 0, 0 }, 0.5);   /* a flicker now and then */
+    }
+    outline(band, line);
+    gpt_extras(&f, p, band, cx, cy);
     flat(face, GPT_FACE);
     outline(face, s_gpt_line);
     m_or(s_body, head);
@@ -2104,7 +2248,22 @@ static void draw_klaude(const rig_t *r, const pose_t *p, anchors_t *a)
     frame_t f = rig_frame(r, p, 32, 51);
     mask_t body;
     m_clear(body);
-    rect(&f, 17, 22, 47, 44, body);
+    if (s_look == LOOK_GHOST) {                   /* a wavy hem for legs */
+        for (int y = 0; y < N; y++) {
+            double ry = f_ry(&f, y);
+            if (ry < 22 || ry >= 50) {
+                continue;
+            }
+            for (int x = 0; x < N; x++) {
+                double rx = f_rx(&f, x, y);
+                if (rx >= 17 && rx < 47 && ry <= 46 + 1.5 * sin(rx * 0.8 + p->t * 4)) {
+                    body[y] |= 1ull << x;
+                }
+            }
+        }
+    } else {
+        rect(&f, 17, 22, 47, 44, body);
+    }
     for (int i = 0; i < p->nhands; i++) {
         if (!p->hands[i].front) {
             float up = minf(0, p->hands[i].dy) * 1.6f;
@@ -2112,7 +2271,7 @@ static void draw_klaude(const rig_t *r, const pose_t *p, anchors_t *a)
             rect(&f, x0, 31 + up, x0 + 6, 36 + up, body);
         }
     }
-    if (feet_on(p)) {
+    if (feet_on(p) && s_look != LOOK_GHOST) {
         static const float LEGS[4] = { 20, 25, 36, 41 };
         for (int i = 0; i < 4; i++) {
             rect(&f, LEGS[i], 44, LEGS[i] + 3, 51, body);
@@ -2120,6 +2279,46 @@ static void draw_klaude(const rig_t *r, const pose_t *p, anchors_t *a)
     }
     shaded(body, &s_rp);
     outline(body, s_rp.out);
+    if (s_look == LOOK_LANTERN || s_look == LOOK_MUMMY) {
+        mask_t torso;
+        m_clear(torso);
+        rect(&f, 17, 22, 47, 44, torso);
+        for (int y = 0; y < N; y++) {
+            for (uint64_t row = torso[y]; row; row &= row - 1) {
+                int x = __builtin_ctzll(row);
+                if (s_look == LOOK_LANTERN) {     /* ribs */
+                    float rx = f_rx(&f, x, y);
+                    if (fabsf(rx - 24.5f) < 0.6f || fabsf(rx - 39.5f) < 0.6f) {
+                        s_img[y][x] = s_rp.dark;
+                    }
+                } else if ((y + x / 6) % 4 == 0) {   /* bandages */
+                    s_img[y][x] = (rgb_t){ 190, 180, 154 };
+                }
+            }
+        }
+        if (s_look == LOOK_LANTERN) {             /* the stem */
+            mask_t stem;
+            m_clear(stem);
+            rect(&f, 30, 18, 34, 22, stem);
+            flat(stem, (rgb_t){ 80, 140, 50 });
+            outline(stem, (rgb_t){ 40, 70, 26 });
+        } else {                                  /* a loose end */
+            float x0, y0;
+            pt(&f, 47, 34, &x0, &y0);
+            for (int k = 0; k < 5; k++) {
+                putd(x0 + 1 + k, y0 + rint(sin(p->t * 3 + k * 0.8)), (rgb_t){ 230, 222, 200 });
+            }
+        }
+    } else if (s_look == LOOK_GHOST) {            /* see-through, here and there */
+        for (int y = 0; y < N; y++) {
+            for (uint64_t row = body[y]; row; row &= row - 1) {
+                int x = __builtin_ctzll(row);
+                if (bay(x, y) < 0.2f) {
+                    s_img[y][x] = s_rp.dark;
+                }
+            }
+        }
+    }
     if (s_look == LOOK_SPONGE) {          /* 海绵宝宝: holes in the block, little brown shorts */
         mask_t torso, hole;
         m_clear(torso);
@@ -2151,9 +2350,55 @@ static void draw_klaude(const rig_t *r, const pose_t *p, anchors_t *a)
     a->show_face = p->scale > 0.6f;
 }
 
+/* 南瓜灯: triangle eyes and a jagged grin, cut dark, a candle flickering inside. */
+static void face_lantern(int fx, int fy, const pose_t *p)
+{
+    const rgb_t cut = { 70, 28, 4 };
+    rgb_t glow = sin(p->t * 9) > -0.3 ? (rgb_t){ 255, 236, 140 } : (rgb_t){ 255, 190, 80 };
+    bool shut = p->eyes == E_BLINK || p->eyes == E_HAPPY || p->eyes == E_DOWN || p->eyes == E_HALF;
+    for (int side = -1; side <= 1; side += 2) {
+        int ex = fx + side * 7;
+        if (shut) {
+            for (int dx = -3; dx <= 3; dx++) {
+                put(ex + dx, fy, cut);
+            }
+            continue;
+        }
+        static const int8_t OUTER[6][2] = { { -4, 0 }, { -3, 1 }, { -2, 2 }, { -1, 3 }, { 0, 4 }, { 1, 4 } };
+        for (int i = 0; i < 6; i++) {
+            for (int dx = -OUTER[i][1]; dx <= OUTER[i][1]; dx++) {
+                put(ex + dx, fy + OUTER[i][0], cut);
+            }
+        }
+        static const int8_t INNER[3][2] = { { -2, 0 }, { -1, 1 }, { 0, 2 } };
+        for (int i = 0; i < 3; i++) {
+            for (int dx = -INNER[i][1]; dx <= INNER[i][1]; dx++) {
+                put(ex + dx, fy + INNER[i][0], glow);
+            }
+        }
+    }
+    int rows = p->mouth == M_TALK || p->mouth == M_O || p->mouth == M_CHOMP ? 3 : 2;
+    for (int dx = -8; dx <= 8; dx++) {
+        int top = fy + 5 + (pymod(dx, 2) ? 1 : 0);
+        for (int k = -1; k <= rows; k++) {
+            put(fx + dx, top + k, cut);
+        }
+    }
+    for (int dx = -7; dx <= 7; dx++) {
+        int top = fy + 5 + (pymod(dx, 2) ? 1 : 0);
+        for (int k = 0; k < rows; k++) {
+            put(fx + dx, top + k, glow);
+        }
+    }
+}
+
 static void face_klaude(const rig_t *r, int fx, int fy, const pose_t *p)
 {
     (void)r;
+    if (s_look == LOOK_LANTERN) {
+        face_lantern(fx, fy, p);
+        return;
+    }
     bool white = p->light.r == 255 && p->light.g == 255 && p->light.b == 255;
     s_eye = p->has_light && !white ? mix(WHITE, p->light, 0.35) : (rgb_t){ 255, 246, 236 };
     if (s_klaude_eye_set) {
@@ -2166,6 +2411,13 @@ static void face_klaude(const rig_t *r, int fx, int fy, const pose_t *p)
     blush(fx, fy, p, 11, (rgb_t){ 255, 176, 150 });
     if (p->mouth == M_TALK || p->mouth == M_O || p->mouth == M_CHOMP || p->mouth == M_WAVY || p->mouth == M_FROWN) {
         mouth(fx, fy + 6, p, (rgb_t){ 92, 34, 22 }, (rgb_t){ 170, 60, 50 });
+    }
+    if (s_look == LOOK_MUMMY) {                   /* one eye under the bandages */
+        for (int dy = -3; dy < 3; dy++) {
+            for (int dx = -10; dx < -4; dx++) {
+                put(fx + dx, fy + dy, (dy + 3) % 3 ? (rgb_t){ 230, 222, 200 } : (rgb_t){ 190, 180, 154 });
+            }
+        }
     }
 }
 
@@ -2473,11 +2725,11 @@ static const skin_t SKINS[] = {
       .outline = SET(0xb4503c), .belly = { SET(0xffd6b0), SET(0xfff0dc) } },
     { SKIN("doubao_sport", "运动装", BOOPIE_CHAR_DOUBAO, false, 200, BOOPIE_SCENE_DEFAULT, 0xf2c9b4),
       .hair = SET(0x3a2a20), .top = SET(0x3a7bd5) },
-    { SKIN("boopie_newyear", "新春", BOOPIE_CHAR_BOOPIE, true, 250, BOOPIE_SCENE_DEFAULT, 0xcc2a2a),
+    { SKIN("boopie_newyear", "新春", BOOPIE_CHAR_BOOPIE, true, 200, BOOPIE_SCENE_DEFAULT, 0xcc2a2a),
       .cheek = SET(0xffb0a0), .glow = SET(0xffd34a), .outline = SET(0x8a1010), .limited = 1u << 1 | 1u << 5 },
-    { SKIN("klaude_pumpkin", "南瓜", BOOPIE_CHAR_KLAUDE, true, 250, BOOPIE_SCENE_DEFAULT, 0xff8c1a),
-      .eye = SET(0x3a1a00), .cheek = SET(0xffc850), .outline = SET(0xa04a00), .limited = 1u << 3 },
-    { SKIN("whale_xmas", "圣诞树", BOOPIE_CHAR_WHALE, true, 250, BOOPIE_SCENE_SNOW, 0x2f8f4f),
+    { SKIN("klaude_lantern", "南瓜灯", BOOPIE_CHAR_KLAUDE, true, 200, BOOPIE_SCENE_DEFAULT, 0xff8c1a),
+      .outline = SET(0x963c00), .look = LOOK_LANTERN, .limited = 1u << 3 },
+    { SKIN("whale_xmas", "圣诞树", BOOPIE_CHAR_WHALE, true, 200, BOOPIE_SCENE_SNOW, 0x2f8f4f),
       .glow = SET(0xffd34a), .outline = SET(0x145a28), .belly = { SET(0xd8f0d8), SET(0xf4fff4) }, .limited = 1u << 4 },
     { SKIN("muse_knight", "骑士", BOOPIE_SKIN_MUSE, true, 300, BOOPIE_SCENE_DEFAULT, 0xd9c7a8),
       .muse_fx = MUSE_FX_KNIGHT },
@@ -2486,11 +2738,32 @@ static const skin_t SKINS[] = {
       .hair = SET(0x8cc0f0), .top = SET(0xf3a6c4), .look = LOOK_REM },
     { SKIN("whale_pearl", "珍珍", BOOPIE_CHAR_WHALE, false, 200, BOOPIE_SCENE_BUBBLES, 0xaebdd2),
       .belly = { SET(0xe2e8f0), SET(0xf4f7fc) }, .look = LOOK_PEARL },
+    /* Round two: Halloween's 小克, 布比's sweets and creatures, GPT's knot as treats and lights. */
+    { SKIN("klaude_mummy", "木乃伊", BOOPIE_CHAR_KLAUDE, false, 250, BOOPIE_SCENE_DEFAULT, 0xe9e2d0),
+      .eye = SET(0x281e1e), .outline = SET(0x786c54), .look = LOOK_MUMMY },
+    { SKIN("klaude_ghost", "小幽灵", BOOPIE_CHAR_KLAUDE, false, 250, BOOPIE_SCENE_FIREFLIES, 0xeef2ff),
+      .eye = SET(0x1e1e2c), .outline = SET(0x7882aa), .look = LOOK_GHOST },
+    { SKIN("boopie_tangyuan", "汤圆", BOOPIE_CHAR_BOOPIE, true, 200, BOOPIE_SCENE_DEFAULT, 0xfbf8f2),
+      .outline = SET(0xaaa096), .look = LOOK_TANGYUAN, .limited = 1u << 1 | 1u << 10 },
+    { SKIN("boopie_jellyfish", "水母", BOOPIE_CHAR_BOOPIE, false, 250, BOOPIE_SCENE_BUBBLES, 0xc4b4ff),
+      .glow = SET(0x96f0ff), .look = LOOK_JELLYFISH },
+    { SKIN("boopie_slime", "史莱姆", BOOPIE_CHAR_BOOPIE, false, 0, BOOPIE_SCENE_DEFAULT, 0x7cc8ff),
+      .outline = SET(0x2864aa), .look = LOOK_SLIME },
+    { SKIN("boopie_weather", "天气精灵", BOOPIE_CHAR_BOOPIE, false, 250, BOOPIE_SCENE_DEFAULT, 0xffd36a),
+      .look = LOOK_WEATHER },
+    { SKIN("gpt_donut", "甜甜圈", BOOPIE_CHAR_GPT, false, 200, BOOPIE_SCENE_DEFAULT, 0xff9ec8),
+      .outline = SET(0x784628), .holes = SET(0xe8b878), .look = LOOK_DONUT },
+    { SKIN("gpt_neon", "霓虹灯管", BOOPIE_CHAR_GPT, false, 250, BOOPIE_SCENE_NEON_GRID, 0x1c1030),
+      .outline = SET(0x00f0ff), .holes = SET(0x0a0614), .look = LOOK_NEON },
+    { SKIN("gpt_kaleido", "万花筒", BOOPIE_CHAR_GPT, false, 250, BOOPIE_SCENE_DEFAULT, 0xf2f2f2),
+      .holes = SET(0x282834), .look = LOOK_KALEIDO },
+    { SKIN("gpt_chrome", "铬金属", BOOPIE_CHAR_GPT, true, 300, BOOPIE_SCENE_DEFAULT, 0xc8ccd4),
+      .outline = SET(0x464a54), .holes = SET(0x282a32), .look = LOOK_CHROME },
     { SKIN("codex_karen", "凯伦", BOOPIE_CHAR_CODEX, false, 200, BOOPIE_SCENE_DEFAULT, 0xb4b9c4),
       .screen = SET(0x080e0a), .glyph = SET(0x5af078), .glyph_fixed = true, .look = LOOK_KAREN },
 };
 #define SKIN_COUNT (int)(sizeof(SKINS) / sizeof(SKINS[0]))
-_Static_assert(SKIN_COUNT <= 32, "NVS keeps what's owned in a u32");
+_Static_assert(SKIN_COUNT <= 64, "NVS keeps what's owned in two u32s");
 
 static int s_skin = -1;
 
@@ -2975,12 +3248,20 @@ static const uint32_t CROWN_COLOURS[] = { 0xffd246, 0xbe821e, 0xf03c50, 0x50aaff
 static const char *const PARTY_ROWS[] = { "...w...", "..www..", "...#...", "..#p#..", "..#y#..", ".#ppp#.", ".#yyy#.",
                                           "#ppppp#", "#######" };
 static const uint32_t PARTY_COLOURS[] = { 0xffffff, 0x3c286e, 0x78c8ff, 0xffdc5a };
+static const char *const STRAW_ROWS[] = { "....yyyyy....", "...yyyyyyy...", "...rrrrrrr...", "ydyyyyyyyyydy",
+                                          ".yyyyyyyyyyy." };
+static const uint32_t STRAW_COLOURS[] = { 0xf0cd6e, 0xc4a046, 0xdc4646 };
+static const char *const HALO_ROWS[] = { "..yyyyy..", ".y.....y.", "..yyyyy..", ".........", "........." };
+static const uint32_t HALO_COLOURS[] = { 0xffe26e };
 
 static const acc_t ACCS[BOOPIE_ACC_COUNT] = {
     [BOOPIE_ACC_BOW] = { "bow", "蝴蝶结", BOW_ROWS, 5, "#p", BOW_COLOURS },
     [BOOPIE_ACC_CROWN] = { "crown", "小皇冠", CROWN_ROWS, 5, "gdrb", CROWN_COLOURS },
     [BOOPIE_ACC_SCARF] = { "scarf", "红围巾", NULL, 0, NULL, NULL },
     [BOOPIE_ACC_PARTY_HAT] = { "party_hat", "生日帽", PARTY_ROWS, 9, "w#py", PARTY_COLOURS },
+    [BOOPIE_ACC_STRAW_HAT] = { "straw_hat", "草帽", STRAW_ROWS, 5, "ydr", STRAW_COLOURS },
+    [BOOPIE_ACC_HALO] = { "halo", "金光环", HALO_ROWS, 5, "y", HALO_COLOURS },
+    [BOOPIE_ACC_MEDAL] = { "medal", "金牌", NULL, 0, NULL, NULL },
 };
 
 static uint32_t s_wear;
@@ -3032,8 +3313,22 @@ static void wear(boopie_acc_t which, const anchors_t *a)
         }
         return;
     }
-    const rgb_t red = { 230, 60, 70 }, dark = { 160, 30, 45 };   /* the scarf */
     double nx = a->neck_x, ny = a->neck_y, w = a->neck_w;
+    if (which == BOOPIE_ACC_MEDAL) {
+        for (int k = 0; k < 4; k++) {   /* the ribbon, in a V */
+            putd(nx - 3 + k, ny + k * 0.6, (rgb_t){ 70, 120, 220 });
+            putd(nx + 3 - k, ny + k * 0.6, (rgb_t){ 220, 60, 70 });
+        }
+        for (int dy = 3; dy < 7; dy++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                if (abs(dx) + fabs(dy - 4.5) <= 2.6) {
+                    putd(nx + dx, ny + dy, pymod(dx + dy, 3) ? (rgb_t){ 255, 210, 70 } : (rgb_t){ 200, 150, 40 });
+                }
+            }
+        }
+        return;
+    }
+    const rgb_t red = { 230, 60, 70 }, dark = { 160, 30, 45 };   /* the scarf */
     int half = (int)rint(w / 2);
     for (int dx = -half; dx <= half; dx++) {
         for (int dy = 0; dy < 3; dy++) {
@@ -3050,7 +3345,8 @@ static void wear(boopie_acc_t which, const anchors_t *a)
 /* All worn, in the prototype's order: hats, then the scarf. */
 static void wear_all(const anchors_t *a)
 {
-    static const boopie_acc_t ORDER[] = { BOOPIE_ACC_BOW, BOOPIE_ACC_PARTY_HAT, BOOPIE_ACC_CROWN, BOOPIE_ACC_SCARF };
+    static const boopie_acc_t ORDER[] = { BOOPIE_ACC_BOW, BOOPIE_ACC_PARTY_HAT, BOOPIE_ACC_CROWN, BOOPIE_ACC_STRAW_HAT,
+                                          BOOPIE_ACC_HALO, BOOPIE_ACC_SCARF, BOOPIE_ACC_MEDAL };
     for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
         if (s_wear & BOOPIE_ACC_BIT(ORDER[i])) {
             wear(ORDER[i], a);
@@ -3077,6 +3373,7 @@ void boopie_pixel_set_character(boopie_char_t c, uint32_t colour)
     }
     s_rp2 = s_rp3 = s_rp;
     s_look = sk ? sk->look : LOOK_NONE;
+    s_mouth_inside = s_look == LOOK_TANGYUAN ? (rgb_t){ 60, 40, 44 } : CHEEK;   /* 黑芝麻 inside */
     if (c == BOOPIE_CHAR_GPT) {
         s_gpt_line = sk && sk->outline ? hex(sk->outline) : GPT_INK;
         s_gpt_holes = sk && sk->holes ? hex(sk->holes) : GPT_HOLE;

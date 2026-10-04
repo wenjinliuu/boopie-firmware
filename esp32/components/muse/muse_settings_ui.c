@@ -1436,7 +1436,7 @@ static void on_skin_choice(lv_event_t *e)
     const char *error = NULL;
     if (i < 0 || boopie_avatar_owns(i)) {
         boopie_avatar_wear(i, &error);
-    } else if (!boopie_avatar_buy(i, &error)) {
+    } else if (!boopie_avatar_buy(i, &error) && boopie_avatar_skin_goal(i) == BOOPIE_GOAL_NONE) {
         s_skin_short = i;
         s_skin_short_at = lv_tick_get();
     }
@@ -1462,6 +1462,14 @@ static void on_scene_choice(lv_event_t *e)
 static void lock_or_tick(lv_obj_t *l, bool chosen, boopie_unlock_kind_t kind, int index)
 {
     int level;
+    boopie_goal_t goal = kind == BOOPIE_UNLOCK_ACCESSORY ? boopie_avatar_acc_goal((boopie_acc_t)index) : BOOPIE_GOAL_NONE;
+    if (goal != BOOPIE_GOAL_NONE && !boopie_avatar_unlocked(kind, index, NULL)) {   /* earned: how far to go */
+        char buf[64];
+        boopie_avatar_goal_text(goal, buf, sizeof buf);
+        set_text(l, buf);
+        lv_obj_set_style_text_color(l, lv_color_hex(COLOR_DIM), 0);
+        return;
+    }
     bool from_start = kind != BOOPIE_UNLOCK_ACCESSORY && (index == 0 || (kind == BOOPIE_UNLOCK_COLOUR && index == 1));
     if (!from_start && !boopie_avatar_unlocked(kind, index, &level)) {
         char buf[16];
@@ -1532,7 +1540,8 @@ static void build_avatar_page(lv_obj_t *tile)
     for (int i = 0; i < boopie_skin_count() && i < SKIN_ROWS_MAX; i++) {
         char name[48];
         snprintf(name, sizeof name, "%s%s", boopie_skin_name(i),
-                 boopie_skin_limited(i) ? "（限定）" : boopie_skin_collector(i) ? "（典藏）" : "");
+                 boopie_avatar_skin_goal(i) != BOOPIE_GOAL_NONE ? "（成就）" : boopie_skin_limited(i) ? "（限定）"
+                 : boopie_skin_collector(i) ? "（典藏）" : "");
         s_skin_rows[i] = row(s_skin_box, NULL, name, &s_skin_checks[i], on_skin_choice, (void *)(intptr_t)i);
     }
     note(list, "配饰");
@@ -1583,13 +1592,20 @@ static void tick_avatar(void)
         if (!mine) {
             continue;
         }
-        char v[24];
+        char v[64];
+        boopie_goal_t goal = boopie_avatar_skin_goal(i);
         if (i == worn) {
             snprintf(v, sizeof v, "%s", LV_SYMBOL_OK);
         } else if (boopie_avatar_owns(i)) {
             v[0] = '\0';
         } else if (i == s_skin_short && lv_tick_elaps(s_skin_short_at) < 2500) {
             snprintf(v, sizeof v, "%s", boopie_avatar_skin_on_sale(i) ? "星星不够" : "节日才能买");
+        } else if (goal != BOOPIE_GOAL_NONE) {
+            if (boopie_avatar_goal(goal, NULL, NULL)) {
+                snprintf(v, sizeof v, "免费领取");
+            } else {
+                boopie_avatar_goal_text(goal, v, sizeof v);
+            }
         } else if (!boopie_avatar_skin_on_sale(i)) {
             snprintf(v, sizeof v, "%s", boopie_avatar_skin_when(i));
         } else {

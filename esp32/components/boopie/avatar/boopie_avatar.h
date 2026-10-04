@@ -230,3 +230,18 @@ void boopie_avatar_game_result(boopie_game_t game, int score, int xp, int stars,
 
 /* Item `index` of a kind is unlocked; *level (if given) the level it takes. */
 bool boopie_avatar_unlocked(boopie_unlock_kind_t kind, int index, int *level);
+
+/*
+ * Achievements: some things are earned, not bought or reached by level.
+ * 史莱姆 skin: 100 slimes beaten; 草帽: 50 harvests; 金光环: 7 days running
+ * (the best run); 金牌: 10 game records broken (past the first score).
+ */
+typedef enum { BOOPIE_GOAL_SLIMES = 0, BOOPIE_GOAL_HARVESTS, BOOPIE_GOAL_STREAK, BOOPIE_GOAL_RECORDS,
+               BOOPIE_GOAL_COUNT, BOOPIE_GOAL_NONE = -1 } boopie_goal_t;
+/* How far along: true once met, *have and *need as counted. */
+bool boopie_avatar_goal(boopie_goal_t g, int *have, int *need);
+/* The goal a skin or accessory is earned by, or BOOPIE_GOAL_NONE. */
+boopie_goal_t boopie_avatar_skin_goal(int skin);
+boopie_goal_t boopie_avatar_acc_goal(boopie_acc_t a);
+/* How far along, for a row on the screen: "打败史莱姆 77/100", or "已达成". */
+void boopie_avatar_goal_text(boopie_goal_t g, char *out, size_t cap);

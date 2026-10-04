@@ -90,7 +90,7 @@ static int s_avatar = BOOPIE_AVATAR_BOOPIE;   /* Boopie, until one's chosen */
 static uint32_t s_colour[BOOPIE_AVATAR_COUNT];
 static boopie_scene_t s_scene = BOOPIE_SCENE_DEFAULT;
 static int s_worn[BOOPIE_AVATAR_COUNT];   /* the skin each character wears, or -1 */
-static uint32_t s_owned;                  /* bit per skin index */
+static uint64_t s_owned;                  /* bit per skin index (NVS: "owned" the first 32, "owned2" the rest) */
 static uint32_t s_acc[BOOPIE_AVATAR_COUNT];  /* the accessories each wears, BOOPIE_ACC_BIT()s */
 static char s_name[BOOPIE_PET_NAME_MAX];  /* the pet's name, or "" for its character's */
 static uint32_t s_best[BOOPIE_GAME_COUNT];   /* each game's best score */
@@ -126,6 +126,10 @@ static struct {
     int32_t mail_key;    /* the festival whose gift's been opened: year * 16 + festival */
     uint8_t birth_month, birth_day;   /* the pet's birthday (0: not set) */
     uint8_t hints;                    /* times 小窝's how-to has been said */
+    uint8_t goals_told;               /* achievements already announced, a bit each */
+    uint16_t streak, best_streak;     /* days running it's been seen, and the most */
+    int32_t visit_day;                /* the last day it was */
+    uint16_t records;                 /* game records broken (past the first score) */
 } s_woods;
 static int s_sim_fest = -1;   /* the simulator's BOOPIE_FEST */
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
@@ -244,7 +248,8 @@ bool boopie_avatar_skin_on_sale(int skin)
 const char *boopie_avatar_skin_when(int skin)
 {
     uint32_t limited = boopie_skin_limited(skin);
-    return limited >> BOOPIE_FEST_SPRING & 1  ? "春节限定"
+    return limited >> BOOPIE_FEST_LANTERN & 1 ? "春节元宵限定"
+           : limited >> BOOPIE_FEST_SPRING & 1  ? "春节限定"
            : limited >> BOOPIE_FEST_HALLOWEEN & 1 ? "万圣节限定"
            : limited >> BOOPIE_FEST_XMAS & 1      ? "圣诞限定"
                                                   : "";
@@ -262,13 +267,18 @@ bool boopie_avatar_buy(int skin, const char **error)
             *error = "on sale only in its festival";
             return false;
         }
+        boopie_goal_t g = boopie_avatar_skin_goal(skin);
+        if (g != BOOPIE_GOAL_NONE && !boopie_avatar_goal(g, NULL, NULL)) {
+            *error = "earned, not bought: not yet";
+            return false;
+        }
         uint32_t price = (uint32_t)boopie_skin_price(skin);
         if (s_pet_state.stars < price) {
             *error = "not enough stars";
             return false;
         }
         s_pet_state.stars -= price;
-        s_owned |= 1u << skin;
+        s_owned |= 1ull << skin;
     }
     s_worn[boopie_avatar_of_skin(skin)] = skin;
     apply();
@@ -330,7 +340,10 @@ static void load(void)
         snprintf(ck, sizeof ck, "c_%s", boopie_avatar_key(i));
         nvs_get_u32(h, ck, &s_colour[i]);
     }
-    nvs_get_u32(h, "owned", &s_owned);
+    uint32_t lo = 0, hi = 0;
+    nvs_get_u32(h, "owned", &lo);
+    nvs_get_u32(h, "owned2", &hi);
+    s_owned = (uint64_t)hi << 32 | lo;
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         char wk[16], sk[24];
         size_t sn = sizeof sk;
@@ -387,7 +400,8 @@ static void save(void)
         nvs_set_u32(h, ck, s_colour[i]);
     }
     nvs_set_str(h, "scene", boopie_scene_key(s_scene));
-    nvs_set_u32(h, "owned", s_owned);
+    nvs_set_u32(h, "owned", (uint32_t)s_owned);
+    nvs_set_u32(h, "owned2", (uint32_t)(s_owned >> 32));
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         char wk[16];
         snprintf(wk, sizeof wk, "w_%s", boopie_avatar_key(i));
@@ -435,7 +449,7 @@ static void load(void)
     }
     int skin = boopie_skin_from_key(getenv("BOOPIE_SKIN"));
     if (skin >= 0) {   /* owned and worn by its character */
-        s_owned |= 1u << skin;
+        s_owned |= 1ull << skin;
         s_worn[boopie_avatar_of_skin(skin)] = skin;
     }
     const char *wear = getenv("BOOPIE_WEAR");   /* bow,scarf */
@@ -819,6 +833,8 @@ static bool local_now(int64_t *now, int32_t *day, int *minute)
 }
 
 static void flash_overlay(boopie_overlay_t o, float secs);
+static void goals_check(void);
+static void visit(int32_t day);
 
 /* The local date, if known: year, month (1 to 12), day of the month, and days since 1970. */
 static bool local_date(int *year, int *month, int *mday, int32_t *day)
@@ -1045,6 +1061,9 @@ static void pet_tick(void)
     }
     boopie_pet_event_t ev = { 0 };
     s_pet_mood = boopie_pet_tick(&s_pet_state, known, now, day, minute, muse_state_idle_secs(), &ev);
+    if (known) {
+        visit(day);
+    }
     show_event(&ev);
     if (s_pet_dirty || s_now - s_pet_saved > 600) {   /* now and then, and after a change */
         s_pet_dirty = false;
@@ -1120,6 +1139,7 @@ int boopie_avatar_garden_changed(int xp, int stars)
     int got = 0;
     if (xp || stars) {
         /* A harvest: 小窝's, toward its day. */
+        goals_check();
         boopie_pet_event_t ev = { 0 };
         boopie_pet_world(&s_pet_state, xp, stars, &ev);
         got = ev.stars;
@@ -1173,12 +1193,114 @@ bool boopie_avatar_open_chest(int chest, int *stars, int *xp)
     return true;
 }
 
+/* ---- achievements ---- */
+
+static const struct {
+    int need;
+    const char *what, *unit;
+    const char *prize;
+} GOALS[BOOPIE_GOAL_COUNT] = {
+    [BOOPIE_GOAL_SLIMES] = { 100, "打败史莱姆", "只", "史莱姆皮肤" },
+    [BOOPIE_GOAL_HARVESTS] = { 50, "收获", "次", "草帽" },
+    [BOOPIE_GOAL_STREAK] = { 7, "连续来看", "天", "金光环" },
+    [BOOPIE_GOAL_RECORDS] = { 10, "破纪录", "次", "金牌" },
+};
+
+static int goal_count(boopie_goal_t g)
+{
+    switch (g) {
+    case BOOPIE_GOAL_SLIMES: return (int)s_woods.slimes;
+    case BOOPIE_GOAL_HARVESTS: {
+        int n = 0;
+        for (int i = 0; i < BOOPIE_GARDEN_KINDS; i++) {
+            n += s_garden.harvested[i];
+        }
+        return n;
+    }
+    case BOOPIE_GOAL_STREAK: return s_woods.best_streak;
+    case BOOPIE_GOAL_RECORDS: return s_woods.records;
+    default: return 0;
+    }
+}
+
+bool boopie_avatar_goal(boopie_goal_t g, int *have, int *need)
+{
+    ensure_loaded();
+    if ((int)g < 0 || g >= BOOPIE_GOAL_COUNT) {
+        return false;
+    }
+    int h = goal_count(g);
+    if (have) {
+        *have = h;
+    }
+    if (need) {
+        *need = GOALS[g].need;
+    }
+    return h >= GOALS[g].need;
+}
+
+boopie_goal_t boopie_avatar_skin_goal(int skin)
+{
+    const char *key = boopie_skin_key(skin);
+    return key && !strcmp(key, "boopie_slime") ? BOOPIE_GOAL_SLIMES : BOOPIE_GOAL_NONE;
+}
+
+boopie_goal_t boopie_avatar_acc_goal(boopie_acc_t a)
+{
+    return a == BOOPIE_ACC_STRAW_HAT ? BOOPIE_GOAL_HARVESTS
+           : a == BOOPIE_ACC_HALO    ? BOOPIE_GOAL_STREAK
+           : a == BOOPIE_ACC_MEDAL   ? BOOPIE_GOAL_RECORDS
+                                     : BOOPIE_GOAL_NONE;
+}
+
+void boopie_avatar_goal_text(boopie_goal_t g, char *out, size_t cap)
+{
+    int have, need;
+    if ((int)g < 0 || g >= BOOPIE_GOAL_COUNT) {
+        snprintf(out, cap, "%s", "");
+    } else if (boopie_avatar_goal(g, &have, &need)) {
+        snprintf(out, cap, "%s", "已达成");
+    } else {
+        snprintf(out, cap, "%s %d/%d", GOALS[g].what, have, need);
+    }
+}
+
+/* Says so the first time a goal's met. */
+static void goals_check(void)
+{
+    for (int g = 0; g < BOOPIE_GOAL_COUNT; g++) {
+        if (!(s_woods.goals_told >> g & 1) && goal_count((boopie_goal_t)g) >= GOALS[g].need) {
+            s_woods.goals_told |= (uint8_t)(1u << g);
+            boopie_sound_play(BOOPIE_SOUND_LEVEL_UP);
+            flash_overlay(BOOPIE_OVERLAY_CONFETTI, 4.0f);
+            muse_state_set_caption("达成成就！解锁%s", GOALS[g].prize);
+            return;   /* one at a time */
+        }
+    }
+}
+
+/* Days running it's been seen: counted once a day, from the clock. */
+static void visit(int32_t day)
+{
+    if (s_woods.visit_day == day) {
+        return;
+    }
+    s_woods.streak = s_woods.visit_day == day - 1 ? (uint16_t)(s_woods.streak + 1) : 1;
+    s_woods.visit_day = day;
+    if (s_woods.streak > s_woods.best_streak) {
+        s_woods.best_streak = s_woods.streak;
+    }
+    goals_check();
+    s_pet_dirty = true;
+}
+
 void boopie_avatar_slime_beaten(int stars, int xp, int *got_stars)
 {
     ensure_loaded();
     boopie_pet_event_t ev = { 0 };
     boopie_pet_world(&s_pet_state, xp, stars, &ev);
     s_woods.slimes++;
+    goals_check();
     boopie_avatar_react(BOOPIE_EXPR_HAPPY, 2.0f);
     show_event(&ev);
     if (got_stars) {
@@ -1487,6 +1609,9 @@ void boopie_avatar_game_result(boopie_game_t game, int score, int xp, int stars,
     boopie_pet_game(&s_pet_state, xp, stars, &got);
     bool rec = false;
     if ((int)game >= 0 && game < BOOPIE_GAME_COUNT && score > 0 && (uint32_t)score > s_best[game]) {
+        if (s_best[game]) {
+            s_woods.records++;   /* past the first score */
+        }
         s_best[game] = (uint32_t)score;
         rec = true;
     }
@@ -1521,6 +1646,12 @@ boopie_expr_t boopie_avatar_reacting(void)
 bool boopie_avatar_unlocked(boopie_unlock_kind_t kind, int index, int *level)
 {
     ensure_loaded();
+    if (kind == BOOPIE_UNLOCK_ACCESSORY && boopie_avatar_acc_goal((boopie_acc_t)index) != BOOPIE_GOAL_NONE) {
+        if (level) {
+            *level = 0;
+        }
+        return boopie_avatar_goal(boopie_avatar_acc_goal((boopie_acc_t)index), NULL, NULL);
+    }
     int need = boopie_pet_unlock_level(kind, index);
     if (level) {
         *level = need;

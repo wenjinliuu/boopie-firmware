@@ -422,7 +422,13 @@ static void on_shop(int i)
         say("买到啦！%s", boopie_skin_name(skin));
     } else {
         boopie_sound_play(BOOPIE_SOUND_ERROR);
-        say("%s", !boopie_avatar_skin_on_sale(skin) ? "节日期间才能买哦" : "星星不够，再攒攒吧");
+        char why[64];
+        if (boopie_avatar_skin_goal(skin) != BOOPIE_GOAL_NONE) {
+            boopie_avatar_goal_text(boopie_avatar_skin_goal(skin), why, sizeof why);
+            say("这是成就奖励：%s", why);
+        } else {
+            say("%s", !boopie_avatar_skin_on_sale(skin) ? "节日期间才能买哦" : "星星不够，再攒攒吧");
+        }
     }
     skins_panel();
 }
@@ -443,8 +449,15 @@ static void skins_panel(void)
         if (boopie_avatar_of_skin(s) != cur) {
             continue;
         }
+        boopie_goal_t goal = boopie_avatar_skin_goal(s);
         if (boopie_avatar_owns(s)) {
             snprintf(v, sizeof v, "%s", boopie_avatar_skin() == s ? "穿着" : "已有");
+        } else if (goal != BOOPIE_GOAL_NONE) {
+            if (boopie_avatar_goal(goal, NULL, NULL)) {
+                snprintf(v, sizeof v, "免费领取");
+            } else {
+                boopie_avatar_goal_text(goal, v, sizeof v);
+            }
         } else if (!boopie_avatar_skin_on_sale(s)) {
             snprintf(v, sizeof v, "%s", boopie_avatar_skin_when(s));
         } else {
