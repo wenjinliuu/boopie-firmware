@@ -37,6 +37,7 @@
 
 #include "muse_adpcm.h"
 #include "boopie_xiaozhi.h"
+#include "boopie_xz_voice.h"
 #include "muse_audio.h"
 #include "muse_board.h"
 #include "muse_chat.h"
@@ -47,6 +48,65 @@
 #include "muse_wifi.h"
 
 static const char *TAG = "muse_voice";
+
+/*
+ * Boopie: a turn goes to Muse or to 小智, whichever AI 助手 is chosen, through
+ * the same calls. The one a turn began with sees it through.
+ */
+static bool s_xz;   /* this turn is 小智's */
+
+static bool xz_chosen(void)
+{
+    return boopie_avatar_brain() == BOOPIE_BRAIN_XIAOZHI;
+}
+
+static bool turn_ready(void)
+{
+    return xz_chosen() ? boopie_xz_ready() : muse_hatch_ready();
+}
+
+static void turn_begin(void)
+{
+    s_xz = xz_chosen();
+    s_xz ? boopie_xz_turn_begin() : muse_hatch_turn_begin();
+}
+
+static void turn_audio(const int16_t *pcm, size_t frames)
+{
+    s_xz ? boopie_xz_turn_audio(pcm, frames) : muse_hatch_turn_audio(pcm, frames);
+}
+
+#if CONFIG_MUSE_HATCH
+static size_t turn_audio_wait(const int16_t *pcm, size_t frames, int wait_ms)
+{
+    return s_xz ? boopie_xz_turn_audio_wait(pcm, frames, wait_ms) : muse_hatch_turn_audio_wait(pcm, frames, wait_ms);
+}
+#endif
+
+static void turn_end(void)
+{
+    s_xz ? boopie_xz_turn_end() : muse_hatch_turn_end();
+}
+
+static void turn_cancel(void)
+{
+    s_xz ? boopie_xz_turn_cancel() : muse_hatch_turn_cancel();
+}
+
+static muse_hatch_ev_t turn_event(char *text, size_t cap)
+{
+    return s_xz ? boopie_xz_turn_event(text, cap) : muse_hatch_turn_event(text, cap);
+}
+
+static bool turn_caption(size_t played, char *out, size_t cap)
+{
+    return s_xz ? boopie_xz_turn_caption(played, out, cap) : muse_hatch_turn_caption(played, out, cap);
+}
+
+static size_t turn_read(int16_t *pcm, size_t frames, int wait_ms)
+{
+    return s_xz ? boopie_xz_turn_read(pcm, frames, wait_ms) : muse_hatch_turn_read(pcm, frames, wait_ms);
+}
 
 #define MAX_SECS 15
 #define TAIL_FRAMES (MUSE_AUDIO_RATE * 12 / 100)   /* capture lag + poll interval, stops before the release click */
@@ -220,7 +280,7 @@ static void feed_live(void)
 {
 #if HOLD_NOTES
     if (s_live && s_sent < s_rec_n) {
-        s_sent += muse_hatch_turn_audio_wait(s_rec + s_sent, s_rec_n - s_sent, 0);
+        s_sent += turn_audio_wait(s_rec + s_sent, s_rec_n - s_sent, 0);
     }
 #endif
 }
@@ -228,7 +288,7 @@ static void feed_live(void)
 /* Streams the note being recorded from its start, then the rest as it comes. */
 static void go_live(void)
 {
-    muse_hatch_turn_begin();
+    turn_begin();
     s_live = s_tried = true;
     s_sent = 0;
     feed_live();
@@ -240,7 +300,7 @@ static void take(rec_stats_t *st, const int16_t *pcm)
     keep(st, pcm, MUSE_AUDIO_CHUNK);
     if (!s_rec) {
         if (s_live) {
-            muse_hatch_turn_audio(pcm, MUSE_AUDIO_CHUNK);
+            turn_audio(pcm, MUSE_AUDIO_CHUNK);
         }
         return;
     }
@@ -263,7 +323,7 @@ static bool record(bool barge_in, size_t *held, char *why, size_t cap)
     muse_state_set_progress(0);
     s_rec_n = s_sent = 0;
     s_live = s_tried = false;
-    if (!s_rec || (muse_hatch_ready() && !s_held_count)) {
+    if (!s_rec || (turn_ready() && !s_held_count)) {
         go_live();
     }
     muse_state_set_caption(s_live ? "在听……" : "录音中……");
@@ -305,13 +365,13 @@ static bool record(bool barge_in, size_t *held, char *why, size_t cap)
         /* Live transcript as the caption. A failure stops the streaming; the
          * kept note goes later, or without one the failure is the caption. */
         muse_hatch_ev_t ev;
-        while (s_live && (ev = muse_hatch_turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
+        while (s_live && (ev = turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
             if (ev == MUSE_HATCH_EV_HEARD && text[0]) {
                 heard = true;
                 muse_state_set_caption("%s", text);
             } else if (ev == MUSE_HATCH_EV_ERROR) {
                 ESP_LOGW(TAG, "muse: %s", text);
-                muse_hatch_turn_cancel();
+                turn_cancel();
                 s_live = false;
                 gave_up = true;
                 if (!s_rec) {
@@ -323,7 +383,7 @@ static bool record(bool barge_in, size_t *held, char *why, size_t cap)
         }
         n += MUSE_AUDIO_CHUNK;
         bool tick = n % (MUSE_AUDIO_CHUNK * 5) == 0;
-        if (tick && s_rec && !s_live && !gave_up && !s_held_count && muse_hatch_ready()) {
+        if (tick && s_rec && !s_live && !gave_up && !s_held_count && turn_ready()) {
             ESP_LOGI(TAG, "Muse in reach: streaming the note so far");
             go_live();
         }
@@ -390,7 +450,7 @@ static bool hatch_reply(bool *delivered)
     *delivered = false;
     for (;;) {
         muse_hatch_ev_t ev;
-        while ((ev = muse_hatch_turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
+        while ((ev = turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
             switch (ev) {
             case MUSE_HATCH_EV_HEARD:
                 if (!speaking && !replied) {
@@ -404,7 +464,7 @@ static bool hatch_reply(bool *delivered)
                 replied = *delivered = true;
                 /* Once speech starts, the caption follows it. The event only
                  * has room for the page's start; the page itself comes below. */
-                if (!speaking && !muse_hatch_turn_caption(played, page, sizeof(page))) {
+                if (!speaking && !turn_caption(played, page, sizeof(page))) {
                     muse_state_set_caption("%s", text);
                 }
                 break;
@@ -422,11 +482,11 @@ static bool hatch_reply(bool *delivered)
         }
         if (got_event(MUSE_PTT_DOWN)) {
             ESP_LOGI(TAG, "reply interrupted");
-            muse_hatch_turn_cancel();
+            turn_cancel();
             muse_state_set_level(0);
             return true;
         }
-        size_t n = muse_hatch_turn_read(buf, MUSE_AUDIO_CHUNK, speaking || done ? 0 : 20);
+        size_t n = turn_read(buf, MUSE_AUDIO_CHUNK, speaking || done ? 0 : 20);
         if (n) {
             if (!speaking) {
                 speaking = true;
@@ -444,7 +504,7 @@ static bool hatch_reply(bool *delivered)
             muse_audio_write(silence, MUSE_AUDIO_CHUNK);
         }
         /* The page being said, or before the speech the reply's opening page. */
-        if ((speaking || replied) && muse_hatch_turn_caption(played, page, sizeof(page))) {
+        if ((speaking || replied) && turn_caption(played, page, sizeof(page))) {
             muse_state_set_caption("%s", page);
         }
     }
@@ -475,7 +535,7 @@ static const char *not_set_up(void)
         case BOOPIE_XZ_CODE:
             snprintf(said, sizeof said, "先绑定小智：在 xiaozhi.me 添加设备，激活码 %s", code);
             return said;
-        case BOOPIE_XZ_READY: return "小智已绑定，对话功能马上就来";
+        case BOOPIE_XZ_READY: return muse_wifi_connected() ? "正在连接小智……" : "没连上网";
         case BOOPIE_XZ_NO_NET: return "没连上网";
         case BOOPIE_XZ_ERROR: return "连不上小智服务器，稍后再试";
         default: return "正在连接小智……";
@@ -629,7 +689,7 @@ static feed_t feed_rest(const int16_t *pcm, size_t frames, size_t *sent, bool yi
     int64_t moved = esp_timer_get_time();
     for (;;) {
         muse_hatch_ev_t ev;
-        while ((ev = muse_hatch_turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
+        while ((ev = turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
             if (ev == MUSE_HATCH_EV_ERROR) {
                 ESP_LOGW(TAG, "muse: %s", text);
                 return FEED_FAILED;
@@ -641,7 +701,7 @@ static feed_t feed_rest(const int16_t *pcm, size_t frames, size_t *sent, bool yi
         if (yield && press_waiting()) {
             return FEED_PRESSED;
         }
-        size_t n = muse_hatch_turn_audio_wait(pcm + *sent, frames - *sent, 100);
+        size_t n = turn_audio_wait(pcm + *sent, frames - *sent, 100);
         *sent += n;
         int64_t now = esp_timer_get_time();
         if (n) {
@@ -651,7 +711,7 @@ static feed_t feed_rest(const int16_t *pcm, size_t frames, size_t *sent, bool yi
             return FEED_FAILED;
         }
     }
-    muse_hatch_turn_end();
+    turn_end();
     return FED;
 }
 
@@ -662,7 +722,7 @@ static bool wait_delivered(void)
     int64_t give_up = esp_timer_get_time() + ACK_WAIT_US;
     while (esp_timer_get_time() < give_up) {
         muse_hatch_ev_t ev;
-        while ((ev = muse_hatch_turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
+        while ((ev = turn_event(text, sizeof(text))) != MUSE_HATCH_EV_NONE) {
             if (ev == MUSE_HATCH_EV_SENT || ev == MUSE_HATCH_EV_REPLY || ev == MUSE_HATCH_EV_DONE) {
                 return true;
             }
@@ -693,7 +753,7 @@ static bool send_held(bool quiet)
         muse_state_set_mode(MUSE_MODE_THINKING);
         muse_state_set_caption("正在发送存下的留言");
     }
-    muse_hatch_turn_begin();
+    turn_begin();
     size_t sent = 0;
     feed_t fed = feed_rest(h->pcm, h->frames, &sent, true);
     bool delivered = false, interrupted = false;
@@ -703,7 +763,7 @@ static bool send_held(bool quiet)
         interrupted = hatch_reply(&delivered);
     }
     if (fed != FED || quiet) {
-        muse_hatch_turn_cancel();   /* asleep, the reply is left for the app */
+        turn_cancel();   /* asleep, the reply is left for the app */
     }
     if (fed == FEED_PRESSED) {
         if (!quiet) {
@@ -750,7 +810,10 @@ static bool held_due(void)
     }
     int64_t now = esp_timer_get_time();
     s_waiting = now - s_held[0].at_us < HELD_KEEP_US;
-    bool ready = muse_hatch_ready();
+    if (xz_chosen()) {
+        return false;   /* Boopie: Muse's notes wait for Muse */
+    }
+    bool ready = turn_ready();
     if (ready && !was_ready) {
         s_next_send_us = 0;
         s_send_backoff_us = RETRY_MIN_US;
@@ -773,7 +836,7 @@ static bool finish_note(void)
         bool fed = false, interrupted = false;
         delivered = false;
         if (s_live && s_sent == s_rec_n) {
-            muse_hatch_turn_end();   /* before the chirp, which takes ~90 ms */
+            turn_end();   /* before the chirp, which takes ~90 ms */
             fed = true;
         }
         muse_audio_chirp(0);
@@ -783,7 +846,7 @@ static bool finish_note(void)
             muse_state_set_caption("正在发送……");
             fed = feed_rest(s_rec, s_rec_n, &s_sent, false) == FED;
             if (!fed) {
-                muse_hatch_turn_cancel();
+                turn_cancel();
             }
         }
         if (fed) {
@@ -797,7 +860,7 @@ static bool finish_note(void)
         return interrupted;
     }
 #endif
-    muse_hatch_turn_end();   /* before the chirp, which takes ~90 ms */
+    turn_end();   /* before the chirp, which takes ~90 ms */
     muse_audio_chirp(0);
     return hatch_reply(&delivered);
 }
@@ -811,7 +874,14 @@ static bool can_record(void)
     if (!muse_wifi_connected()) {
         muse_wifi_apply();   /* retry now, not after the backoff */
     }
-    bool ready = muse_hatch_ready();
+    bool ready = turn_ready();
+    if (xz_chosen()) {
+        /* Boopie: 小智 has no saved notes: a press needs it in reach. */
+        if (!ready) {
+            go_idle(not_set_up());
+        }
+        return ready;
+    }
 #if HOLD_NOTES
     muse_hatch_status_t st;
     muse_hatch_status(&st);
@@ -993,7 +1063,7 @@ static void voice_task(void *arg)
         bool ok = record(pending_down, &held, why, sizeof(why));
         pending_down = false;
         if (held < MIN_HELD_FRAMES && !wake) {
-            muse_hatch_turn_cancel();
+            turn_cancel();
             drop_rec();
             pre_reset();
             go_idle("按久一点再说话");

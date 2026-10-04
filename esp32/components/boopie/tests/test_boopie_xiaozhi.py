@@ -90,6 +90,59 @@ class BoopieXiaozhiTest(unittest.TestCase):
         r = self.parse({"activation": {"code": "1" * 200}})
         self.assertEqual(len(r["code"]), 15)                   # kept to its buffer
 
+    def test_the_conversation_messages(self) -> None:
+        hello = self.run_x("hello")
+        self.assertEqual(hello["type"], "hello")
+        self.assertEqual(hello["features"], {"mcp": True})
+        self.assertEqual(hello["audio_params"], {"format": "opus", "sample_rate": 16000, "channels": 1,
+                                                 "frame_duration": 60})
+        listen, abort = self.run_x("listen", 'a"b', "start")
+        self.assertEqual(listen, {"session_id": 'a"b', "type": "listen", "state": "start", "mode": "manual"})
+        self.assertEqual(abort, {"session_id": 'a"b', "type": "abort"})
+
+    def msg(self, m) -> dict:
+        return self.run_x("msg", stdin=json.dumps(m) if not isinstance(m, str) else m)
+
+    def test_reading_the_server(self) -> None:
+        r = self.msg({"type": "hello", "transport": "websocket", "session_id": "xyz",
+                      "audio_params": {"format": "opus", "sample_rate": 24000, "channels": 1, "frame_duration": 60}})
+        self.assertEqual((r["type"], r["session"], r["rate"], r["frame"]), (1, "xyz", 24000, 60))
+        self.assertEqual(self.msg({"type": "stt", "text": "你好"})["type"], 2)
+        self.assertEqual(self.msg({"type": "stt", "text": "你好"})["text"], "你好")
+        self.assertEqual(self.msg({"type": "llm", "emotion": "happy", "text": "😊"})["text"], "happy")
+        self.assertEqual(self.msg({"type": "tts", "state": "start"})["type"], 4)
+        r = self.msg({"type": "tts", "state": "sentence_start", "text": "我在呢"})
+        self.assertEqual((r["type"], r["text"]), (5, "我在呢"))
+        self.assertEqual(self.msg({"type": "tts", "state": "stop"})["type"], 6)
+        self.assertEqual(self.msg({"type": "mcp", "payload": {}})["type"], 7)
+        self.assertEqual(self.msg({"type": "system", "command": "reboot"})["type"], 0)   # never obeyed
+        self.assertEqual(self.msg("garbage")["ok"], 0)
+
+    def mcp(self, payload, tools: str = "[]") -> dict:
+        return self.run_x("mcp", tools, stdin=json.dumps({"session_id": "s1", "type": "mcp", "payload": payload}))
+
+    def test_mcp(self) -> None:
+        r = self.mcp({"jsonrpc": "2.0", "method": "initialize", "id": 1, "params": {}})
+        self.assertEqual(r["out"]["type"], "mcp")
+        res = r["out"]["payload"]
+        self.assertEqual((res["id"], res["result"]["serverInfo"]["name"]), (1, "boopie"))
+        self.assertIn("tools", res["result"]["capabilities"])
+        r = self.mcp({"jsonrpc": "2.0", "method": "tools/list", "id": 2}, '[{"name":"self.x"}]')
+        self.assertEqual(r["out"]["payload"]["result"]["tools"], [{"name": "self.x"}])
+        r = self.mcp({"jsonrpc": "2.0", "method": "tools/list", "id": 3}, "not json")
+        self.assertEqual(r["out"]["payload"]["result"]["tools"], [])
+        r = self.mcp({"jsonrpc": "2.0", "method": "tools/call", "id": 4,
+                      "params": {"name": "self.audio_speaker.set_volume", "arguments": {"volume": 50}}})
+        self.assertEqual((r["r"], r["name"], r["args"], r["id"]), (-2, "self.audio_speaker.set_volume", {"volume": 50}, 4))
+        self.assertEqual(r["result"]["payload"]["result"]["content"], [{"type": "text", "text": "好的"}])
+        r = self.mcp({"jsonrpc": "2.0", "method": "nope", "id": 5})
+        self.assertEqual(r["out"]["payload"]["error"]["code"], -32601)
+        self.assertEqual(self.mcp({"jsonrpc": "2.0", "method": "notifications/initialized"})["r"], -1)
+
+    def test_moods(self) -> None:
+        self.assertEqual(self.run_x("mood", "happy", "laughing", "crying", "sleepy", "shocked", "neutral", ""),
+                         [1, 1, 2, 3, 4, 0, 0])
+
 
 if __name__ == "__main__":
     unittest.main()

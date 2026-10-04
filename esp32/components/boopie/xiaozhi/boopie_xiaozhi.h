@@ -36,3 +36,6 @@ void boopie_xiaozhi_recheck(void);
 
 /* Where to talk once bound: false before. */
 bool boopie_xiaozhi_endpoint(char *url, size_t url_cap, char *token, size_t token_cap);
+
+/* Who the board is to the server: its MAC (Device-Id) and its UUID (Client-Id). */
+void boopie_xiaozhi_ids(char *mac, size_t mac_cap, char *uuid, size_t uuid_cap);

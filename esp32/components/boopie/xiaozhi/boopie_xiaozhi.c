@@ -334,3 +334,9 @@ bool boopie_xiaozhi_endpoint(char *url, size_t url_cap, char *token, size_t toke
     xSemaphoreGive(s_lock);
     return ok;
 }
+
+void boopie_xiaozhi_ids(char *mac, size_t mac_cap, char *uuid, size_t uuid_cap)
+{
+    snprintf(mac, mac_cap, "%s", s_mac);
+    snprintf(uuid, uuid_cap, "%s", s_uuid);
+}

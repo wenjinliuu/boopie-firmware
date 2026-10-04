@@ -16,6 +16,12 @@ dependencies:
   idf:
     version: ">=5.5"
   espressif/cjson: "~1.7"
+  # Boopie: 小智's voice: Opus both ways, over a WebSocket.
+  espressif/esp_websocket_client: "~1.2"
+  espressif/esp_audio_codec:
+    version: "~2.5"
+    rules:
+      - if: "$CONFIG{MUSE_BOARD_ID} != \"none\""
   lvgl/lvgl:
     version: "9.5.0"
     public: true

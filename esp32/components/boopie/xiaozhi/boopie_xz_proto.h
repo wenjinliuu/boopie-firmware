@@ -52,3 +52,60 @@ typedef struct {
 
 /* The check-in's answer; false if it isn't JSON. */
 bool boopie_xz_parse_ota(const char *json, boopie_xz_ota_t *out);
+
+/* ---- the conversation, over the WebSocket (docs/websocket_zh.md upstream) ---- */
+
+#define BOOPIE_XZ_SESSION_MAX 64
+#define BOOPIE_XZ_TEXT_MAX 192
+
+/* The device's hello: Opus, 16 kHz mono, 60 ms frames, MCP on. */
+int boopie_xz_hello_json(char *out, size_t cap);
+/* Listening starts or stops ("start" / "stop"), manual: the button says when. */
+int boopie_xz_listen_json(const char *session, const char *state, char *out, size_t cap);
+/* Stop speaking. */
+int boopie_xz_abort_json(const char *session, char *out, size_t cap);
+
+typedef enum {
+    BOOPIE_XZ_MSG_OTHER = 0,
+    BOOPIE_XZ_MSG_HELLO,        /* the server's: session, its audio */
+    BOOPIE_XZ_MSG_STT,          /* what it heard */
+    BOOPIE_XZ_MSG_LLM,          /* an emotion for the face */
+    BOOPIE_XZ_MSG_TTS_START,
+    BOOPIE_XZ_MSG_TTS_SENTENCE, /* the sentence being said */
+    BOOPIE_XZ_MSG_TTS_STOP,
+    BOOPIE_XZ_MSG_MCP,          /* JSON-RPC for the device's tools */
+} boopie_xz_msg_type_t;
+
+typedef struct {
+    boopie_xz_msg_type_t type;
+    char session[BOOPIE_XZ_SESSION_MAX];
+    char text[BOOPIE_XZ_TEXT_MAX];   /* STT, TTS_SENTENCE; LLM: the emotion */
+    int sample_rate;                 /* HELLO: the server's audio (0: not said) */
+    int frame_ms;
+} boopie_xz_msg_t;
+
+/* A text message from the server; false if it isn't JSON. */
+bool boopie_xz_parse_msg(const char *json, boopie_xz_msg_t *out);
+
+/*
+ * The device's answer to an MCP message (the whole {"type":"mcp",...} the
+ * server sent), into out: initialize, tools/list (the tools in tools_json, a
+ * JSON array, "[]" for none), anything else an error. A tools/call gets back
+ * -2 with its name and arguments (JSON) for the caller to run, which then
+ * answers with boopie_xz_mcp_result. -1 for a notification (nothing to say)
+ * or what can't be read.
+ */
+int boopie_xz_mcp_reply(const char *json, const char *session, const char *tools_json, char *out, size_t cap,
+                        char *call_name, size_t name_cap, char *call_args, size_t args_cap, int *call_id);
+int boopie_xz_mcp_result(const char *session, int id, const char *text, bool is_error, char *out, size_t cap);
+
+/* What the reply's emotion (llm's "emotion") means for the pet's face. */
+typedef enum {
+    BOOPIE_XZ_MOOD_NONE = 0,
+    BOOPIE_XZ_MOOD_HAPPY,
+    BOOPIE_XZ_MOOD_SAD,
+    BOOPIE_XZ_MOOD_SLEEPY,
+    BOOPIE_XZ_MOOD_SURPRISED,
+} boopie_xz_mood_t;
+
+boopie_xz_mood_t boopie_xz_mood(const char *emotion);

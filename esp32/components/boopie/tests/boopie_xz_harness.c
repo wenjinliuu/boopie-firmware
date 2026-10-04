@@ -48,5 +48,53 @@ int main(int argc, char **argv)
                o.has_time, (long long)o.time_ms, o.offered_firmware);
         return 0;
     }
+    if (!strcmp(argv[1], "mood")) {
+        printf("[");
+        for (int i = 2; i < argc; i++) {
+            printf("%s%d", i > 2 ? ", " : "", boopie_xz_mood(argv[i]));
+        }
+        printf("]\n");
+        return 0;
+    }
+    if (!strcmp(argv[1], "hello")) {
+        char out[256];
+        boopie_xz_hello_json(out, sizeof out);
+        printf("%s\n", out);
+        return 0;
+    }
+    if (!strcmp(argv[1], "listen") && argc >= 4) {
+        char out[256], ab[256];
+        boopie_xz_listen_json(argv[2], argv[3], out, sizeof out);
+        boopie_xz_abort_json(argv[2], ab, sizeof ab);
+        printf("[%s, %s]\n", out, ab);
+        return 0;
+    }
+    if (!strcmp(argv[1], "msg") || !strcmp(argv[1], "mcp")) {
+        static char in[16384];
+        size_t n = fread(in, 1, sizeof in - 1, stdin);
+        in[n] = '\0';
+        if (!strcmp(argv[1], "msg")) {
+            boopie_xz_msg_t m;
+            bool ok = boopie_xz_parse_msg(in, &m);
+            printf("{\"ok\": %d, \"type\": %d, \"session\": \"%s\", \"text\": \"%s\", \"rate\": %d, \"frame\": %d}\n", ok,
+                   m.type, m.session, m.text, m.sample_rate, m.frame_ms);
+            return 0;
+        }
+        static char out[4096];
+        char name[64] = "", args[512] = "";
+        int id = 0;
+        int r = boopie_xz_mcp_reply(in, "s1", argc >= 3 ? argv[2] : "[]", out, sizeof out, name, sizeof name, args,
+                                    sizeof args, &id);
+        if (r == -2) {
+            char res[512];
+            boopie_xz_mcp_result("s1", id, "好的", false, res, sizeof res);
+            printf("{\"r\": -2, \"name\": \"%s\", \"args\": %s, \"id\": %d, \"result\": %s}\n", name, args, id, res);
+        } else if (r < 0) {
+            printf("{\"r\": %d}\n", r);
+        } else {
+            printf("{\"r\": %d, \"out\": %s}\n", r, out);
+        }
+        return 0;
+    }
     return 2;
 }

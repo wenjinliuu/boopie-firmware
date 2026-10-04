@@ -9,8 +9,17 @@
   - 绑好：提示“已连接小智！”，对话地址和令牌存 NVS（命名空间 `xiaozhi`），每 6 小时重新报到一次换新令牌。
   - 服务器的 `firmware` 只记一笔日志，从不升级；服务器时间在 NTP 对时前先拿来用。
   - 连不上：10 秒起翻倍重试，最长 5 分钟；设置页有“重新连接”按钮。
-  - 按住说话时，如果还没绑定，屏幕会提示激活码；已绑定会说“对话功能马上就来”（步骤 2）。
-  - 测试：`test_boopie_xiaozhi.py`（报到内容、UUID、各种回复的解析）。模拟器用 `BOOPIE_XZ_CODE=123456` / `BOOPIE_XZ_READY=1` 看设置页。
+  - 按住说话时，如果还没绑定，屏幕会提示激活码。
+  - 测试：`test_boopie_xiaozhi.py`（报到内容、UUID、各种回复的解析）。
+- **步骤 2（语音对话）已写好，待上板验证**：`boopie_xz_voice.c`，和 Muse 的对话接口一模一样（`muse_voice.c` 里按选中的 AI 助手转给 Muse 或小智，一次对话从头到尾归同一个）。
+  - 第一次按下才连 WebSocket，90 秒没说话就断开；连接中录的音先编码存着（约 10 秒），等服务器 hello 后补发。
+  - 上行：16 kHz、60 ms 一帧 Opus（参数同官方）；下行：Opus 直接解码成 16 kHz，不用重采样。
+  - 字幕：识别出的话（stt）→ 每句回复（sentence_start），按播放进度切换；回复的情绪（llm emotion）说完后让宠物开心/难过/犯困/惊讶几秒。
+  - 再按一下打断：发 `abort`，丢掉还没播的回复。
+  - 出错提示：连不上（10 秒没 hello）、没听清（松开 10 秒没回应）、没有回应（20 秒没动静）、断开。
+  - MCP：回 `initialize` 和空的 `tools/list`；工具留到步骤 3。服务器的 `system` 等指令一律不执行。
+  - 选小智时不存断网留言（Muse 的留言照旧等 Muse）。
+  - Opus 放在单独的任务里，24 KB 栈放 PSRAM；WebSocket 任务 6 KB 内部内存。模拟器用 `BOOPIE_XZ_CODE=123456` / `BOOPIE_XZ_READY=1` 看设置页。
 - 官方仓库**正式支持我们这块板**（`waveshare/esp32-s3-touch-amoled-1.75`，含 1.75C 变体），也用 ESP-IDF 6.0.1，音频芯片同样是 ES8311（喇叭）+ ES7210（麦克风，带回采），官方配置 24 kHz。
 - 从开发环境能访问官方接口 `api.tenclass.net` 和乐鑫组件库（Opus 编解码组件要从这里下载）。
 
@@ -49,7 +58,7 @@
 
 ## 必须注意
 - **不能自动升级**：回复里的 `firmware` 是官方小智固件，照做会把布比固件整个覆盖掉。我们只读激活码、`websocket` 和 `server_time`，`firmware` 一律忽略。应用名报我们自己的（`boopie`），不报官方板子名。
-- Opus 用乐鑫的 `espressif/esp_audio_codec`（官方固件同款），上行在设备上编码，下行解码后重采样到喇叭的采样率。
+- Opus 用乐鑫的 `espressif/esp_audio_codec`（官方固件同款），上行在设备上编码，下行直接解码成 16 kHz。
 - 按住说话用 `manual` 模式，不开唤醒词，省电；唤醒词以后再说。
 - 令牌、`Client-Id` 存 NVS，不写进代码、不打日志。
 
