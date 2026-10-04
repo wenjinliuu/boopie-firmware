@@ -72,12 +72,31 @@ function sProduct(ctx, t) {
 }
 
 // ---------------------------------------------------------------- 3. scan to set up
+// The setup screen with its QR code and hotspot password frosted over: never shown.
+const QR = [128, 96, 210, 210], PW = [150, 318, 166, 52];
+function frost(c, im, src, dx, dy, dw, dh) {
+  c.save();
+  c.beginPath();
+  c.rect(dx, dy, dw, dh);
+  c.clip();
+  c.filter = `blur(${Math.max(6, dw / 14)}px)`;
+  if (im.complete) c.drawImage(im, src[0], src[1], src[2], src[3], dx, dy, dw, dh);
+  c.filter = 'none';
+  c.fillStyle = 'rgba(235,238,245,0.55)';
+  c.fillRect(dx, dy, dw, dh);
+  c.restore();
+}
+const setupScreen = t => (c, r) => {
+  drawClip(c, 'setup_qr', t, 0, 0, r);
+  const im = clipFrame('setup_qr', t), k = (2 * r) / 466;
+  for (const b of [QR, PW]) frost(c, im, b, -r + b[0] * k, -r + b[1] * k, b[2] * k, b[3] * k);
+};
 function sSetup(ctx, t) {
   title(ctx, '扫一扫，就上线', 'Set up in seconds', 960, 150, t, 0.1, 3.6);
   const k = easeOut(seg(t, 0, 0.6));
   const done = t > 2.4;
   device(ctx, 680, 600, 240 * lerp(0.94, 1, k), {
-    screen: done ? screenClip('boopie_happy', t - 2.4) : screenClip('setup_qr', t) });
+    screen: done ? screenClip('boopie_happy', t - 2.4) : setupScreen(t) });
   const p = easeOut(seg(t, 0.3, 1.0));
   const px = lerp(1600, 1240, p);
   phone(ctx, px, 610, 640, (c, w, h) => {
@@ -90,7 +109,7 @@ function sSetup(ctx, t) {
     c.rect(-w / 2, -h / 2 + 60, w, h - 160);
     c.clip();
     c.imageSmoothingEnabled = false;
-    if (im.complete) c.drawImage(im, 128, 96, 210, 210, -w * 0.4, -h * 0.28, w * 0.8, w * 0.8);
+    frost(c, im, QR, -w * 0.4, -h * 0.28, w * 0.8, w * 0.8);
     c.restore();
     const fr = w * 0.8;
     c.strokeStyle = '#2fd07a';
@@ -435,7 +454,7 @@ function sSkins(ctx, t) {
   title(ctx, 'One Boopie, 40+ looks', '7 个角色  ·  40 多套皮肤', 960, 130, t, 0.1, 7.8, { size: 80 });
   let name, label;
   if (t < 3.5) {
-    const i = Math.min(6, Math.floor(t / 0.5));
+    const i = clamp(Math.floor(t / 0.5), 0, 6);
     [name, label] = CHARS[i];
   } else {
     const i = Math.floor((t - 3.5) / 0.35) % SKINS.length;
@@ -528,32 +547,20 @@ function sWorld(ctx, t) {
   const [, , what] = ROOMS[i];
   const wk = easeOut(seg(local, 0, 0.3));
   text(ctx, what, 470, 660, { size: 34, weight: 600, color: '#3a3a3f', alpha: wk * seg(t, 0.5, 0.8), dy: (1 - wk) * 16 });
-  // the window into it
+  // the round screen, the world in it, sliding from room to room
   const k = easeOut(seg(t, 0, 0.8));
-  const S = 720, x0 = 1230 - S / 2, y0 = 560 - S / 2;
-  ctx.save();
-  ctx.globalAlpha = k;
-  ctx.translate(0, (1 - k) * 60);
-  card(ctx, x0 - 18, y0 - 18, S + 36, S + 36, 64, { fill: '#0b0b0f', blur: 70, dy: 30, shadow: 'rgba(30,30,60,0.3)' });
-  ctx.save();
-  ctx.beginPath();
-  roundRect(ctx, x0, y0, S, S, 48);
-  ctx.clip();
-  const draw = (j, lt, dx) => {
-    const im = clipFrame(ROOMS[j][0], lt);
-    ctx.imageSmoothingEnabled = false;
-    if (im.complete) ctx.drawImage(im, x0 + dx, y0, S, S);
-  };
-  const sw = easeInOut(seg(local, 0, 0.35));
-  if (i > 0 && sw < 1) {
-    draw(i - 1, local + per, -sw * S);
-    draw(i, local, (1 - sw) * S);
-  } else draw(i, local, 0);
-  ctx.restore();
-  ctx.restore();
-  // Boopie peeking over the corner
+  const R0 = 330, cx = 1260, cy = 560;
+  device(ctx, cx, cy + (1 - k) * 60, R0 * lerp(0.92, 1, k), { screen: (c, r) => {
+    const sw = easeInOut(seg(local, 0, 0.35));
+    const one = (j, lt, dx) => drawClip(c, ROOMS[j][0], lt, dx, 0, r, { square: 1, zoom: 1.0 });
+    if (i > 0 && sw < 1) {
+      one(i - 1, local + per, -sw * 2 * r);
+      one(i, local, (1 - sw) * 2 * r);
+    } else one(i, local, 0);
+  } });
+  // Boopie peeking over its rim
   const pb = backOut(seg(t, 0.9, 1.4));
-  if (pb > 0) drawBoopie(ctx, x0 + 40, y0 + 6, 130 * pb, pose(t, { look: 0.6, happy: (t % 4) > 3 }));
+  if (pb > 0) drawBoopie(ctx, cx - 250, cy - 268, 130 * pb, pose(t, { look: 0.6, happy: (t % 4) > 3 }));
 }
 
 // ---------------------------------------------------------------- 12. the end

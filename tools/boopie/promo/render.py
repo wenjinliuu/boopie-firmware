@@ -57,9 +57,9 @@ def main() -> None:
                 pg.locator("canvas").screenshot(path=str(args.work / f"still_{float(s):05.1f}.png"))
             b.close()
             return
-        if frames.exists():
+        if frames.exists() and args.start == 0:
             shutil.rmtree(frames)
-        frames.mkdir()
+        frames.mkdir(exist_ok=True)
         n0, n1 = round(args.start * args.fps), round(args.end * args.fps)
         for i in range(n0, n1):
             pg.evaluate(f"renderAt({i / args.fps})")
@@ -71,7 +71,7 @@ def main() -> None:
         b.close()
     out = args.work / "boopie-promo.mp4"
     music = args.work / "music.wav"
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(args.fps), "-start_number", str(n0),
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(args.fps), "-start_number", "0",
            "-i", str(frames / "%05d.jpg")]
     if music.exists():
         cmd += ["-i", str(music), "-c:a", "aac", "-b:a", "192k", "-shortest"]
