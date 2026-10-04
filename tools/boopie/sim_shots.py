@@ -136,9 +136,9 @@ SKINS = [("boopie", "boopie_starry"), ("boopie", "boopie_jelly"), ("muse", "muse
          ("muse", "muse_matcha"), ("gpt", "gpt_ink"), ("gpt", "gpt_porcelain"), ("codex", "codex_neon"),
          ("codex", "codex_glitch"), ("klaude", "klaude_ice"), ("klaude", "klaude_lava"), ("whale", "whale_koi"),
          ("whale", "whale_deepsea"), ("doubao", "doubao_sakura"), ("doubao", "doubao_winter"),
-         ("boopie", "boopie_mint"), ("muse", "muse_berry"), ("gpt", "gpt_jade"), ("codex", "codex_retro"),
+         ("muse", "muse_berry"), ("gpt", "gpt_jade"), ("codex", "codex_retro"),
          ("klaude", "klaude_peach"), ("whale", "whale_sunset"), ("doubao", "doubao_sport"),
-         ("boopie", "boopie_newyear"), ("klaude", "klaude_pumpkin"), ("whale", "whale_xmas")]
+         ("boopie", "boopie_newyear"), ("klaude", "klaude_pumpkin"), ("whale", "whale_xmas"), ("muse", "muse_patrick"), ("muse", "muse_knight")]
 SKIN_STATES = [s for s in AVATAR_STATES if s[0] in ("idle", "thinking", "speaking", "happy")]
 
 

@@ -949,8 +949,7 @@ SKINS = {
     "doubao_winter": Skin("doubao_winter", "doubao", "冬装", "典藏", 300, "snow", "f2c9b4",
                           extra={"top": "e6d9bf"}, body_fx="winter"),
     # A third for each, a new palette (★200), and three for festivals only (★250).
-    "boopie_mint": Skin("boopie_mint", "boopie", "薄荷", "普通", 200, "default", "b8f0d8",
-                        cheek=(255, 150, 170), outline=(60, 156, 124)),
+    "muse_patrick": Skin("muse_patrick", "muse", "派大星", "普通", 200, "bubbles", "ffbccd"),
     "muse_berry": Skin("muse_berry", "muse", "莓果", "普通", 200, "petals", "b46ab4"),
     "gpt_jade": Skin("gpt_jade", "gpt", "翡翠", "普通", 200, "fireflies", "9fd8b8",
                      cheek=(230, 150, 150), extra={"bands_colour": "2e7d5b"}),
@@ -970,6 +969,8 @@ SKINS = {
     "whale_xmas": Skin("whale_xmas", "whale", "圣诞树", "典藏", 250, "snow", "2f8f4f",
                        glow=(255, 211, 74), outline=(20, 90, 40),
                        extra={"belly": ((216, 240, 216), (244, 255, 244))}, limited="xmas"),
+    # Muse in armour: silver plates from the neck down, a pink bow, a sword (drawn over Muse's own frame).
+    "muse_knight": Skin("muse_knight", "muse", "骑士", "典藏", 300, "default", "d9c7a8"),
 }
 
 

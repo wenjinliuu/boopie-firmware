@@ -2286,7 +2286,10 @@ typedef struct {
     face_fx_t face_fx;
     back_fx_t back_fx;
     uint16_t limited;         /* bit f: on sale only in festival f (boopie_fest_t); 0 always */
+    uint8_t muse_fx;          /* Muse's: drawn over its own frame (MUSE_FX_*) */
 } skin_t;
+
+enum { MUSE_FX_NONE = 0, MUSE_FX_SHORTS, MUSE_FX_KNIGHT };
 
 #define SKIN(k, n, c, coll, stars, sc, col) .key = k, .name = n, .character = c, .collector = coll, \
     .price = stars, .scene = sc, .colour = col
@@ -2323,8 +2326,8 @@ static const skin_t SKINS[] = {
     { SKIN("doubao_winter", "冬装", BOOPIE_CHAR_DOUBAO, true, 300, BOOPIE_SCENE_SNOW, 0xf2c9b4),
       .top = SET(0xe6d9bf), .body_fx = FX_BODY_WINTER },
     /* A third for each, a new palette, and three for festivals only. */
-    { SKIN("boopie_mint", "薄荷", BOOPIE_CHAR_BOOPIE, false, 200, BOOPIE_SCENE_DEFAULT, 0xb8f0d8),
-      .cheek = SET(0xff96aa), .outline = SET(0x3c9c7c) },
+    { SKIN("muse_patrick", "派大星", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_BUBBLES, 0xffbccd),
+      .muse_fx = MUSE_FX_SHORTS },
     { SKIN("muse_berry", "莓果", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_PETALS, 0xb46ab4) },
     { SKIN("gpt_jade", "翡翠", BOOPIE_CHAR_GPT, false, 200, BOOPIE_SCENE_FIREFLIES, 0x9fd8b8),
       .cheek = SET(0xe69696), .bands = SET(0x2e7d5b) },
@@ -2343,6 +2346,8 @@ static const skin_t SKINS[] = {
       .eye = SET(0x3a1a00), .cheek = SET(0xffc850), .outline = SET(0xa04a00), .limited = 1u << 3 },
     { SKIN("whale_xmas", "圣诞树", BOOPIE_CHAR_WHALE, true, 250, BOOPIE_SCENE_SNOW, 0x2f8f4f),
       .glow = SET(0xffd34a), .outline = SET(0x145a28), .belly = { SET(0xd8f0d8), SET(0xf4fff4) }, .limited = 1u << 4 },
+    { SKIN("muse_knight", "骑士", BOOPIE_SKIN_MUSE, true, 300, BOOPIE_SCENE_DEFAULT, 0xd9c7a8),
+      .muse_fx = MUSE_FX_KNIGHT },
 };
 #define SKIN_COUNT (int)(sizeof(SKINS) / sizeof(SKINS[0]))
 _Static_assert(SKIN_COUNT <= 32, "NVS keeps what's owned in a u32");
@@ -3269,6 +3274,82 @@ void boopie_pixel_set_slots(const float slots[5])
     }
 }
 
+/*
+ * A Muse skin's extras, over Muse's own frame (whose shape its renderer
+ * keeps): green shorts on 派大星, armour, a bow and a sword on the knight.
+ * Fur is palette entries 3 to 6 there (dark to highlight, avatar/muse_pixel.c).
+ */
+#define MUSE_FUR0 3
+#define MUSE_FUR1 6
+
+static void muse_skin_over(const uint8_t *fb)
+{
+    const skin_t *sk = skin_at(s_skin);
+    if (!sk || sk->character != BOOPIE_SKIN_MUSE || !sk->muse_fx || !s_slots_set) {
+        return;
+    }
+    int bottom = -1;
+    for (int y = 0; y < N; y++) {
+        for (int x = 0; x < N; x++) {
+            uint8_t i = fb[y * N + x];
+            if (i >= MUSE_FUR0 && i <= MUSE_FUR1) {
+                bottom = y;
+            }
+        }
+    }
+    if (bottom < 0) {
+        return;
+    }
+    int neck = (int)lroundf(s_slots.neck_y);
+    if (sk->muse_fx == MUSE_FX_SHORTS) {
+        static const rgb_t GREEN[4] = { { 70, 140, 50 }, { 110, 185, 70 }, { 140, 210, 90 }, { 175, 230, 120 } };
+        int top = bottom - 9 > neck + 3 ? bottom - 9 : neck + 3;
+        for (int y = top; y <= bottom; y++) {
+            for (int x = 0; x < N; x++) {
+                uint8_t i = fb[y * N + x];
+                if (i >= MUSE_FUR0 && i <= MUSE_FUR1) {
+                    bool flower = (x * 7 + y * 3) % 11 == 0 && y > top;
+                    s_img[y][x] = flower ? (rgb_t){ 170, 90, 210 } : GREEN[i - MUSE_FUR0];
+                }
+            }
+        }
+        return;
+    }
+    /* The knight: plates from the neck down, the arms in gauntlets. */
+    static const rgb_t STEEL[4] = { { 110, 116, 130 }, { 160, 166, 180 }, { 200, 205, 216 }, { 236, 240, 248 } };
+    for (int y = neck + 1; y <= bottom; y++) {
+        for (int x = 0; x < N; x++) {
+            uint8_t i = fb[y * N + x];
+            if (i >= MUSE_FUR0 && i <= MUSE_FUR1) {
+                bool seam = y == neck + 5 || y == neck + 10;
+                s_img[y][x] = seam ? (rgb_t){ 90, 96, 110 } : STEEL[i - MUSE_FUR0];
+            }
+        }
+    }
+    float hx = s_slots.hat_x, hy = s_slots.hat_y, w = s_slots.neck_w;
+    static const char *const BOW[] = { "##.##", "#p#p#", "##.##" };
+    for (int r = 0; r < 3; r++) {      /* a little pink bow on the hood */
+        for (int k = 0; k < 5; k++) {
+            if (BOW[r][k] != '.') {
+                put(hx + w * 0.3f + k - 2, hy + 6 + r, BOW[r][k] == 'p' ? (rgb_t){ 255, 200, 215 } : (rgb_t){ 240, 150, 175 });
+            }
+        }
+    }
+    float sx = s_slots.neck_x - w / 2 - 2;    /* the sword, held up on its left */
+    for (int y = (int)hy - 6; y <= neck + 4; y++) {
+        put(sx, y, (rgb_t){ 225, 230, 240 });
+        put(sx + 1, y, (rgb_t){ 150, 156, 170 });
+    }
+    put(sx, hy - 7, (rgb_t){ 225, 230, 240 });
+    for (int k = -2; k <= 3; k++) {
+        put(sx + k, neck + 5, (rgb_t){ 220, 180, 80 });
+    }
+    for (int y = neck + 6; y <= neck + 8; y++) {
+        put(sx, y, (rgb_t){ 110, 70, 40 });
+        put(sx + 1, y, (rgb_t){ 90, 56, 30 });
+    }
+}
+
 void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t bg_mask,
                           const boopie_pixel_pose_t *in)
 {
@@ -3299,6 +3380,7 @@ void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t b
         }
     }
     scene_front(scene, in->scene_t);
+    muse_skin_over(fb);
     if (s_slots_set) {
         wear_all(&s_slots);
     }

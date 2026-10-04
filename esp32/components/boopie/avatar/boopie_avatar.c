@@ -298,6 +298,7 @@ static void apply(void)
         boopie_pixel_set_character((boopie_char_t)(s_avatar - 1), s_colour[s_avatar]);
         return;
     }
+    boopie_pixel_set_skin(s_worn[s_avatar]);   /* its extras go over the frame (boopie_pixel_compose) */
     boopie_muse_colours_t c;
     jolly_pixel_set_colours(s_worn[s_avatar] >= 0 && boopie_skin_muse_colours(s_worn[s_avatar], &c) ? &c : NULL);
 }
