@@ -174,10 +174,10 @@ bool boopie_sdk_token_valid(const char *t) { return t && strlen(t) == BOOPIE_SDK
 bool boopie_sdk_token_set(const char *t) { (void)t; return true; }
 
 static const boopie_vpn_node_t SIM_NODES[] = {
-    { .name = "香港 01", .host = "hk.example", .cipher = "aes-256-gcm", .port = 443, .supported = true },
-    { .name = "日本 02", .host = "jp.example", .cipher = "chacha20-ietf-poly1305", .port = 443, .supported = true },
-    { .name = "美国 03", .host = "us.example", .cipher = "aes-128-gcm", .port = 8388, .supported = true },
-    { .name = "新加坡 2022", .host = "sg.example", .cipher = "2022-blake3-aes-128-gcm", .port = 443, .supported = false },
+    { .name = "节点一", .host = "hk.example", .cipher = "aes-256-gcm", .port = 443, .supported = true },
+    { .name = "节点二", .host = "jp.example", .cipher = "chacha20-ietf-poly1305", .port = 443, .supported = true },
+    { .name = "节点三", .host = "us.example", .cipher = "aes-128-gcm", .port = 8388, .supported = true },
+    { .name = "节点四", .host = "sg.example", .cipher = "2022-blake3-aes-128-gcm", .port = 443, .supported = false },
 };
 static const int SIM_LATENCY[] = { 86, 142, -2, -1 };
 static int s_sim_node;

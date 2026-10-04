@@ -544,6 +544,22 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
         render_for((uint32_t)number, real_time);
         return true;
     }
+    if (!strcmp(key, "record")) {   /* record=DIR,COUNT,MS: COUNT screenshots MS apart, DIR/0000.ppm on */
+        char dir[256];
+        int count = 0, ms = 0;
+        if (sscanf(value, "%255[^,],%d,%d", dir, &count, &ms) != 3 || count < 1 || count > 10000 || ms < 1) {
+            return false;
+        }
+        for (int i = 0; i < count; i++) {
+            char path[300];
+            snprintf(path, sizeof path, "%s/%04d.ppm", dir, i);
+            if (!write_snapshot(path)) {
+                return false;
+            }
+            render_for((uint32_t)ms, real_time);
+        }
+        return true;
+    }
     return false;
 }
 

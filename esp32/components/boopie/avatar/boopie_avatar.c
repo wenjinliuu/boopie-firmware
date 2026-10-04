@@ -443,6 +443,13 @@ static void load(void)
     if (xp) {
         s_pet_state.xp = (uint32_t)strtoul(xp, NULL, 10);
     }
+    if (getenv("BOOPIE_PET_FED")) {   /* just fed: not hungry for a while */
+        s_pet_state.last_fed = (int64_t)time(NULL);
+    }
+    const char *stars = getenv("BOOPIE_PET_STARS");
+    if (stars) {
+        s_pet_state.stars = (uint32_t)strtoul(stars, NULL, 10);
+    }
     if (getenv("BOOPIE_PET_HUNGRY")) {   /* hungry from the start, as in the day */
         s_pet_state.hungry = 1;
         s_pet_state.hungry_since = (int64_t)time(NULL);

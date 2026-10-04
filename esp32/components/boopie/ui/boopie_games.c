@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "boopie_avatar.h"
@@ -353,6 +354,76 @@ static void finish(void)
     show_card(record ? "新纪录！" : s_def->done, lines, true);
 }
 
+#ifdef BOOPIE_SIM_TOOLS
+/* The simulator with BOOPIE_AUTOPLAY set plays by itself, for recordings. */
+static void autoplay(float dt)
+{
+    static float wait;
+    wait -= dt;
+    if (s_def->tick == whack_tick) {
+        for (int i = 0; i < BOOPIE_WHACK_HOLES && wait <= 0; i++) {
+            const boopie_whack_hole_t *h = &s_whack.holes[i];
+            if (h->kind != BOOPIE_WHACK_NONE && h->kind != BOOPIE_WHACK_CLOUD && !h->hit
+                && boopie_whack_rise(h) > 0.95f && h->t > 0.6f) {
+                float x, y;
+                boopie_whack_hole_pos(i, &x, &y);
+                whack_tap(x, y - 2);
+                wait = 0.5f;
+            }
+        }
+    } else if (s_def->tick == hop_tick) {
+        float gap = 30;
+        for (int i = 0; i < BOOPIE_HOP_PIPES; i++) {
+            const boopie_hop_pipe_t *p = &s_hop.pipes[i];
+            if (p->x + BOOPIE_HOP_PIPE_W > BOOPIE_HOP_X - BOOPIE_HOP_HALF_W && p->x < BOOPIE_HOP_X + 20) {
+                gap = p->gap_y;
+                break;
+            }
+        }
+        if (s_hop.y > gap + 1.0f && s_hop.vy >= 0 && s_hop.hopped > 0.2f) {
+            boopie_hop_flap(&s_hop);
+        }
+    } else if (s_def->tick == catch_tick) {
+        float best = -1, x = s_catch.x;
+        for (int i = 0; i < BOOPIE_CATCH_ITEMS; i++) {
+            const boopie_catch_item_t *it = &s_catch.items[i];
+            if (it->kind != BOOPIE_CATCH_NONE && it->kind != BOOPIE_CATCH_CLOUD && !it->caught && it->y > best) {
+                best = it->y;
+                x = it->x;
+            }
+        }
+        s_steer.held = true;
+        s_steer.fx = x;
+    } else if (s_def->tick == maze_tick && s_maze.cleared <= 0) {
+        /* The way to the star, or else out, a cell at a time. */
+        int n = s_maze.n, from = (int)(s_maze.y / BOOPIE_MAZE_CELL) * n + (int)(s_maze.x / BOOPIE_MAZE_CELL);
+        int to = s_maze.star >= 0 ? s_maze.star : n * n - 1;
+        int8_t prev[BOOPIE_MAZE_MAX * BOOPIE_MAZE_MAX];
+        int queue[BOOPIE_MAZE_MAX * BOOPIE_MAZE_MAX], head = 0, tail = 0;
+        memset(prev, -1, sizeof prev);
+        prev[to] = (int8_t)to;
+        queue[tail++] = to;
+        static const int DX[4] = { 0, 1, 0, -1 }, DY[4] = { -1, 0, 1, 0 };
+        static const uint8_t SIDE[4] = { BOOPIE_MAZE_N, BOOPIE_MAZE_E, BOOPIE_MAZE_S, BOOPIE_MAZE_W };
+        while (head < tail) {
+            int c = queue[head++];
+            for (int k = 0; k < 4; k++) {
+                int nx = c % n + DX[k], ny = c / n + DY[k], nc = ny * n + nx;
+                if ((s_maze.open[c] & SIDE[k]) && nx >= 0 && nx < n && ny >= 0 && ny < n && prev[nc] < 0) {
+                    prev[nc] = (int8_t)c;
+                    queue[tail++] = nc;
+                }
+            }
+        }
+        int next = from >= 0 && from < n * n && prev[from] >= 0 ? prev[from] : to;
+        float cx = (next % n + 0.5f) * BOOPIE_MAZE_CELL, cy = (next / n + 0.5f) * BOOPIE_MAZE_CELL;
+        s_steer.held = false;
+        s_steer.tx = (cx - s_maze.x) * 0.08f - s_maze.vx * 0.02f;
+        s_steer.ty = (cy - s_maze.y) * 0.08f - s_maze.vy * 0.02f;
+    }
+}
+#endif
+
 static void tick(lv_timer_t *t)
 {
     (void)t;
@@ -368,6 +439,11 @@ static void tick(lv_timer_t *t)
     float dt = (float)(now - s_last_us) / 1e6f;
     s_last_us = now;
     read_tilt(&s_steer.tx, &s_steer.ty, false);
+#ifdef BOOPIE_SIM_TOOLS
+    if (getenv("BOOPIE_AUTOPLAY")) {
+        autoplay(dt > 0.1f ? 0.1f : dt);
+    }
+#endif
     boopie_sound_t sound = s_def->tick(dt > 0.1f ? 0.1f : dt, &s_steer);
     if (sound != BOOPIE_SOUND_COUNT) {
         boopie_sound_play(sound);

@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Boopie promo</title>
+<link rel="stylesheet" href="fonts/local.css">
+<style>html,body{margin:0;background:#fff;overflow:hidden}canvas{display:block}</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script src="clips.js"></script>
+<script src="lib.js"></script>
+<script src="mascots.js"></script>
+<script src="scenes.js"></script>
+<script>
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const layer = document.createElement('canvas');
+layer.width = W; layer.height = H;
+const lctx = layer.getContext('2d');
+const FADE = 0.35;
+function frame(t) {
+  backdrop(ctx, t);
+  sparkles(ctx, t, 26, 0.8);
+  for (const [a, b, fn] of TIMELINE) {
+    if (t < a - FADE || t > b + FADE) continue;
+    const al = Math.min(seg(t, a - FADE, a + 0.05), 1 - seg(t, b - 0.05, b + FADE));
+    if (al <= 0) continue;
+    lctx.clearRect(0, 0, W, H);
+    lctx.save();
+    fn(lctx, t - a);
+    lctx.restore();
+    ctx.save();
+    ctx.globalAlpha = al;
+    ctx.drawImage(layer, 0, 0);
+    ctx.restore();
+  }
+  const end = seg(t, DURATION - 0.6, DURATION);   // to white
+  if (end > 0) { ctx.fillStyle = `rgba(255,255,255,${end})`; ctx.fillRect(0, 0, W, H); }
+}
+// Draws time t, waiting for any clip frame it needs; resolves when the canvas is done.
+window.renderAt = async function (t) {
+  for (let pass = 0; pass < 4; pass++) {
+    pending = [];
+    frame(t);
+    if (!pending.length) return true;
+    await Promise.all(pending);
+  }
+  frame(t);
+  return true;
+};
+window.ready = (async () => {
+  await document.fonts.load('800 80px Inter');
+  await document.fonts.load('700 40px "Noto Sans SC"', '你好小伙伴');
+  await document.fonts.ready;
+  return true;
+})();
+const q = new URLSearchParams(location.search);
+if (q.has('t')) window.ready.then(() => renderAt(parseFloat(q.get('t'))));
+</script></body></html>
