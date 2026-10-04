@@ -4039,9 +4039,13 @@ static rgb_t head_colour(int head, char ch, bool gold)
         default: break;
         }
     }
-    ramp_t r = gold ? ramp(0xffd246) : head == BOOPIE_CHAR_COUNT ? ramp(0xe6d7bd) : s_rp;
+    const skin_t *sk = head == BOOPIE_CHAR_COUNT ? skin_at(s_skin) : NULL;
+    if (sk && sk->character != BOOPIE_SKIN_MUSE) {
+        sk = NULL;
+    }
+    ramp_t r = gold ? ramp(0xffd246) : head == BOOPIE_CHAR_COUNT ? ramp(sk ? sk->colour : 0xe6d7bd) : s_rp;
     switch (ch) {
-    case 'o': return r.out;
+    case 'o': return head == BOOPIE_CHAR_GPT && !gold ? s_gpt_line : r.out;
     case 'd': return r.dark;
     case 'b': return r.mid;
     case 'l': return r.light;
@@ -4051,13 +4055,279 @@ static rgb_t head_colour(int head, char ch, bool gold)
     case 'w': return head == BOOPIE_CHAR_WHALE ? s_whale_belly[1] : head == BOOPIE_CHAR_GPT ? GPT_FACE
                                                                                               : (rgb_t){ 245, 245, 250 };
     case 'x': return gold ? r.dark : s_gpt_holes;   /* GPT's knot, between its bands */
-    case 'k': return head == BOOPIE_CHAR_COUNT ? (rgb_t){ 18, 13, 11 } : (rgb_t){ 18, 18, 24 };
-    case 's': return head == BOOPIE_CHAR_COUNT ? (rgb_t){ 246, 223, 189 } : s_codex_screen;
+    case 'k': return head != BOOPIE_CHAR_COUNT ? (rgb_t){ 18, 18, 24 } : sk && sk->visor ? (rgb_t){ 200, 230, 255 }
+                                                                                         : (rgb_t){ 18, 13, 11 };
+    case 's': return head != BOOPIE_CHAR_COUNT ? s_codex_screen : sk && sk->visor ? hex(sk->visor)
+                                                                                  : (rgb_t){ 246, 223, 189 };
     case 'g': return s_codex_glyph;
     case 'h': return s_rp2.mid;
     default: return (rgb_t){ 0, 0, 0 };
     }
 }
+
+/* A head as it's dressed now: the grid's own pixels in the skin's colours, and
+ * the skin's signature bits on top (a hat or ears in the DRESS_TOP rows above,
+ * holes, bandages, a fringe). Rows are -DRESS_TOP .. HEAD_H - 1. */
+#define DRESS_TOP 3
+#define DRESS_H (HEAD_H + DRESS_TOP)
+typedef struct {
+    rgb_t c[DRESS_H][HEAD_W];
+    bool on[DRESS_H][HEAD_W];
+} dressed_t;
+
+static void dset(dressed_t *d, int j, int i, rgb_t c)
+{
+    if (j >= -DRESS_TOP && j < HEAD_H && i >= 0 && i < HEAD_W) {
+        d->c[j + DRESS_TOP][i] = c;
+        d->on[j + DRESS_TOP][i] = true;
+    }
+}
+
+static bool dbody(const dressed_t *d, int j, int i)   /* the head's own pixel, not its outline or face */
+{
+    return j >= 0 && j < HEAD_H && d->on[j + DRESS_TOP][i];
+}
+
+/* rows drawn from row j0 down: o b l d the body's ramp, w white, k ink,
+ * p pink, 1 and 2 the bit's own colours, - rubbed out. */
+static void dsprite(dressed_t *d, int j0, const char *const *rows, int n, const ramp_t *r, rgb_t c1, rgb_t c2)
+{
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; rows[j][i]; i++) {
+            rgb_t c;
+            switch (rows[j][i]) {
+            case 'o': c = r->out; break;
+            case 'b': c = r->mid; break;
+            case 'l': c = r->light; break;
+            case 'd': c = r->dark; break;
+            case 'w': c = WHITE; break;
+            case 'k': c = (rgb_t){ 18, 18, 24 }; break;
+            case 'p': c = (rgb_t){ 250, 170, 180 }; break;
+            case '1': c = c1; break;
+            case '2': c = c2; break;
+            case '-':
+                if (j0 + j >= -DRESS_TOP && j0 + j < HEAD_H) {
+                    d->on[j0 + j + DRESS_TOP][i] = false;
+                }
+                continue;
+            default: continue;
+            }
+            dset(d, j0 + j, i, c);
+        }
+    }
+}
+
+static void dress_bits(dressed_t *d, int head)
+{
+    const skin_t *sk = skin_at(s_skin);
+    if (!sk || (int)sk->character != head) {
+        return;
+    }
+    ramp_t r = head == BOOPIE_CHAR_COUNT ? ramp(sk->colour) : s_rp;
+    rgb_t none = { 0 };
+    switch (sk->muse_fx) {   /* Muse's */
+    case MUSE_FX_KNIGHT: {
+        static const char *const PLUME[] = { ".....11......", "......1......" };
+        dsprite(d, -2, PLUME, 2, &r, (rgb_t){ 220, 60, 70 }, none);
+        return;
+    }
+    case MUSE_FX_BUNNY: {
+        static const char *const EARS[] = { "...o.....o...", "..opo...opo..", "..opo...opo.." };
+        dsprite(d, -3, EARS, 3, &r, none, none);
+        return;
+    }
+    case MUSE_FX_DINO: {
+        static const char *const SPIKES[] = { "....1.1.1...." };
+        dsprite(d, -1, SPIKES, 1, &r, (rgb_t){ 255, 170, 70 }, none);
+        return;
+    }
+    case MUSE_FX_TUBBY: {
+        static const char *const ANT[] = { "......o......", ".....obo.....", "......o......" };
+        dsprite(d, -3, ANT, 3, &r, none, none);
+        return;
+    }
+    case MUSE_FX_DUCK: {
+        static const char *const TUFT[] = { ".......oo....", "......o......" };
+        dsprite(d, -2, TUFT, 2, &r, none, none);
+        return;
+    }
+    case MUSE_FX_CHEF: {
+        static const char *const HAT[] = { "...o.ooo.o...", "..owwwwwwwo..", "...owwwwwo..." };
+        dsprite(d, -3, HAT, 3, &r, none, none);
+        return;
+    }
+    default:
+        break;
+    }
+    /* Spots, stars, cracks or baubles, for the older skins that are only colours otherwise. */
+    static const struct {
+        const char *key;
+        uint32_t c1, c2;
+        int8_t at[6][2];
+    } SPOTS[] = {
+        { "boopie_starry", 0xffe680, 0xffffff, { { 4, 3 }, { 7, 9 }, { 8, 4 }, { 3, 8 }, { 5, 10 }, { -1, 0 } } },
+        { "whale_koi", 0xff7a3c, 0xe83c3c, { { 4, 3 }, { 4, 4 }, { 5, 8 }, { 5, 9 }, { 4, 8 }, { 7, 10 } } },
+        { "klaude_lava", 0xff8a2a, 0xffc040, { { 2, 3 }, { 3, 4 }, { 6, 9 }, { 7, 8 }, { 7, 3 }, { 9, 6 } } },
+        { "whale_xmas", 0xff4a4a, 0xffd84a, { { 5, 2 }, { 6, 10 }, { 4, 9 }, { 7, 5 }, { -1, 0 }, { -1, 0 } } },
+    };
+    for (size_t k = 0; k < sizeof SPOTS / sizeof SPOTS[0]; k++) {
+        if (!strcmp(sk->key, SPOTS[k].key)) {
+            for (int n = 0; n < 6 && SPOTS[k].at[n][0] >= 0; n++) {
+                int j = SPOTS[k].at[n][0], i = SPOTS[k].at[n][1];
+                char ch = HEADS[head][j][i];
+                if (ch == 'b' || ch == 'l' || ch == 'd' || ch == 'w') {
+                    dset(d, j, i, hex(n & 1 ? SPOTS[k].c2 : SPOTS[k].c1));
+                }
+            }
+        }
+    }
+    switch (sk->look) {
+    case LOOK_SPONGE: {   /* holes, and its brown shorts */
+        static const int8_t HOLES[][2] = { { 2, 3 }, { 3, 9 }, { 6, 2 }, { 6, 10 }, { 7, 6 } };
+        for (size_t k = 0; k < sizeof HOLES / sizeof HOLES[0]; k++) {
+            dset(d, HOLES[k][0], HOLES[k][1], (rgb_t){ 196, 172, 44 });
+        }
+        static const char *const SHORTS[] = { "..111111111..", "..222222222.." };
+        dsprite(d, 8, SHORTS, 2, &r, (rgb_t){ 90, 56, 24 }, (rgb_t){ 150, 96, 44 });
+        return;
+    }
+    case LOOK_LANTERN: {  /* carved, lit inside, a stem on top */
+        static const char *const FACE[] = { ".....2.......", "......2......", ".............", "...1.....1...",
+                                            "..111...111..", ".............", "....1.1.1....", "....11111...." };
+        dsprite(d, -1, FACE, 8, &r, (rgb_t){ 255, 210, 80 }, (rgb_t){ 70, 140, 50 });
+        return;
+    }
+    case LOOK_MUMMY: {    /* bandages across, one eye under them */
+        for (int j = 1; j < HEAD_H; j++) {
+            for (int i = 2; i < HEAD_W - 2; i++) {
+                if (dbody(d, j, i) && (i + j) % 4 == 0) {
+                    dset(d, j, i, r.dark);
+                }
+            }
+        }
+        dset(d, 4, 8, r.light);
+        dset(d, 5, 8, r.light);
+        return;
+    }
+    case LOOK_GHOST: {    /* a wavy hem */
+        static const char *const HEM[] = { "...-..-..-..." };
+        dsprite(d, 9, HEM, 1, &r, none, none);
+        return;
+    }
+    case LOOK_REM: {      /* a white headband, the fringe over one eye */
+        static const char *const BAND[] = { "...w.w.w.w..." };
+        dsprite(d, 1, BAND, 1, &r, none, none);
+        for (int j = 3; j <= 6; j++) {
+            for (int i = 2; i <= 5 - (j > 4); i++) {
+                dset(d, j, i, s_rp2.mid);
+            }
+        }
+        dset(d, 5, 8, (rgb_t){ 40, 80, 170 });   /* the eye that shows */
+        dset(d, 6, 8, (rgb_t){ 40, 80, 170 });
+        return;
+    }
+    case LOOK_PEARL: {    /* a blonde ponytail with a pink bow */
+        static const char *const TAIL[] = { "..1.1........", "...1.........", "..222........" };
+        dsprite(d, 0, TAIL, 3, &r, (rgb_t){ 250, 210, 90 }, (rgb_t){ 240, 90, 140 });
+        return;
+    }
+    case LOOK_KAREN: {    /* two dots and a wavy line on her screen */
+        for (int j = 3; j < 9; j++) {
+            for (int i = 2; i < 11; i++) {
+                if (HEADS[head][j][i] == 'g') {
+                    dset(d, j, i, s_codex_screen);
+                }
+            }
+        }
+        static const char *const FACE[] = { "....1...1....", ".............", "..11...11....", "....111..11.." };
+        dsprite(d, 4, FACE, 4, &r, s_codex_glyph, none);
+        return;
+    }
+    case LOOK_TANGYUAN:
+        dsprite(d, 0, (const char *const[]){ "........11..." }, 1, &r, (rgb_t){ 240, 110, 130 }, none);
+        return;
+    case LOOK_JELLYFISH: {  /* glowing tip, lights inside, tentacles */
+        static const char *const BITS[] = { "........11...", "........11...", ".............", ".............",
+                                            ".............", "...2.........", ".............", ".........2...",
+                                            ".............", "..-.-.-.-.-.." };
+        dsprite(d, 0, BITS, 10, &r, (rgb_t){ 150, 240, 255 }, (rgb_t){ 200, 255, 255 });
+        return;
+    }
+    case LOOK_SLIME:     /* no bulb: a shine instead */
+        dsprite(d, 0, (const char *const[]){ "--------.----", "--------.----", ".......-.....", ".............",
+                                             "...w........." }, 5, &r, none, none);
+        return;
+    case LOOK_DONUT: {   /* sprinkles on the icing */
+        static const rgb_t SPRINKLE[3] = { { 255, 90, 120 }, { 120, 200, 255 }, { 255, 220, 80 } };
+        for (int j = 0; j < HEAD_H; j++) {
+            for (int i = 0; i < HEAD_W; i++) {
+                if (HEADS[head][j][i] == 'b' && (i * 3 + j * 2) % 5 == 0) {
+                    dset(d, j, i, SPRINKLE[(i + j) % 3]);
+                }
+            }
+        }
+        return;
+    }
+    case LOOK_KALEIDO:   /* its bands a rainbow round */
+        for (int j = 0; j < HEAD_H; j++) {
+            for (int i = 0; i < HEAD_W; i++) {
+                char ch = HEADS[head][j][i];
+                if (ch == 'b' || ch == 'l') {
+                    float a = atan2f(j - 4.5f, i - 6.0f) / 6.2832f + 0.5f;
+                    dset(d, j, i, hsv((float)pymodd(a, 1.0), 0.55f, ch == 'l' ? 1.0f : 0.9f));
+                }
+            }
+        }
+        return;
+    case LOOK_CHROME:    /* a glint across */
+        for (int j = 0; j < HEAD_H; j++) {
+            for (int i = 0; i < HEAD_W; i++) {
+                char ch = HEADS[head][j][i];
+                if ((ch == 'b' || ch == 'l') && (i - j == 3 || i - j == 4)) {
+                    dset(d, j, i, WHITE);
+                }
+            }
+        }
+        return;
+    default:
+        return;
+    }
+}
+
+static void dressed_head(dressed_t *d, int head, bool gold)
+{
+    memset(d, 0, sizeof *d);
+    for (int j = 0; j < HEAD_H; j++) {
+        for (int i = 0; i < HEAD_W; i++) {
+            char ch = HEADS[head][j][i];
+            if (ch != '.') {
+                dset(d, j, i, head_colour(head, ch, gold));
+            }
+        }
+    }
+    if (!gold && !s_head_defaults) {
+        dress_bits(d, head);
+    }
+}
+
+/* Draws it with row 0 of the head at x, y; rows above are its hat or ears. eyes_white: dazed. */
+static void put_dressed(const dressed_t *d, int x, int y, int rows, bool eyes_white, int head)
+{
+    for (int j = -DRESS_TOP; j < rows; j++) {
+        for (int i = 0; i < HEAD_W; i++) {
+            if (!d->on[j + DRESS_TOP][i]) {
+                continue;
+            }
+            rgb_t c = d->c[j + DRESS_TOP][i];
+            if (eyes_white && j >= 0 && HEADS[head][j][i] == 'e') {
+                c = WHITE;
+            }
+            put(x + i, y + j, c);
+        }
+    }
+}
+
+static dressed_t s_dress, s_dress_gold;
 
 static void draw_glyph(int which, int x, int y, int scale, rgb_t c)
 {
@@ -4107,6 +4377,8 @@ void boopie_pixel_render_whack(const boopie_whack_t *g, int head)
     s_dst = s_img;
     s_dst_mask = NULL;
     time_ring(1 - g->t / BOOPIE_WHACK_SECONDS);
+    dressed_head(&s_dress, head, false);
+    dressed_head(&s_dress_gold, head, true);
     for (int i = 0; i < BOOPIE_WHACK_HOLES; i++) {
         float hx, hy;
         boopie_whack_hole_pos(i, &hx, &hy);
@@ -4121,18 +4393,20 @@ void boopie_pixel_render_whack(const boopie_whack_t *g, int head)
         }
         const boopie_whack_hole_t *h = &g->holes[i];
         int shown = (int)rintf(boopie_whack_rise(h) * HEAD_H);
-        if (shown > 0) {
-            bool cloud = h->kind == BOOPIE_WHACK_CLOUD;
-            const char *const *rows = cloud ? CLOUD : HEADS[head];
-            for (int j = 0; j < shown; j++) {   /* the top of the head first, out of the hole */
+        if (shown > 0 && h->kind != BOOPIE_WHACK_CLOUD) {   /* the top of the head first, out of the hole */
+            put_dressed(h->kind == BOOPIE_WHACK_GOLD ? &s_dress_gold : &s_dress, cx - HEAD_W / 2, base - shown, shown,
+                        false, head);
+        } else if (shown > 0) {
+            for (int j = 0; j < shown; j++) {   /* the cloud */
                 for (int k = 0; k < HEAD_W; k++) {
-                    char ch = rows[j][k];
+                    char ch = CLOUD[j][k];
                     if (ch == '.') {
                         continue;
                     }
-                    rgb_t c = cloud ? (ch == 'o' ? (rgb_t){ 70, 70, 96 } : ch == 'w' ? (rgb_t){ 156, 156, 180 }
-                                       : ch == 'k' ? (rgb_t){ 40, 40, 60 } : (rgb_t){ 110, 170, 255 })
-                                    : head_colour(head, ch, h->kind == BOOPIE_WHACK_GOLD);
+                    rgb_t c = ch == 'o'   ? (rgb_t){ 70, 70, 96 }
+                              : ch == 'w' ? (rgb_t){ 156, 156, 180 }
+                              : ch == 'k' ? (rgb_t){ 40, 40, 60 }
+                                          : (rgb_t){ 110, 170, 255 };
                     put(cx - HEAD_W / 2 + k, base - shown + j, c);
                 }
             }
@@ -4220,19 +4494,8 @@ void boopie_pixel_render_catch(const boopie_catch_t *g, int head)
     /* The pet, dizzy a moment after a cloud. */
     int px = (int)rintf(g->x) - HEAD_W / 2;
     bool dizzy = g->dizzy > 0;
-    for (int j = 0; j < HEAD_H; j++) {
-        for (int k = 0; k < HEAD_W; k++) {
-            char ch = HEADS[head][j][k];
-            if (ch == '.') {
-                continue;
-            }
-            rgb_t c = head_colour(head, ch, false);
-            if (dizzy && ch == 'e') {
-                c = (rgb_t){ 255, 255, 255 };
-            }
-            put(px + k, BOOPIE_CATCH_PET_Y + j, c);
-        }
-    }
+    dressed_head(&s_dress, head, false);
+    put_dressed(&s_dress, px, BOOPIE_CATCH_PET_Y, HEAD_H, dizzy, head);
     if (dizzy) {
         for (int i = 0; i < 3; i++) {
             float a = g->t * 9 + i * 2.094f;
@@ -4358,19 +4621,8 @@ void boopie_pixel_render_hop(const boopie_hop_t *g, int head)
     /* The pet: dazed after a crash, a puff under it just after a hop. */
     int px = (int)rintf(BOOPIE_HOP_X) - HEAD_W / 2, py = (int)rintf(g->y) - HEAD_H / 2;
     bool dazed = g->crashed > 0;
-    for (int j = 0; j < HEAD_H; j++) {
-        for (int k = 0; k < HEAD_W; k++) {
-            char ch = HEADS[head][j][k];
-            if (ch == '.') {
-                continue;
-            }
-            rgb_t c = head_colour(head, ch, false);
-            if (dazed && ch == 'e') {
-                c = (rgb_t){ 255, 255, 255 };
-            }
-            put(px + k, py + j, c);
-        }
-    }
+    dressed_head(&s_dress, head, false);
+    put_dressed(&s_dress, px, py, HEAD_H, dazed, head);
     if (g->hopped < 0.15f && !dazed) {
         put(BOOPIE_HOP_X - 3, py + HEAD_H + 1, (rgb_t){ 200, 200, 230 });
         put(BOOPIE_HOP_X, py + HEAD_H + 2, (rgb_t){ 200, 200, 230 });
@@ -4384,6 +4636,20 @@ void boopie_pixel_render_hop(const boopie_hop_t *g, int head)
     }
     /* The score on top of it all. */
     draw_number(g->score, 0, 32, 7, 2, (rgb_t){ 242, 239, 255 });
+}
+
+void boopie_pixel_pet_image(int head, uint16_t *dst)
+{
+    if (head < 0 || head > BOOPIE_CHAR_COUNT) {
+        head = BOOPIE_CHAR_BOOPIE;
+    }
+    dressed_head(&s_dress, head, false);
+    for (int j = 0; j < DRESS_H; j++) {
+        for (int i = 0; i < HEAD_W; i++) {
+            rgb_t c = s_dress.c[j][i];
+            dst[j * HEAD_W + i] = s_dress.on[j][i] ? (to565(c.r, c.g, c.b) ? to565(c.r, c.g, c.b) : 0x0821) : 0;
+        }
+    }
 }
 
 void boopie_pixel_head_image(int head, uint16_t *dst, int scale)

@@ -49,7 +49,7 @@ static uint8_t *s_rgb;
 static boopie_world_t s_world;
 static int64_t s_last_us;
 static float s_t, s_said_at = -100, s_chat_at;
-static uint16_t s_pet[BOOPIE_HEAD_W * BOOPIE_HEAD_H];
+static uint16_t s_pet[BOOPIE_HEAD_W * BOOPIE_PET_H];
 static int s_pet_for = -1;
 static bool s_hello;   /* the first visit's hint has been said */
 
@@ -1206,13 +1206,13 @@ static void frame(lv_timer_t *timer)
     }
     int avatar = boopie_avatar_current();
     if (avatar != s_pet_for || ((int)s_t & 7) == 0) {
-        boopie_pixel_head_image(avatar == BOOPIE_AVATAR_MUSE ? BOOPIE_SKIN_MUSE : avatar - 1, s_pet, 1);
+        boopie_pixel_pet_image(avatar == BOOPIE_AVATAR_MUSE ? BOOPIE_SKIN_MUSE : avatar - 1, s_pet);
         s_pet_for = avatar;
     }
     int64_t epoch = 0;
     int minute = 0;
     const boopie_garden_t *garden = boopie_avatar_garden(&epoch, &minute);
-    boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_HEAD_H, garden, epoch,
+    boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_PET_H, garden, epoch,
                                  boopie_avatar_chests_open(), boopie_avatar_gathered(), wx, fest,
                                  boopie_avatar_mail_waiting() };
     boopie_world_draw(&s_world, &look, s_rgb);

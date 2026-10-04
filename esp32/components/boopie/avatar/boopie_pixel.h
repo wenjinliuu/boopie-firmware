@@ -238,3 +238,8 @@ void boopie_pixel_render_hop(const struct boopie_hop *g, int head);
 #define BOOPIE_HEAD_W 13
 #define BOOPIE_HEAD_H 10
 void boopie_pixel_head_image(int head, uint16_t *dst, int scale);
+
+/* The same head as it's dressed now, for 小窝: its colour and skin, with the
+ * skin's hat or ears in BOOPIE_PET_H - BOOPIE_HEAD_H rows above; 0 is see-through. */
+#define BOOPIE_PET_H (BOOPIE_HEAD_H + 3)
+void boopie_pixel_pet_image(int head, uint16_t *dst);
