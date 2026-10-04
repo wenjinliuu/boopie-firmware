@@ -455,6 +455,7 @@ class Codex(Rig):
     screen = (30, 34, 84)
     glyph = (120, 236, 240)
     glyph_follows_light = True   # the prompt takes the state light's colour
+    wave_face = False            # 凯伦: a green line for a face
 
     def draw(self, c, p):
         cx, base = 32, 56
@@ -482,6 +483,16 @@ class Codex(Rig):
         return {"screen_box": (*f.pt(21, 21), *f.pt(44, 34)), "slots": {"hat": f.pt(31, 10), "eyes": (face[0] - 0.5, face[1], 4.5 * f.sx), "neck": (*f.pt(32, 38), 16 * f.sx)}, "face": face, "body": f.pt(32, 40), "light": f.pt(44, 14), "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
+        if self.wave_face:
+            g = self.glyph
+            amp = 2.5 if p.mouth == "talk" else 1.0 if p.mouth in ("w", "smile") else 0.4
+            for x in range(-9, 10):
+                y = math.sin((x + p.t * 8) * 0.9) * amp * (1 - abs(x) / 11)
+                c.put(fx + x, fy + 1 + y, g)
+            if p.eyes not in ("blink", "happy"):
+                c.put(fx - 4, fy - 3, g)
+                c.put(fx + 4, fy - 3, g)
+            return
         col = (p.light if self.glyph_follows_light else None) or self.glyph
         col = mix(self.screen, col, max(0.25, min(1.0, p.light_level)))
         L, R = fx - 5, fx + 4
@@ -529,43 +540,65 @@ KNOT = [
 KNOT_GRID = np.array([list(r) for r in KNOT])
 
 
-class GPT(Rig):
-    """GPT: a white mochi, Boopie's shape and face, with the knot of its logo
-    clipped on its head like a hair clip."""
-    key, name, colour = "gpt", "GPT", "e8e8e8"
-    ink = (18, 18, 24)
-    hole = (34, 34, 44)
+KNOT_BANDS = np.array([[1.0 if ch == "#" else 0.0 for ch in row] for row in KNOT])
+KNOT_ALL = np.array([[1.0 if ch != " " else 0.0 for ch in row] for row in KNOT])
 
-    def __init__(self, colour=None, skin=None):
-        super().__init__(colour, skin)
-        self.rp["out"] = self.ink
-        self.bands = ramp(getattr(self, "bands_colour", "f6f6f6"))
-        self.bands["out"] = self.ink
+
+def bilinear(grid, gx, gy):
+    """grid sampled at (gx, gy), cell centres at +0.5, 0 outside it."""
+    n = grid.shape[0]
+    x = np.clip(gx - 0.5, 0, n - 1.001)
+    y = np.clip(gy - 0.5, 0, n - 1.001)
+    x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
+    fx, fy = x - x0, y - y0
+    x1, y1 = np.minimum(x0 + 1, n - 1), np.minimum(y0 + 1, n - 1)
+    v = (grid[y0, x0] * (1 - fx) * (1 - fy) + grid[y0, x1] * fx * (1 - fy) + grid[y1, x0] * (1 - fx) * fy
+         + grid[y1, x1] * fx * fy)
+    return np.where((gx >= 0) & (gx < n) & (gy >= 0) & (gy < n), v, 0)
+
+
+class GPT(Rig):
+    """GPT: the knot of its logo, scaled up smooth, as a big head, a round
+    little face in its middle, stubby hands and feet."""
+    key, name, colour = "gpt", "GPT", "f2f2f2"
+    size, squash_k, jump_k = 1.0, 0.6, 0.6
+    line = (18, 18, 24)        # outlines
+    holes = (64, 64, 74)       # between the bands
+    face_colour = (255, 244, 230)
+    knot_scale = 2.45
 
     def draw(self, c, p):
-        cx, cy, rx, ry = 32, 41, 16, 14
-        f = self.frame(p, cx, cy + ry)
-        body = f.ellipse(cx, cy, rx, ry)
+        cx, cy = 32, 30
+        f = self.frame(p, cx, 54)
+        gx, gy = (f.rx - cx) / self.knot_scale + 8, (f.ry - cy) / self.knot_scale + 8
+        band = bilinear(KNOT_BANDS, gx, gy) > 0.5
+        head = bilinear(KNOT_ALL, gx, gy) > 0.5
+        face = f.ellipse(cx, cy, 7.5, 7.5)
+        limbs = np.zeros_like(head)
         if p.feet and p.scale > 0.6:
-            body |= f.ellipse(cx - 7, cy + ry - 1, 4, 2.5) | f.ellipse(cx + 7, cy + ry - 1, 4, 2.5)
+            limbs |= f.ellipse(cx - 7, 50.5, 3.8, 2.8) | f.ellipse(cx + 7, 50.5, 3.8, 2.8)
         for h in p.hands:
             if h[0] != "front":
-                body |= f.ellipse(cx + h[0] * rx, cy + h[1], 3, 2.6)
-        c.shaded(body, self.rp)
-        c.outline(body, self.ink)
-        n, kx, ky = len(KNOT), 42, 25          # the clip, up on the right like Boopie's antenna
-        gx = np.floor(f.rx - (kx - n / 2)).astype(int)
-        gy = np.floor(f.ry - (ky - n / 2)).astype(int)
-        ok = (gx >= 0) & (gx < n) & (gy >= 0) & (gy < n)
-        cells = np.full((N, N), " ")
-        cells[ok] = KNOT_GRID[gy[ok], gx[ok]]
-        bands, holes = cells == "#", cells == "."
-        c.flat(holes, self.hole)
-        rim, c.rim = c.rim, None               # the bands are too thin for a rim light
-        c.shaded(bands, self.bands)
-        c.rim = rim
-        c.outline(bands | holes, self.ink)
-        return {"slots": {"hat": f.pt(25, 29), "eyes": (*f.pt(cx, cy - 1), 7 * f.sx), "neck": (*f.pt(cx, 48), 24 * f.sx)}, "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": f.pt(42, 17), "show_face": True}
+                limbs |= f.ellipse(cx + h[0] * 19.5, cy + 7 + h[1], 3.2, 2.8)
+        limbs &= ~head
+        c.shaded(limbs, self.rp)
+        c.outline(limbs, self.line)
+        c.flat(head & ~band & ~face, self.holes)
+        c.shaded(band & ~face, self.rp)
+        c.outline(band & ~face, self.line)
+        c.flat(face, self.face_colour)
+        c.outline(face, self.line)
+        c.body |= head
+        return {"slots": {"hat": f.pt(cx, cy - 18), "eyes": (*f.pt(cx, cy - 1), 4 * f.sx),
+                          "neck": (*f.pt(cx, cy + 17), 16 * f.sx)},
+                "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": f.pt(cx + 14, cy - 15),
+                "show_face": p.scale > 0.6}
+
+    def face(self, c, fx, fy, p):
+        for side in (-1, 1):
+            eye(c, fx + side * 3, fy, p, side)
+        blush(c, fx, fy - 1, p, 5, self.cheek)
+        mouth(c, fx + p.look[0] // 2, fy + 4, p)
 
 
 GLYPHS = {
@@ -586,6 +619,7 @@ def glyph(c, ch, x, y, colour):
 class Klaude(Rig):
     """小克: a blocky orange critter with square eyes, stubby side arms and four little legs."""
     key, name, colour = "klaude", "小克", "f28c5e"
+    sponge = False   # 海绵宝宝: holes in the block, little brown shorts
 
     def draw(self, c, p):
         cx, base = 32, 51
@@ -601,6 +635,16 @@ class Klaude(Rig):
                 body |= f.rect(x, 44, x + 3, 51)
         c.shaded(body, self.rp)
         c.outline(body, self.rp["out"])
+        if self.sponge:
+            torso = f.rect(17, 22, 47, 44)
+            for i in range(10):
+                hx, hy = 19 + h01(i, 61) * 26, 23 + h01(i, 62) * 13
+                if abs(hx - 32) < 11 and 26 < hy < 34:
+                    continue                     # not over the face
+                hole = f.ellipse(hx, hy, 1.3 + h01(i, 63) * 0.9, 1.1 + h01(i, 64) * 0.7)
+                c.flat(hole & torso, (196, 172, 44))
+            c.flat(torso & (f.ry >= 40), (150, 96, 44))
+            c.flat(torso & (f.ry >= 40) & (f.ry < 41), (90, 56, 24))
         return {"slots": {"hat": f.pt(32, 23), "eyes": (*f.pt(32, 30), 7 * f.sx), "neck": (*f.pt(32, 42), 30 * f.sx)}, "face": f.pt(32, 30), "body": f.pt(32, 35), "light": f.pt(44, 16), "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
@@ -620,6 +664,7 @@ class Whale(Rig):
     its spout is the state light."""
     key, name, colour = "whale", "DeepSeek 小鲸鱼", "5a7dff"
     belly = ((214, 224, 255), (240, 244, 255))
+    ponytail = False   # 珍珍: a blonde ponytail and a pink bow
 
     def draw(self, c, p):
         cx, cy, rx, ry = 31, 41, 16, 15
@@ -644,6 +689,13 @@ class Whale(Rig):
             c.put(hx, hy - 1 - i, col)
         for dx, dy in ((-2, -h), (2, -h), (-3, -h + 2), (3, -h + 2)):
             c.put(hx + dx, hy + dy, col)
+        if self.ponytail:
+            px, py = f.pt(29, 25)
+            for k in range(7):
+                for w in (-1, 0, 1):
+                    c.put(px - k * 0.6 + w, py - k, (250, 210, 90) if w else (255, 230, 140))
+            for dx, dy in ((-2, 0), (-1, 0), (1, 0), (2, 0), (-2, -1), (2, -1), (0, 0)):
+                c.put(px + dx, py + 1 + dy, (240, 90, 140))
         return {"slots": {"hat": f.pt(37, 27), "eyes": (*f.pt(cx, cy - 2), 7 * f.sx), "neck": (*f.pt(cx, 47), 24 * f.sx)}, "face": f.pt(cx, cy - 2), "body": f.pt(cx, cy), "light": (hx, hy - h - 1),
                 "show_face": p.scale > 0.6}
 
@@ -654,6 +706,7 @@ class Doubao(Rig):
     size, squash_k, jump_k = 1.08, 0.35, 0.4
     hair = "6b4a3e"
     top = "3a3a44"
+    rem = False   # 蕾姆: a maid's frilly headband, a pink ribbon, her fringe over one eye, a blue eye
 
     def __init__(self, colour=None, skin=None):
         super().__init__(colour, skin)
@@ -684,9 +737,45 @@ class Doubao(Rig):
         clip = f.ellipse(45, 16, 2.4, 1.6)
         c.flat(clip, self.light_colour(p))
         c.outline(clip, self.hp["out"])
-        return {"slots": {"hat": f.pt(29, 11), "eyes": (*f.pt(32, 30), 6 * f.sx), "neck": (*f.pt(32, 43), 12 * f.sx)}, "face": f.pt(32, 30), "body": f.pt(32, 44), "light": f.pt(45, 16), "show_face": p.scale > 0.6}
+        light = f.pt(45, 16)
+        if self.rem:
+            for x in range(19, 46, 4):           # the headband's frills
+                px, py = f.pt(x, 13 - 3.2 * math.cos((x - 32) / 13 * 1.2))
+                for dx, dy in ((0, 0), (1, 0), (0, -1), (1, -1), (-1, 0)):
+                    c.put(px + dx, py + dy, (252, 252, 252))
+                c.put(px, py + 1, (40, 40, 48))
+            light = f.pt(46, 20)                 # the ribbon and its X clip
+            rx, ry = light
+            for dx, dy in ((-1, -1), (1, 1), (1, -1), (-1, 1), (0, 0)):
+                c.put(rx + dx, ry + dy, (230, 70, 150))
+            for k in range(2, 8):
+                c.put(rx + (k % 2), ry + k, (230, 70, 150))
+            qx, qy = f.pt(32, 44)                # the frilled collar
+            for dx in range(-4, 5):
+                c.put(qx + dx, qy, (250, 250, 250))
+            c.put(qx, qy + 1, (30, 30, 40))
+        return {"slots": {"hat": f.pt(29, 11), "eyes": (*f.pt(32, 30), 6 * f.sx), "neck": (*f.pt(32, 43), 12 * f.sx)}, "face": f.pt(32, 30), "body": f.pt(32, 44), "light": light, "show_face": p.scale > 0.6}
+
+    # 蕾姆's fringe: its right edge, a row at a time from 8 above the eyes to 3 below.
+    FRINGE = (-1, -1, -2, -2, -3, -3, -3, -4, -4, -5, -5, -5)
 
     def face(self, c, fx, fy, p):
+        self.face_doubao(c, fx, fy, p)
+        if not self.rem:
+            return
+        if p.eyes in ("open", "look", "wide", "worried"):
+            lx, ly = p.look if p.eyes == "look" else (0, 0)
+            c.put(fx + 6 + lx, fy + ly, (70, 120, 220))
+            c.put(fx + 6 + lx, fy + 1 + ly, (70, 120, 220))
+        for j, edge in enumerate(self.FRINGE):
+            y = j - 8
+            for x in range(-11, edge + 1):
+                c.put(fx + x, fy + y, self.hp["dark"] if (x - y) % 4 == 0 else self.hp["mid"])
+            c.put(fx + edge + 1, fy + y, self.hp["out"])
+        for x in range(-11, -5):
+            c.put(fx + x, fy + 4, self.hp["out"])
+
+    def face_doubao(self, c, fx, fy, p):
         c.eye = (58, 36, 30)
         for side in (-1, 1):
             eye(c, fx + side * 6, fy, p, side)
@@ -921,10 +1010,10 @@ SKINS = {
     "muse_astronaut": Skin("muse_astronaut", "muse", "宇航员", "典藏", 300, "stars", "e8ecf2",
                            extra={"visor": "1d2b4a"}),
     "muse_matcha": Skin("muse_matcha", "muse", "抹茶", "普通", 150, "fireflies", "8fbf6a"),
-    "gpt_ink": Skin("gpt_ink", "gpt", "水墨", "典藏", 300, "default", "dadada",
-                    cheek=(200, 120, 120), extra={"bands_colour": "c83a3a"}, body_fx="ink"),
-    "gpt_porcelain": Skin("gpt_porcelain", "gpt", "青花瓷", "普通", 150, "petals", "f4f6fa",
-                          cheek=(150, 170, 230), extra={"bands_colour": "3a5bb8"}, body_fx="porcelain"),
+    "gpt_black": Skin("gpt_black", "gpt", "黑结", "典藏", 300, "default", "26262e", outline=(150, 150, 165),
+                      extra={"line": (150, 150, 165), "holes": (250, 250, 250)}),
+    "gpt_paper": Skin("gpt_paper", "gpt", "白纸", "普通", 150, "default", "f2f2f2",
+                      extra={"holes": (255, 255, 255)}),
     "codex_neon": Skin("codex_neon", "codex", "霓虹", "典藏", 300, "neon_grid", "120e24",
                        cheek=(255, 60, 200), outline=(0, 240, 255), body_fx="neon",
                        extra={"screen": (10, 0, 20), "glyph": (255, 70, 210), "glyph_follows_light": False},
@@ -951,13 +1040,13 @@ SKINS = {
     # A third for each, a new palette (★200), and three for festivals only (★250).
     "muse_patrick": Skin("muse_patrick", "muse", "派大星", "普通", 200, "bubbles", "ffbccd"),
     "muse_berry": Skin("muse_berry", "muse", "莓果", "普通", 200, "petals", "b46ab4"),
-    "gpt_jade": Skin("gpt_jade", "gpt", "翡翠", "普通", 200, "fireflies", "9fd8b8",
-                     cheek=(230, 150, 150), extra={"bands_colour": "2e7d5b"}),
+    "gpt_green": Skin("gpt_green", "gpt", "经典绿", "普通", 200, "default", "10a37f", outline=(6, 40, 30),
+                      extra={"line": (6, 40, 30), "holes": (230, 255, 245)}),
     "codex_retro": Skin("codex_retro", "codex", "复古绿屏", "普通", 200, "matrix", "d8d2bc",
                         cheek=(230, 150, 120), outline=(110, 100, 80),
                         extra={"screen": (8, 30, 10), "glyph": (80, 255, 120), "glyph_follows_light": False}),
-    "klaude_peach": Skin("klaude_peach", "klaude", "蜜桃", "普通", 200, "petals", "ffc0a8", eye=(90, 40, 32),
-                         cheek=(255, 122, 138), outline=(200, 100, 80)),
+    "klaude_sponge": Skin("klaude_sponge", "klaude", "海绵宝宝", "普通", 200, "bubbles", "f7e14d", eye=(70, 46, 20),
+                          extra={"sponge": True}),
     "whale_sunset": Skin("whale_sunset", "whale", "晚霞", "普通", 200, "default", "ff9e7a",
                          outline=(180, 80, 60), extra={"belly": ((255, 214, 176), (255, 240, 220))}),
     "doubao_sport": Skin("doubao_sport", "doubao", "运动装", "普通", 200, "default", "f2c9b4",
@@ -971,6 +1060,14 @@ SKINS = {
                        extra={"belly": ((216, 240, 216), (244, 255, 244))}, limited="xmas"),
     # Muse in armour: silver plates from the neck down, a pink bow, a sword (drawn over Muse's own frame).
     "muse_knight": Skin("muse_knight", "muse", "骑士", "典藏", 300, "default", "d9c7a8"),
+    # Themes: 蕾姆, and two of 海绵宝宝's friends.
+    "doubao_rem": Skin("doubao_rem", "doubao", "蕾姆", "典藏", 300, "petals", "f2c9b4",
+                       extra={"hair": "8cc0f0", "top": "f3a6c4", "rem": True}),
+    "whale_pearl": Skin("whale_pearl", "whale", "珍珍", "普通", 200, "bubbles", "aebdd2",
+                        extra={"belly": ((226, 232, 240), (244, 247, 252)), "ponytail": True}),
+    "codex_karen": Skin("codex_karen", "codex", "凯伦", "普通", 200, "default", "b4b9c4",
+                        extra={"screen": (8, 14, 10), "glyph": (90, 240, 120), "glyph_follows_light": False,
+                               "wave_face": True}),
 }
 
 

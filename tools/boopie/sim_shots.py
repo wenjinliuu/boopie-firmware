@@ -133,12 +133,13 @@ def render_scenes(binary: Path, out: Path) -> list[Path]:
 
 
 SKINS = [("boopie", "boopie_starry"), ("boopie", "boopie_jelly"), ("muse", "muse_astronaut"),
-         ("muse", "muse_matcha"), ("gpt", "gpt_ink"), ("gpt", "gpt_porcelain"), ("codex", "codex_neon"),
+         ("muse", "muse_matcha"), ("gpt", "gpt_black"), ("gpt", "gpt_paper"), ("codex", "codex_neon"),
          ("codex", "codex_glitch"), ("klaude", "klaude_ice"), ("klaude", "klaude_lava"), ("whale", "whale_koi"),
          ("whale", "whale_deepsea"), ("doubao", "doubao_sakura"), ("doubao", "doubao_winter"),
-         ("muse", "muse_berry"), ("gpt", "gpt_jade"), ("codex", "codex_retro"),
-         ("klaude", "klaude_peach"), ("whale", "whale_sunset"), ("doubao", "doubao_sport"),
-         ("boopie", "boopie_newyear"), ("klaude", "klaude_pumpkin"), ("whale", "whale_xmas"), ("muse", "muse_patrick"), ("muse", "muse_knight")]
+         ("muse", "muse_berry"), ("gpt", "gpt_green"), ("codex", "codex_retro"),
+         ("klaude", "klaude_sponge"), ("whale", "whale_sunset"), ("doubao", "doubao_sport"),
+         ("boopie", "boopie_newyear"), ("klaude", "klaude_pumpkin"), ("whale", "whale_xmas"), ("muse", "muse_patrick"), ("muse", "muse_knight"),
+         ("doubao", "doubao_rem"), ("whale", "whale_pearl"), ("codex", "codex_karen")]
 SKIN_STATES = [s for s in AVATAR_STATES if s[0] in ("idle", "thinking", "speaking", "happy")]
 
 

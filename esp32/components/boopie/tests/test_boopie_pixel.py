@@ -121,7 +121,7 @@ class BoopiePixelTest(unittest.TestCase):
         # Drafts are designs still under review, not in the firmware yet; Muse's
         # are drawn by Muse's own renderer, so aren't compared here.
         done = [k for k, sk in ap.SKINS.items() if not sk.draft and sk.rig != "muse"]
-        self.assertEqual(len(done), 20)
+        self.assertEqual(len(done), 23)
         rigs = {R.key: R for R in ap.CHARACTERS}
         for key in done:
             skin = ap.SKINS[key]
