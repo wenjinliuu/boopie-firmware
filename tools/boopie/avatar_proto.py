@@ -105,6 +105,17 @@ def mix(a, b, t):
     return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
+def hue_colour(h: float, v: float) -> tuple:
+    """A pastel of hue h (0..1) at brightness v: the hue, a third white."""
+    r = min(1.0, max(0.0, abs(h * 6 - 3) - 1))
+    g = min(1.0, max(0.0, 2 - abs(h * 6 - 2)))
+    b = min(1.0, max(0.0, 2 - abs(h * 6 - 4)))
+    return tuple(round((c + (1 - c) * 0.35) * v * 255) for c in (r, g, b))
+
+
+ROLES = ("dark", "mid", "light", "high")
+
+
 # ---------------------------------------------------------------- icons
 ICONS = {
     "heart": ([".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."], {"#": (255, 90, 140)}),
@@ -397,11 +408,13 @@ class Rig:
     def draw(self, c: Canvas, p: Pose) -> dict:
         raise NotImplementedError
 
+    mouth_inside = CHEEK
+
     def face(self, c: Canvas, fx, fy, p: Pose):
         for side in (-1, 1):
             eye(c, fx + side * self.eye_gap, fy, p, side)
         blush(c, fx, fy, p, colour=self.cheek)
-        mouth(c, fx + p.look[0] // 2, fy + 5, p)
+        mouth(c, fx + p.look[0] // 2, fy + 5, p, inside=self.mouth_inside)
 
     def light_colour(self, p: Pose):
         base = p.light or self.rp["glow"]
@@ -429,23 +442,84 @@ def antenna(c, f: Frame, base_x, base_y, p: Pose, colour, bulb_r, glow, out):
     return tx, ty
 
 
+WEATHER_COLOUR = {"sunny": "ffd36a", "cloudy": "c4cad6", "rain": "8aa4c8", "snow": "f2f6ff"}
+
+
 class Boopie(Rig):
     """布比: a round mochi sprite, one antenna leaning right with a glowing bulb."""
     key, name, colour = "boopie", "布比", "ff9ec8"
+    look = ""          # tangyuan, jellyfish, slime or weather (a skin's)
+    weather = "sunny"  # the weather spirit's, as the day's
+
+    def __init__(self, colour=None, skin=None):
+        super().__init__(colour, skin)
+        if self.look == "weather":
+            glow, out = self.rp["glow"], self.rp["out"]
+            self.rp = ramp(WEATHER_COLOUR[self.weather])
+            if self.skin and self.skin.glow:
+                self.rp["glow"] = glow
+            if self.skin and self.skin.outline:
+                self.rp["out"] = out
+        if self.look == "tangyuan":
+            self.mouth_inside = (60, 40, 44)   # 黑芝麻 inside
 
     def draw(self, c, p):
         cx, cy, rx, ry = 32, 40, 17, 15
         f = self.frame(p, cx, cy + ry)
         body = f.ellipse(cx, cy, rx, ry)
-        if p.feet and p.scale > 0.6:
+        if self.look == "jellyfish":
+            body &= f.ry <= cy + 6               # a bell, its rim straight
+        if p.feet and p.scale > 0.6 and self.look not in ("jellyfish", "slime"):
             body |= f.ellipse(cx - 7, cy + ry - 1, 4, 2.5) | f.ellipse(cx + 7, cy + ry - 1, 4, 2.5)
         for h in p.hands:
             if h[0] != "front":
                 body |= f.ellipse(cx + h[0] * rx, cy + h[1], 3 / p.squash, 2.6 * p.squash)
+        if self.look == "slime":                 # drips along the bottom
+            for dx, r in ((-9, 2.2), (1, 2.6), (10, 2.0)):
+                body |= f.ellipse(cx + dx, cy + ry - 1, r, 2.4)
         c.shaded(body, self.rp)
         c.outline(body, self.rp["out"])
+        self.extras(c, p, f, body, cx, cy, ry)
         light = antenna(c, f, cx + 3, cy - ry + 1, p, self.rp["out"], 2.4, self.light_colour(p), self.rp["out"])
         return {"slots": {"hat": f.pt(27, 27), "eyes": (*f.pt(cx, cy - 1), 7 * f.sx), "neck": (*f.pt(cx, 47), 26 * f.sx)}, "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": light, "show_face": p.scale > 0.6}
+
+    def extras(self, c, p, f, body, cx, cy, ry):
+        t = p.t
+        if self.look == "tangyuan":                # steam rising off it
+            for i, dx in enumerate((-6, 0, 6)):
+                x0, y0 = f.pt(cx + dx, cy - ry - 2)
+                for k in range(0, 6, 2):
+                    c.put(x0 + round(math.sin(t * 3 + i + k * 0.7)), y0 - k - (i % 2), (226, 226, 236))
+        elif self.look == "jellyfish":             # tentacles, swaying, and specks of light inside
+            for i, dx in enumerate((-10, -5, 0, 5, 10)):
+                x0, y0 = f.pt(cx + dx, cy + 7)
+                for k in range(10 - abs(dx) // 3):
+                    c.put(x0 + round(math.sin(t * 2.2 + i + k * 0.5) * 1.2), y0 + k,
+                          self.rp["light"] if (k + i) % 3 else self.rp["mid"])
+            for i in range(5):
+                x, y = f.pt(cx - 10 + h01(i, 81) * 20, cy - 8 + h01(i, 82) * 10)
+                if math.sin(t * 2 + i * 1.7) > 0:
+                    c.put(x, y, self.rp["high"])
+        elif self.look == "slime":                 # a wet shine
+            x, y = f.pt(cx - 9, cy - 8)
+            for dx, dy in ((0, 0), (1, 0), (0, 1), (2, -1)):
+                c.put(x + dx, y + dy, WHITE)
+        elif self.look == "weather":
+            if self.weather == "sunny":            # rays round it, turning
+                for k in range(8):
+                    a = k * math.pi / 4 + t * 0.6
+                    x, y = f.pt(cx + math.cos(a) * 21, cy + math.sin(a) * 19)
+                    c.put(x, y, self.rp["glow"])
+            elif self.weather == "rain":           # drops falling from it
+                for i, dx in enumerate((-8, 0, 8)):
+                    k = (t * 9 + i * 3) % 9
+                    x, y = f.pt(cx + dx, cy + 15 + k)
+                    c.put(x, y, (120, 170, 240))
+                    c.put(x, y + 1, (120, 170, 240))
+            elif self.weather == "snow":           # flakes settled on top
+                for i in range(6):
+                    x, y = f.pt(cx - 12 + i * 5, cy - 13 + abs(i - 2.5) * 1.2)
+                    c.put(x, y, WHITE)
 
 
 class Codex(Rig):
@@ -566,6 +640,7 @@ class GPT(Rig):
     holes = (64, 64, 74)       # between the bands
     face_colour = (255, 244, 230)
     knot_scale = 2.45
+    look = ""            # donut, neon, kaleido or chrome (a skin's)
 
     def draw(self, c, p):
         cx, cy = 32, 30
@@ -584,8 +659,13 @@ class GPT(Rig):
         c.shaded(limbs, self.rp)
         c.outline(limbs, self.line)
         c.flat(head & ~band & ~face, self.holes)
-        c.shaded(band & ~face, self.rp)
-        c.outline(band & ~face, self.line)
+        bands = band & ~face
+        c.shaded(bands, self.rp)
+        line = self.line
+        if self.look == "neon" and int(p.t * 7) % 23 == 0:
+            line = mix(line, (0, 0, 0), 0.5)        # a flicker now and then
+        c.outline(bands, line)
+        self.extras(c, p, f, bands, cx, cy)
         c.flat(face, self.face_colour)
         c.outline(face, self.line)
         c.body |= head
@@ -593,6 +673,27 @@ class GPT(Rig):
                           "neck": (*f.pt(cx, cy + 17), 16 * f.sx)},
                 "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": f.pt(cx + 14, cy - 15),
                 "show_face": p.scale > 0.6}
+
+    def extras(self, c, p, f, bands, cx, cy):
+        t = p.t
+        if self.look == "donut":                   # sprinkles on the glaze
+            cols = ((255, 255, 255), (255, 220, 80), (110, 200, 255), (140, 230, 120))
+            for i in range(22):
+                x, y = (round(v) for v in f.pt(cx + (h01(i, 71) - 0.5) * 40, cy + (h01(i, 72) - 0.5) * 40))
+                if 0 <= x < N and 0 <= y < N and bands[y, x]:
+                    c.put(x, y, cols[i % 4])
+        elif self.look == "kaleido":               # the colours going round
+            for y, x in zip(*np.nonzero(bands)):
+                role = next((k for k, r in enumerate(ROLES) if tuple(c.img[y, x]) == self.rp[r]), 1)
+                hue = (math.atan2(y + 0.5 - cy, x + 0.5 - cx) / (2 * math.pi) + t * 0.15) % 1.0
+                c.img[y, x] = hue_colour(hue, (0.62, 0.78, 0.9, 1.0)[role])
+        elif self.look == "chrome":                # a gleam sweeping across
+            for y, x in zip(*np.nonzero(bands)):
+                k = (x + y * 0.5 - t * 24) % 70
+                if k < 3:
+                    c.img[y, x] = WHITE
+                elif k < 5:
+                    c.img[y, x] = self.rp["high"]
 
     def face(self, c, fx, fy, p):
         for side in (-1, 1):
@@ -620,21 +721,43 @@ class Klaude(Rig):
     """小克: a blocky orange critter with square eyes, stubby side arms and four little legs."""
     key, name, colour = "klaude", "小克", "f28c5e"
     sponge = False   # 海绵宝宝: holes in the block, little brown shorts
+    look = ""        # lantern, mummy or ghost (a skin's)
 
     def draw(self, c, p):
         cx, base = 32, 51
         f = self.frame(p, cx, base)
         body = f.rect(17, 22, 47, 44)
+        if self.look == "ghost":                 # a wavy hem for legs
+            hem = 46 + 1.5 * np.sin(f.rx * 0.8 + p.t * 4)
+            body = f.rect(17, 22, 47, 50) & (f.ry <= hem)
         for h in p.hands:
             if h[0] != "front":
                 up = min(0, h[1]) * 1.6
                 x0 = 11 if h[0] < 0 else 47
                 body |= f.rect(x0, 31 + up, x0 + 6, 36 + up)
-        if p.feet and p.scale > 0.6:
+        if p.feet and p.scale > 0.6 and self.look != "ghost":
             for x in (20, 25, 36, 41):
                 body |= f.rect(x, 44, x + 3, 51)
         c.shaded(body, self.rp)
         c.outline(body, self.rp["out"])
+        torso = f.rect(17, 22, 47, 44)
+        if self.look == "lantern":               # ribs, and the stem
+            ribs = torso & ((np.abs(f.rx - 24.5) < 0.6) | (np.abs(f.rx - 39.5) < 0.6))
+            c.flat(ribs, self.rp["dark"])
+            stem = f.rect(30, 18, 34, 22)
+            c.flat(stem, (80, 140, 50))
+            c.outline(stem, (40, 70, 26))
+        elif self.look == "mummy":               # wrapped in bandages, a loose end
+            for y, x in zip(*np.nonzero(torso)):
+                if (y + x // 6) % 4 == 0:
+                    c.img[y, x] = (190, 180, 154)
+            x0, y0 = f.pt(47, 34)
+            for k in range(5):
+                c.put(x0 + 1 + k, y0 + round(math.sin(p.t * 3 + k * 0.8)), (230, 222, 200))
+        elif self.look == "ghost":               # see-through, here and there
+            for y, x in zip(*np.nonzero(body)):
+                if BAYER[y % 4][x % 4] < 0.2:
+                    c.img[y, x] = self.rp["dark"]
         if self.sponge:
             torso = f.rect(17, 22, 47, 44)
             for i in range(10):
@@ -648,6 +771,9 @@ class Klaude(Rig):
         return {"slots": {"hat": f.pt(32, 23), "eyes": (*f.pt(32, 30), 7 * f.sx), "neck": (*f.pt(32, 42), 30 * f.sx)}, "face": f.pt(32, 30), "body": f.pt(32, 35), "light": f.pt(44, 16), "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
+        if self.look == "lantern":
+            self.lantern_face(c, fx, fy, p)
+            return
         eyec = mix(WHITE, p.light, 0.35) if p.light and p.light != WHITE else (255, 246, 236)
         if self.skin and self.skin.eye:
             eyec = self.skin.eye
@@ -657,6 +783,36 @@ class Klaude(Rig):
         blush(c, fx, fy, p, 11, (255, 176, 150))
         if p.mouth in ("talk", "o", "chomp", "wavy", "frown"):
             mouth(c, fx, fy + 6, p, colour=(92, 34, 22), inside=(170, 60, 50))
+        if self.look == "mummy":                  # one eye under the bandages
+            for dy in range(-3, 3):
+                for dx in range(-10, -4):
+                    c.put(fx + dx, fy + dy, (230, 222, 200) if (dy + 3) % 3 else (190, 180, 154))
+
+    def lantern_face(self, c, fx, fy, p):
+        """Carved: triangle eyes and a jagged grin, cut dark, a candle flickering inside."""
+        cut, glow = (70, 28, 4), ((255, 236, 140) if math.sin(p.t * 9) > -0.3 else (255, 190, 80))
+        shut = p.eyes in ("blink", "happy", "down", "half")
+        for side in (-1, 1):
+            ex = fx + side * 7
+            if shut:
+                for dx in range(-3, 4):
+                    c.put(ex + dx, fy, cut)
+                continue
+            for dy, w in ((-4, 0), (-3, 1), (-2, 2), (-1, 3), (0, 4), (1, 4)):
+                for dx in range(-w, w + 1):
+                    c.put(ex + dx, fy + dy, cut)
+            for dy, w in ((-2, 0), (-1, 1), (0, 2)):
+                for dx in range(-w, w + 1):
+                    c.put(ex + dx, fy + dy, glow)
+        rows = 3 if p.mouth in ("talk", "o", "chomp") else 2
+        for dx in range(-8, 9):
+            top = fy + 5 + (1 if dx % 2 else 0)
+            for k in range(-1, rows + 1):
+                c.put(fx + dx, top + k, cut)
+        for dx in range(-7, 8):
+            top = fy + 5 + (1 if dx % 2 else 0)
+            for k in range(rows):
+                c.put(fx + dx, top + k, glow)
 
 
 class Whale(Rig):
@@ -799,10 +955,16 @@ HAT_SPRITES = {
                   {"w": (255, 255, 255), "#": (60, 40, 110), "p": (120, 200, 255), "y": (255, 220, 90)}),
     "crown": (["g...g...g", "gg.ggg.gg", "ggggggggg", "grgggggbg", "ddddddddd"],
               {"g": (255, 210, 70), "d": (190, 130, 30), "r": (240, 60, 80), "b": (80, 170, 255)}),
+    "straw_hat": (["....yyyyy....", "...yyyyyyy...", "...rrrrrrr...", "ydyyyyyyyyydy", ".yyyyyyyyyyy."],
+                  {"y": (240, 205, 110), "d": (196, 160, 70), "r": (220, 70, 70)}),
+    "halo": (["..yyyyy..", ".y.....y.", "..yyyyy..", ".........", "........."],
+             {"y": (255, 226, 110)}),
 }
 ACCESSORIES = {   # name: slot, Chinese name
     "bow": ("hat", "蝴蝶结"), "party_hat": ("hat", "生日帽"), "crown": ("hat", "小皇冠"),
     "scarf": ("neck", "红围巾"),
+    # Earned, not unlocked by level: 收获 50 次, 连续 7 天来看它, 破纪录 10 次.
+    "straw_hat": ("hat", "草帽"), "halo": ("hat", "金光环"), "medal": ("neck", "金牌"),
 }
 
 
@@ -828,6 +990,15 @@ def wear(c: Canvas, name: str, slots: dict):
         for dy in range(3, 8):   # the tail
             for dx in range(2):
                 c.put(nx + w / 4 + dx + (dy > 5), ny + dy, dark if dy == 7 else red)
+    elif name == "medal":
+        nx, ny, w = slots["neck"]
+        for k in range(4):       # the ribbon, in a V
+            c.put(nx - 3 + k, ny + k * 0.6, (70, 120, 220))
+            c.put(nx + 3 - k, ny + k * 0.6, (220, 60, 70))
+        for dy in range(3, 7):
+            for dx in range(-2, 3):
+                if abs(dx) + abs(dy - 4.5) <= 2.6:
+                    c.put(nx + dx, ny + dy, (255, 210, 70) if (dx + dy) % 3 else (200, 150, 40))
 
 
 # ---------------------------------------------------------------- scenes
@@ -1053,8 +1224,8 @@ SKINS = {
                          extra={"hair": "3a2a20", "top": "3a7bd5"}),
     "boopie_newyear": Skin("boopie_newyear", "boopie", "新春", "典藏", 250, "default", "cc2a2a",
                            cheek=(255, 176, 160), glow=(255, 211, 74), outline=(138, 16, 16), limited="spring"),
-    "klaude_pumpkin": Skin("klaude_pumpkin", "klaude", "南瓜", "典藏", 250, "default", "ff8c1a",
-                           eye=(58, 26, 0), cheek=(255, 200, 80), outline=(160, 74, 0), limited="halloween"),
+    "klaude_lantern": Skin("klaude_lantern", "klaude", "南瓜灯", "典藏", 250, "default", "ff8c1a",
+                           outline=(150, 60, 0), extra={"look": "lantern"}, limited="halloween"),
     "whale_xmas": Skin("whale_xmas", "whale", "圣诞树", "典藏", 250, "snow", "2f8f4f",
                        glow=(255, 211, 74), outline=(20, 90, 40),
                        extra={"belly": ((216, 240, 216), (244, 255, 244))}, limited="xmas"),
@@ -1065,6 +1236,27 @@ SKINS = {
                        extra={"hair": "8cc0f0", "top": "f3a6c4", "rem": True}),
     "whale_pearl": Skin("whale_pearl", "whale", "珍珍", "普通", 200, "bubbles", "aebdd2",
                         extra={"belly": ((226, 232, 240), (244, 247, 252)), "ponytail": True}),
+    # Round two: Halloween's 小克, 布比's sweets and creatures, GPT's knot as treats and lights.
+    "klaude_mummy": Skin("klaude_mummy", "klaude", "木乃伊", "普通", 250, "default", "e9e2d0", eye=(40, 30, 30),
+                         outline=(120, 108, 84), extra={"look": "mummy"}),
+    "klaude_ghost": Skin("klaude_ghost", "klaude", "小幽灵", "普通", 250, "fireflies", "eef2ff", eye=(30, 30, 44),
+                         outline=(120, 130, 170), extra={"look": "ghost"}),
+    "boopie_tangyuan": Skin("boopie_tangyuan", "boopie", "汤圆", "典藏", 250, "default", "fbf8f2",
+                            outline=(170, 160, 150), extra={"look": "tangyuan"}, limited="lantern"),
+    "boopie_jellyfish": Skin("boopie_jellyfish", "boopie", "水母", "普通", 250, "bubbles", "c4b4ff",
+                             glow=(150, 240, 255), extra={"look": "jellyfish"}),
+    "boopie_slime": Skin("boopie_slime", "boopie", "史莱姆", "成就", 0, "default", "7cc8ff",
+                         outline=(40, 100, 170), extra={"look": "slime"}),
+    "boopie_weather": Skin("boopie_weather", "boopie", "天气精灵", "普通", 250, "default", "ffd36a",
+                           extra={"look": "weather"}),
+    "gpt_donut": Skin("gpt_donut", "gpt", "甜甜圈", "普通", 200, "default", "ff9ec8", outline=(120, 70, 40),
+                      extra={"line": (120, 70, 40), "holes": (232, 184, 120), "look": "donut"}),
+    "gpt_neon": Skin("gpt_neon", "gpt", "霓虹灯管", "普通", 250, "neon_grid", "1c1030", outline=(0, 240, 255),
+                     extra={"line": (0, 240, 255), "holes": (10, 6, 20), "look": "neon"}),
+    "gpt_kaleido": Skin("gpt_kaleido", "gpt", "万花筒", "普通", 250, "default", "f2f2f2",
+                        extra={"holes": (40, 40, 52), "look": "kaleido"}),
+    "gpt_chrome": Skin("gpt_chrome", "gpt", "铬金属", "典藏", 300, "default", "c8ccd4", outline=(70, 74, 84),
+                       extra={"line": (70, 74, 84), "holes": (40, 42, 50), "look": "chrome"}),
     "codex_karen": Skin("codex_karen", "codex", "凯伦", "普通", 200, "default", "b4b9c4",
                         extra={"screen": (8, 14, 10), "glyph": (90, 240, 120), "glyph_follows_light": False,
                                "wave_face": True}),

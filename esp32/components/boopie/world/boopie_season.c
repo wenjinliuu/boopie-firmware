@@ -88,6 +88,9 @@ boopie_fest_t boopie_fest_on(int year, int month, int mday)
         if (d >= spring - 1 && d <= spring + 6) {
             return BOOPIE_FEST_SPRING;
         }
+        if (d == spring + 14) {
+            return BOOPIE_FEST_LANTERN;
+        }
         if (d >= moon - 1 && d <= moon + 1) {
             return BOOPIE_FEST_MOON;
         }
@@ -107,6 +110,6 @@ boopie_fest_t boopie_fest_on(int year, int month, int mday)
 const char *boopie_fest_name(boopie_fest_t f)
 {
     static const char *const NAMES[BOOPIE_FEST_COUNT] = { "", "春节", "中秋", "万圣节", "圣诞", "元旦",
-                                                          "情人节", "端午", "儿童节", "生日" };
+                                                          "情人节", "端午", "儿童节", "生日", "元宵" };
     return (int)f >= 0 && f < BOOPIE_FEST_COUNT ? NAMES[f] : "";
 }

@@ -39,6 +39,7 @@ typedef enum {
     BOOPIE_FEST_DRAGON,       /* 端午: the day (2026 to 2035) */
     BOOPIE_FEST_CHILDREN,     /* 儿童节: 1 June */
     BOOPIE_FEST_BIRTHDAY,     /* the pet's own: never by the date here, the screen knows it */
+    BOOPIE_FEST_LANTERN,      /* 元宵: the fifteenth of the first month (2026 to 2035) */
     BOOPIE_FEST_COUNT,
 } boopie_fest_t;
 

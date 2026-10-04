@@ -1020,7 +1020,7 @@ static void act(boopie_do_t what, int arg)
         int stars = boopie_avatar_open_mail();
         if (stars) {
             static const char *const GIFT[BOOPIE_FEST_COUNT] = { "", "红包", "月饼", "糖果", "圣诞礼物", "新年贺卡",
-                                                                 "巧克力", "粽子", "小玩具", "生日礼物" };
+                                                                 "巧克力", "粽子", "小玩具", "生日礼物", "汤圆" };
             boopie_sound_play(BOOPIE_SOUND_GOLD);
             say("%s快乐！收到%s ★ +%d", boopie_fest_name(boopie_avatar_festival()), GIFT[boopie_avatar_festival()], stars);
         } else {
@@ -1035,6 +1035,7 @@ static void act(boopie_do_t what, int arg)
             static const char *const HELLO[BOOPIE_FEST_COUNT] = {
                 "", "新年快乐！恭喜发财！", "中秋快乐！月饼真香", "不给糖就捣蛋！", "圣诞快乐！", "元旦快乐！",
                 "情人节快乐！最喜欢你了", "端午安康！粽子好香", "儿童节快乐！", "今天是我的生日！谢谢你～",
+                "元宵快乐！一起吃汤圆",
             };
             say("%s", HELLO[arg < BOOPIE_FEST_COUNT ? arg : 0]);
         }
