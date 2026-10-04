@@ -40,6 +40,7 @@
 #include "muse_wifi.h"
 #include "boopie_font.h"
 #include "boopie_avatar.h"
+#include "boopie_input.h"
 #include "boopie_guide.h"
 #include "boopie_setup.h"
 #include "boopie_heads.h"
@@ -1397,6 +1398,23 @@ static lv_obj_t *s_pet_line;
 static lv_obj_t *s_skin_box, *s_skin_none_check, *s_skin_rows[SKIN_ROWS_MAX], *s_skin_checks[SKIN_ROWS_MAX];
 static lv_obj_t *s_acc_checks[BOOPIE_ACC_COUNT];
 static int s_avatar_shown = -1;
+static lv_obj_t *s_pet_name;   /* the name row's value */
+
+static void pet_named(const char *text, bool done)
+{
+    const char *error = NULL;
+    if (done && !boopie_avatar_set_pet_name(text, &error)) {
+        muse_state_set_caption("这个名字用不了");
+    }
+}
+
+/* The name row: the keypad, with the name as it is (empty: the character's own). */
+static void on_pet_name(lv_event_t *e)
+{
+    (void)e;
+    boopie_input_open("给它起个名字", boopie_avatar_has_own_name() ? boopie_avatar_pet_name() : "", "留空就叫角色名",
+                      BOOPIE_PET_NAME_CHARS, pet_named);
+}
 
 static void on_avatar_choice(lv_event_t *e)
 {
@@ -1475,6 +1493,7 @@ static void build_avatar_page(lv_obj_t *tile)
     s_avatar_big = lv_image_create(list);
     s_avatar_big_for = -1;
     s_pet_line = note(list, "");
+    row(list, NULL, "名字", &s_pet_name, on_pet_name, NULL);
     for (int i = 0; i < BOOPIE_AVATAR_COUNT; i++) {
         lv_obj_t *r = row(list, NULL, boopie_avatar_name(i), &s_avatar_checks[i], on_avatar_choice, (void *)(intptr_t)i);
         lv_obj_set_style_text_color(s_avatar_checks[i], lv_color_hex(COLOR_ACCENT), 0);
@@ -1537,6 +1556,7 @@ static void tick_avatar(void)
     snprintf(line, sizeof line, "%s    Lv %d    %u/%u    ★ %u", boopie_avatar_pet_name(), pet.level,
              (unsigned)pet.xp_into, (unsigned)pet.xp_need, (unsigned)pet.stars);
     set_text(s_pet_line, line);
+    set_text(s_pet_name, boopie_avatar_pet_name());
     /* Skins: this character's only. */
     bool any = false;
     int worn = boopie_avatar_skin();
