@@ -327,7 +327,9 @@ static void on_floor(const boopie_world_t *w, float *x, float *y)
 static void walk_to(boopie_world_t *w, float x, float y, int pending)
 {
     const boopie_thing_t *t = boopie_world_thing(w, pending);
-    if (!t || t->act != BOOPIE_DO_FISH) {
+    if (w->antic == BOOPIE_ANTIC_SWIM && w->antic_phase == 1) {
+        /* in, over the water */
+    } else if (!t || t->act != BOOPIE_DO_FISH) {
         on_floor(w, &x, &y);
     } else if (fabsf(w->x - x) > 1) {
         y = (float)t->y;   /* to the pier's foot first, then out along it over the water */
@@ -508,11 +510,233 @@ static int fight_tap(boopie_world_t *w, float x, float y)
     return -5;
 }
 
+/* ---- its little somethings ---- */
+
+/* A thing in the room by its art, shown at the level: its index, or -1. */
+static int find_art(const boopie_world_t *w, int level, boopie_art_id_t art)
+{
+    int n;
+    const boopie_thing_t *t = boopie_room_things(w->room, &n);
+    for (int i = 0; i < n; i++) {
+        if (t[i].art == art && boopie_thing_shown(&t[i], level)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Where it goes for one here, and for LOVE what it loves; false if the room hasn't it. */
+static bool antic_spot(boopie_world_t *w, int level, boopie_antic_t a, float *x, float *y, uint8_t *art)
+{
+    int i;
+    const boopie_thing_t *t;
+    *art = 0;
+    switch (a) {
+    case BOOPIE_ANTIC_TV:
+        if (w->room != BOOPIE_ROOM_LIVING) {
+            return false;
+        }
+        if ((i = find_art(w, level, BOOPIE_ART_SOFA)) >= 0) {
+            t = boopie_world_thing(w, i);
+            *x = t->x;
+            *y = t->y;   /* on it */
+        } else {
+            *x = 52;
+            *y = 92;     /* on the floor before it */
+        }
+        return true;
+    case BOOPIE_ANTIC_DANCE:
+        if ((i = find_art(w, level, BOOPIE_ART_RECORD_PLAYER)) < 0) {
+            return false;
+        }
+        t = boopie_world_thing(w, i);
+        *x = t->x + 34;   /* out on the rug, clear of the fish tank */
+        *y = t->y + 10;
+        return true;
+    case BOOPIE_ANTIC_MIRROR:
+        if ((i = find_art(w, level, BOOPIE_ART_MIRROR)) < 0) {
+            return false;
+        }
+        t = boopie_world_thing(w, i);
+        *x = t->x;
+        *y = t->y + 30;
+        return true;
+    case BOOPIE_ANTIC_LOVE: {
+        static const boopie_art_id_t LOVED[] = { BOOPIE_ART_TEDDY, BOOPIE_ART_FLOWERBED, BOOPIE_ART_SANDCASTLE };
+        for (int k = 0; k < 3; k++) {
+            if ((i = find_art(w, level, LOVED[k])) >= 0) {
+                t = boopie_world_thing(w, i);
+                /* Beside it: the teddy's between the wardrobe and the desk, so above the desk. */
+                *x = t->x - (LOVED[k] == BOOPIE_ART_TEDDY ? 14 : 12);
+                *y = t->y + (LOVED[k] == BOOPIE_ART_FLOWERBED ? -8 : LOVED[k] == BOOPIE_ART_TEDDY ? -8 : 2);
+                *art = (uint8_t)LOVED[k];
+                return true;
+            }
+        }
+        return false;
+    }
+    case BOOPIE_ANTIC_SWING:
+        if ((i = find_art(w, level, BOOPIE_ART_SWING)) < 0) {
+            return false;
+        }
+        t = boopie_world_thing(w, i);
+        *x = t->x;
+        *y = t->y - 3;
+        return true;
+    case BOOPIE_ANTIC_BUTTERFLY:
+        if (w->room != BOOPIE_ROOM_OUTSIDE && w->room != BOOPIE_ROOM_WOODS) {
+            return false;
+        }
+        *x = w->x;
+        *y = w->y;
+        return true;
+    case BOOPIE_ANTIC_SWIM:
+        if (w->room != BOOPIE_ROOM_BEACH) {
+            return false;
+        }
+        *x = w->x < 70 ? 70 : w->x > 410 ? 410 : w->x;   /* clear of the pier */
+        *y = 68;
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool boopie_world_antic(boopie_world_t *w, int level, boopie_antic_t a)
+{
+    float x, y;
+    uint8_t art;
+    if (w->state == BOOPIE_PET_SLEEPING || w->fight >= 0 || w->fishing || !antic_spot(w, level, a, &x, &y, &art)) {
+        return false;
+    }
+    w->antic = (uint8_t)a;
+    w->antic_phase = 0;
+    w->antic_art = art;
+    w->b_away = 0;
+    if (a == BOOPIE_ANTIC_BUTTERFLY) {
+        /* It comes fluttering by: up ahead, a little. */
+        w->bcx = w->bx = w->x + (w->facing < 0 ? -20 : 20);
+        w->bcy = w->by = w->y - 14;
+        w->state = BOOPIE_PET_ANTIC;
+        w->state_t = 0;
+        w->antic_left = 8 + frand(w) * 4;
+        w->event = BOOPIE_DO_ANTIC;
+        return true;
+    }
+    walk_to(w, x, y, -1);
+    return true;
+}
+
+/* Arrived where it was going for one: begin it (true), or on to the next leg. */
+static bool antic_arrived(boopie_world_t *w)
+{
+    if (w->antic == BOOPIE_ANTIC_SWIM) {
+        if (w->antic_phase == 0) {
+            w->antic_phase = 1;
+            walk_to(w, w->x, 40, -1);   /* in, its head clear of the stars over the middle */
+            return false;
+        }
+        if (w->antic_phase == 3) {
+            w->antic = BOOPIE_ANTIC_NONE;   /* out, and dripping */
+            return false;
+        }
+        w->antic_phase = 2;
+    }
+    w->state = BOOPIE_PET_ANTIC;
+    w->state_t = 0;
+    w->antic_left = w->antic == BOOPIE_ANTIC_SWIM ? 7 + frand(w) * 3 : 6 + frand(w) * 4;
+    if (w->antic == BOOPIE_ANTIC_TV) {
+        w->facing = -1;   /* to the screen */
+    } else if (w->antic == BOOPIE_ANTIC_DANCE || w->antic == BOOPIE_ANTIC_LOVE) {
+        w->facing = 1;
+    }
+    return true;
+}
+
+static void butterfly(boopie_world_t *w, float dt)
+{
+    if (w->b_away > 0) {
+        w->b_away += dt;
+        w->by -= 30 * dt;   /* up and away */
+        w->bx += 12 * dt;
+        if (w->b_away > 2) {
+            w->b_away = 0;
+        }
+        return;
+    }
+    /* Round and about a spot that drifts off, now and then, somewhere new. */
+    if (frand(w) < dt * 0.5f) {
+        int x0, y0, x1, y1;
+        boopie_room_floor(w->room, &x0, &y0, &x1, &y1);
+        float nx = w->bcx + (frand(w) - 0.5f) * 80;
+        w->bcx = nx < x0 + 10 ? x0 + 10 : nx > x1 - 10 ? x1 - 10 : nx;
+        w->bcy = y0 + frand(w) * (y1 - y0) - 12;
+    }
+    float t = w->antic_left;
+    w->bx += ((w->bcx + sinf(t * 2.1f) * 10) - w->bx) * (dt * 2 > 1 ? 1 : dt * 2);
+    w->by += ((w->bcy + sinf(t * 3.3f) * 5) - w->by) * (dt * 2 > 1 ? 1 : dt * 2);
+}
+
+/* At it: its time running down, the butterfly followed; then done. */
+static void antic_tick(boopie_world_t *w, float dt)
+{
+    w->antic_left -= dt;
+    if (w->antic == BOOPIE_ANTIC_BUTTERFLY) {
+        butterfly(w, dt);
+        float tx = w->bx, ty = w->by + 12;
+        on_floor(w, &tx, &ty);
+        float dx = tx - w->x, dy = ty - w->y, d = sqrtf(dx * dx + dy * dy);
+        if (d > 5) {
+            float step = SPEED * 0.8f * dt;
+            step = step > d ? d : step;
+            w->x += dx / d * step;
+            w->y += dy / d * step;
+            w->walked += step;
+            if (fabsf(dx) > 0.5f) {
+                w->facing = dx < 0 ? -1 : 1;
+            }
+        }
+    }
+    if (w->antic_left > 0) {
+        return;
+    }
+    w->state = BOOPIE_PET_IDLE;
+    w->state_t = 0;
+    w->idle_for = 3 + frand(w) * 4;
+    if (w->antic == BOOPIE_ANTIC_SWIM) {
+        w->antic_phase = 3;
+        walk_to(w, w->x, 72, -1);   /* back out onto the sand */
+        return;
+    }
+    if (w->antic == BOOPIE_ANTIC_BUTTERFLY) {
+        w->b_away = 0.01f;
+    }
+    w->antic = BOOPIE_ANTIC_NONE;
+}
+
+/* Left alone: now and then one of these, if the room has any. */
+static bool maybe_antic(boopie_world_t *w, int level)
+{
+    if (frand(w) > 0.4f) {
+        return false;
+    }
+    int first = 1 + (int)(rnd(w) % (BOOPIE_ANTIC_COUNT - 1));
+    for (int k = 0; k < BOOPIE_ANTIC_COUNT - 1; k++) {
+        boopie_antic_t a = (boopie_antic_t)(1 + (first - 1 + k) % (BOOPIE_ANTIC_COUNT - 1));
+        if (boopie_world_antic(w, level, a)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
 {
     boopie_room_t was = w->room;
     w->room = room;
     w->fishing = w->bite = false;
+    w->antic = BOOPIE_ANTIC_NONE;
+    w->b_away = 0;
     w->state = BOOPIE_PET_IDLE;
     w->state_t = 0;
     w->pending = -1;
@@ -577,6 +801,14 @@ int boopie_world_tap(boopie_world_t *w, int level, float x, float y)
         w->idle_for = 3.0f;
         return caught ? -7 : -8;
     }
+    if (w->antic != BOOPIE_ANTIC_NONE) {
+        if (w->antic == BOOPIE_ANTIC_BUTTERFLY) {
+            w->b_away = 0.01f;   /* off it flies */
+        }
+        w->antic = BOOPIE_ANTIC_NONE;   /* a tap: whatever it was at, it's here */
+        w->state = BOOPIE_PET_IDLE;
+        w->state_t = 0;
+    }
     if (w->state != BOOPIE_PET_SLEEPING) {
         for (int i = 0; i < BOOPIE_SLIMES; i++) {
             if (on_slime(&w->slimes[i], x, y)) {
@@ -623,6 +855,12 @@ int boopie_world_tap(boopie_world_t *w, int level, float x, float y)
 
 void boopie_world_sleep(boopie_world_t *w, int level, bool on)
 {
+    if (on && w->antic != BOOPIE_ANTIC_NONE) {
+        w->antic = BOOPIE_ANTIC_NONE;
+        if (w->state == BOOPIE_PET_ANTIC) {
+            w->state = BOOPIE_PET_IDLE;
+        }
+    }
     if (!on) {
         if (w->state == BOOPIE_PET_SLEEPING) {
             w->state = BOOPIE_PET_IDLE;
@@ -648,6 +886,9 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
 {
     w->level = level;
     w->state_t += dt;
+    if (w->b_away > 0) {
+        butterfly(w, dt);
+    }
     for (int i = 0; i < BOOPIE_SLIMES; i++) {
         slime_tick(w, i, dt);
     }
@@ -729,6 +970,12 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
             w->x = w->tx;
             w->y = w->ty;
             w->walked += d;
+            if (w->antic != BOOPIE_ANTIC_NONE && w->pending < 0) {
+                w->state = BOOPIE_PET_IDLE;
+                w->state_t = 0;
+                w->idle_for = 3 + frand(w) * 4;
+                return antic_arrived(w) ? BOOPIE_DO_ANTIC : BOOPIE_DO_NOTHING;
+            }
             const boopie_thing_t *t = boopie_world_thing(w, w->pending);
             if (t && t->act == BOOPIE_DO_FISH && fabsf(w->y - (t->y + t->use_dy)) > 1) {
                 walk_to(w, t->x + t->use_dx, t->y + t->use_dy, w->pending);   /* at the pier's foot: out along it */
@@ -782,6 +1029,9 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
     }
     case BOOPIE_PET_SLEEPING:
         return BOOPIE_DO_NOTHING;
+    case BOOPIE_PET_ANTIC:
+        antic_tick(w, dt);
+        return BOOPIE_DO_NOTHING;
     default:
         /* Left alone, it wanders: somewhere on the floor, now and then. */
         if (w->state_t >= w->idle_for) {
@@ -789,6 +1039,8 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
             boopie_room_floor(w->room, &x0, &y0, &x1, &y1);
             if (w->y < y0) {
                 walk_to(w, w->x, (float)y0 + 2, -1);   /* off the pier first, the way it came */
+            } else if (maybe_antic(w, level)) {
+                /* off to its little something */
             } else {
                 walk_to(w, x0 + frand(w) * (x1 - x0), y0 + frand(w) * (y1 - y0), -1);
             }

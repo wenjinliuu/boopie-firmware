@@ -26,8 +26,9 @@ COMPONENT = HERE.parent
 
 (NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS,
  PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED, GATHER, FURNI,
- BEACH_SIGN, FISH, FISH_BITE, FISH_CAUGHT, FISH_EARLY, FISH_MISSED) = range(29)
-IDLE, WALKING, USING, SLEEPING = range(4)
+ BEACH_SIGN, FISH, FISH_BITE, FISH_CAUGHT, FISH_EARLY, FISH_MISSED, ANTIC) = range(30)
+IDLE, WALKING, USING, SLEEPING, AT_IT = range(5)
+NONE, TV, DANCE, MIRROR, LOVE, SWING, BUTTERFLY, SWIM = range(8)
 LIVING, BEDROOM, YARD, WOODS, BEACH = range(5)
 WIDTH = {YARD: 360, WOODS: 520, BEACH: 440}
 GREEN, BLUE, PINK, GOLD = range(4)
@@ -253,6 +254,38 @@ class BoopieWorldTest(unittest.TestCase):
                 self.assertEqual(s[5]["acts"], [FISH_CAUGHT])
                 caught += 1
         self.assertGreater(caught, 0)
+
+    def test_each_room_has_its_little_somethings(self) -> None:
+        def can(room: int, level: int, furniture: int = 0) -> list[int]:
+            return [a for a in range(1, 8)
+                    if self.run_w(f"furni:{furniture}", f"lv:{level}", f"room:{room}", f"antic:{a}")[3]["ok"]]
+        self.assertEqual(can(LIVING, 1), [TV])
+        self.assertEqual(can(LIVING, 1, 63), [TV, DANCE])                 # the record player bought
+        self.assertEqual(can(BEDROOM, 1), [MIRROR])
+        self.assertEqual(can(BEDROOM, 1, 63), [MIRROR, LOVE])             # the teddy
+        self.assertEqual(can(YARD, 1), [BUTTERFLY])
+        self.assertEqual(can(YARD, 5, 63), [LOVE, SWING, BUTTERFLY])      # the flowers, the swing
+        self.assertEqual(can(WOODS, 1), [BUTTERFLY])
+        self.assertEqual(can(BEACH, 1), [SWIM])
+        self.assertEqual(can(BEACH, 7), [LOVE, SWIM])                     # its sandcastle
+
+    def test_a_swim_goes_in_and_comes_back_out(self) -> None:
+        s = self.run_w("room:4", "antic:7", "tick:6", "tick:12", "tick:6")
+        self.assertIn(ANTIC, s[2]["acts"])
+        self.assertLess(s[2]["min_y"], 45)                     # out in the water
+        self.assertEqual(s[4]["antic"], NONE)
+        self.assertGreaterEqual(s[4]["y"], 66)                 # back on the sand
+
+    def test_a_butterfly_is_chased_and_a_tap_ends_it(self) -> None:
+        s = self.run_w("room:2", "antic:6", "tick:4", "tap:100:110", "tick:0.1")
+        self.assertEqual(s[1]["ok"], 1)
+        self.assertEqual((s[2]["state"], s[2]["antic"]), (AT_IT, BUTTERFLY))
+        self.assertEqual(s[4]["antic"], NONE)
+        self.assertEqual(s[4]["state"], WALKING)               # off where it was tapped
+
+    def test_left_alone_it_gets_up_to_things(self) -> None:
+        s = self.run_w("furni:63", "lv:10", "tick:240")
+        self.assertIn(ANTIC, s[2]["acts"])
 
     def test_floor_and_wall(self) -> None:
         s = self.run_w("tap:90:90", "tick:1.5", "tap:78:10")

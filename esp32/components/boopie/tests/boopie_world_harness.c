@@ -39,14 +39,16 @@ int main(int argc, char **argv)
             printf("{\"tap\": %d, \"act\": %d}\n", r, t ? t->act : -1);
         } else if (!strcmp(op, "tick")) {
             int acts[16], n = 0;
+            float min_y = w.y;
             for (int k = 0; k < (int)(a * 30); k++) {
                 boopie_do_t d = boopie_world_tick(&w, level, 1.0f / 30);
+                min_y = fminf(min_y, w.y);
                 if (d != BOOPIE_DO_NOTHING && n < 16) {
                     acts[n++] = d;
                 }
             }
-            printf("{\"room\": %d, \"x\": %.1f, \"y\": %.1f, \"state\": %d, \"cam\": %.1f, \"acts\": [", w.room, w.x,
-                   w.y, w.state, w.cam);
+            printf("{\"room\": %d, \"x\": %.1f, \"y\": %.1f, \"state\": %d, \"cam\": %.1f, \"antic\": %d, "
+                   "\"min_y\": %.1f, \"acts\": [", w.room, w.x, w.y, w.state, w.cam, w.antic, min_y);
             for (int k = 0; k < n; k++) {
                 printf("%s%d", k ? ", " : "", acts[k]);
             }
@@ -65,6 +67,15 @@ int main(int argc, char **argv)
             }
             printf("{\"far\": %.1f, \"x\": [%.1f, %.1f], \"y\": [%.1f, %.1f], \"walked\": %.1f}\n", far, min_x, max_x,
                    min_y, max_y, w.walked);
+        } else if (!strcmp(op, "antic")) {
+            int ok = boopie_world_antic(&w, level, (boopie_antic_t)a);
+            printf("{\"ok\": %d, \"antic\": %d}\n", ok, w.antic);
+        } else if (!strcmp(op, "room")) {   /* straight in, as the simulator does */
+            static const boopie_do_t FROM[] = { BOOPIE_DO_NOTHING, BOOPIE_DO_UPSTAIRS, BOOPIE_DO_OUTSIDE, BOOPIE_DO_WILD,
+                                                BOOPIE_DO_BEACH };
+            w.level = level;
+            boopie_world_enter(&w, (boopie_room_t)a, FROM[(int)a]);
+            printf("{\"room\": %d}\n", w.room);
         } else if (!strcmp(op, "beach")) {
             w.level = level;
             boopie_world_enter(&w, BOOPIE_ROOM_BEACH, BOOPIE_DO_BEACH);

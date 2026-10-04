@@ -807,6 +807,43 @@ static void caught(void)
     fight_over();
 }
 
+/* ---- its little somethings: a word as it begins one ---- */
+
+static void antic_said(void)
+{
+    if (s_t - s_said_at < SAY_S) {
+        return;   /* something's being said already */
+    }
+    switch (s_world.antic) {
+    case BOOPIE_ANTIC_TV: say("看会儿电视～"); break;
+    case BOOPIE_ANTIC_DANCE: say("♪ 跳舞跳舞～"); break;
+    case BOOPIE_ANTIC_MIRROR: say("镜子里的我真可爱"); break;
+    case BOOPIE_ANTIC_LOVE:
+        say(s_world.antic_art == BOOPIE_ART_TEDDY      ? "抱抱小熊～"
+            : s_world.antic_art == BOOPIE_ART_FLOWERBED ? "花好香呀"
+                                                        : "我堆的沙堡！");
+        break;
+    case BOOPIE_ANTIC_SWING: say("荡秋千咯～"); break;
+    case BOOPIE_ANTIC_BUTTERFLY: say("蝴蝶！等等我～"); break;
+    case BOOPIE_ANTIC_SWIM: say("下水游泳咯！"); break;
+    default: break;
+    }
+}
+
+bool boopie_world_ui_antic(const char *name)
+{
+    static const char *const NAMES[BOOPIE_ANTIC_COUNT] = { "", "tv", "dance", "mirror", "love", "swing", "butterfly",
+                                                           "swim" };
+    boopie_pet_status_t st;
+    boopie_avatar_pet_status(&st);
+    for (int a = 1; a < BOOPIE_ANTIC_COUNT; a++) {
+        if (!strcmp(name, NAMES[a])) {
+            return boopie_world_antic(&s_world, st.level, (boopie_antic_t)a);
+        }
+    }
+    return false;
+}
+
 /* ---------------------------------------------------------------- doing things */
 
 static void feed(void)
@@ -839,6 +876,7 @@ static void act(boopie_do_t what, int arg)
     case BOOPIE_DO_HOME_PATH: say("回到家门口啦"); break;
     case BOOPIE_DO_CHEST: open_chest(arg); break;
     case BOOPIE_DO_GATHER: gather(arg); break;
+    case BOOPIE_DO_ANTIC: antic_said(); break;
     case BOOPIE_DO_BEACH: say("到海边啦！去码头钓鱼吧"); break;
     case BOOPIE_DO_FISH:
         muse_ui_set_swipe_enabled(false);   /* every tap is for the line */

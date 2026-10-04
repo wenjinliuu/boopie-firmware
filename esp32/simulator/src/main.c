@@ -77,7 +77,8 @@ static void usage(FILE *out, const char *argv0)
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
             "  tap=X,Y            swipe=left|right|up|down   menu=power|setup\n"
-            "  room=living|bedroom|outside (小窝, swipe=up first)\n"
+            "  room=living|bedroom|outside|woods|beach (小窝, swipe=up first)\n"
+            "  antic=tv|dance|mirror|love|swing|butterfly|swim (in 小窝)\n"
             "  game=whack         input=TEXT             settings=PAGE\n"
             "  viewer=chat|album  ask=chat|album|notes|all\n"
             "\n"
@@ -402,6 +403,13 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
             boopie_viewer_chat_locked();
         }
         render_for(400, real_time);
+        return true;
+    }
+    if (!strcmp(key, "antic")) {   /* 小窝: its little something (swim, butterfly, tv, dance ...) now */
+        if (!boopie_world_ui_antic(value)) {
+            return false;
+        }
+        render_for(300, real_time);
         return true;
     }
     if (!strcmp(key, "room")) {   /* 小窝's room: living, bedroom or outside (BOOPIE_GARDEN plants the farm) */

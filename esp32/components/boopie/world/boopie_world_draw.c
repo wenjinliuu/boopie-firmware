@@ -80,16 +80,36 @@ static void pet(const boopie_world_t *w, const boopie_world_look_t *look)
     if (!look->pet) {
         return;
     }
-    bool walking = w->state == BOOPIE_PET_WALKING;
+    bool at = w->state == BOOPIE_PET_ANTIC;
+    bool walking = w->state == BOOPIE_PET_WALKING || (at && w->antic == BOOPIE_ANTIC_BUTTERFLY);
     bool asleep = w->state == BOOPIE_PET_SLEEPING;
+    /* In the sea (swimming, or wading in and out): only its head above the water. */
+    bool wet = w->antic == BOOPIE_ANTIC_SWIM && w->room == BOOPIE_ROOM_BEACH && w->y < 62;
     /* A hop as it walks; a slow breath standing; still, asleep. */
     int hop = walking ? (int)(fabsf(sinf(w->walked * 0.45f)) * 3) : asleep ? 0 : ((int)(look->t * 2) & 1);
-    int px = (int)w->x - s_cam, py = (int)w->y;
-    shadow(px + s_cam, py, look->pet_w / 2.0f + 1, 2.2f);
+    int dx = 0, lift = 0;
+    if (at && w->antic == BOOPIE_ANTIC_DANCE) {
+        hop = (int)(fabsf(sinf(look->t * 6)) * 4);   /* bouncing to it, side to side */
+        dx = (int)(sinf(look->t * 3) * 2);
+    } else if (at && w->antic == BOOPIE_ANTIC_SWING) {
+        lift = 7;   /* on the seat, to and fro */
+        dx = (int)(sinf(look->t * 2.5f) * 3);
+        hop = 0;
+    } else if (at && w->antic == BOOPIE_ANTIC_TV && w->y < 100 && w->x > 100) {
+        lift = 4;   /* sat on the sofa */
+        hop = 0;
+    } else if (wet) {
+        hop = (int)(sinf(look->t * 3) * 1.2f);   /* bobbing */
+    }
+    int px = (int)w->x - s_cam + dx, py = (int)w->y - lift;
+    if (!wet && !lift) {
+        shadow(px + s_cam, py, look->pet_w / 2.0f + 1, 2.2f);
+    }
     int x0 = px - look->pet_w / 2, y0 = py - look->pet_h - 2 - hop;
+    int water = wet ? py - 5 : 9999;   /* rows from here down are under */
     /* Two little feet under it, its body's colour darkened, stepping in turn as it walks. */
     uint16_t body = look->pet[(look->pet_h - 1) * look->pet_w + look->pet_w / 2];
-    if (body && !asleep) {
+    if (body && !asleep && !wet && !lift) {
         uint32_t c = ((uint32_t)((body >> 11) * 200 / 31) << 16) | ((uint32_t)(((body >> 5) & 63) * 200 / 63) << 8)
                      | (uint32_t)((body & 31) * 200 / 31);
         int step = walking ? ((int)(w->walked * 0.3f) & 1) : 0;
@@ -105,10 +125,20 @@ static void pet(const boopie_world_t *w, const boopie_world_look_t *look)
         for (int i = 0; i < look->pet_w; i++) {
             int si = w->facing < 0 ? look->pet_w - 1 - i : i;
             uint16_t c = look->pet[j * look->pet_w + si];
-            if (c) {
+            if (c && y0 + j < water) {
                 uint32_t rgb = ((uint32_t)((c >> 11) * 255 / 31) << 16) | ((uint32_t)(((c >> 5) & 63) * 255 / 63) << 8)
                                | (uint32_t)((c & 31) * 255 / 31);
                 put(x0 + i, y0 + j, rgb);
+            }
+        }
+    }
+    if (wet) {
+        /* Rings round it on the water. */
+        float r = 7 + fmodf(look->t * 4, 4);
+        for (int a = 0; a < 24; a++) {
+            float ang = a * 6.2832f / 24;
+            if ((a + (int)(look->t * 4)) % 3) {
+                put(px + (int)(cosf(ang) * r), water + (int)(sinf(ang) * r * 0.3f), 0xe8f4fc);
             }
         }
     }
@@ -166,6 +196,105 @@ static void slime(const boopie_world_t *w, int i, const boopie_world_look_t *loo
         int bx = (int)s->x - s_cam - bw / 2;
         for (int k = 0; k < bw; k++) {
             put(bx + k, top - 3, k < filled ? (w->fight_left < 4 ? 0xf8a040 : 0xf8e070) : 0x404050);
+        }
+    }
+}
+
+/* ---- its little somethings: what goes with them ---- */
+
+static void glyph5(int x, int y, const char *const rows[5], uint32_t c)
+{
+    /* A dark edge round it first, so it reads over anything. */
+    for (int j = 0; j < 5; j++) {
+        for (int i = 0; rows[j][i]; i++) {
+            if (rows[j][i] == '#') {
+                put(x + i - 1, y + j, 0x303848);
+                put(x + i + 1, y + j, 0x303848);
+                put(x + i, y + j - 1, 0x303848);
+                put(x + i, y + j + 1, 0x303848);
+            }
+        }
+    }
+    for (int j = 0; j < 5; j++) {
+        for (int i = 0; rows[j][i]; i++) {
+            if (rows[j][i] == '#') {
+                put(x + i, y + j, c);
+            }
+        }
+    }
+}
+
+/* Over everything (not dimmed at night): hearts, notes or sparkles rising off it, a butterfly. */
+static void antic_over(const boopie_world_t *w, const boopie_world_look_t *look)
+{
+    static const char *const HEART[5] = { ".#.#.", "#####", "#####", ".###.", "..#.." };
+    static const char *const NOTE[5] = { "..##", "..#.", "..#.", "##..", "##.." };
+    static const char *const SPARK[5] = { "..#..", "..#..", "#####", "..#..", "..#.." };
+    int px = (int)w->x - s_cam, py = (int)w->y - 14;
+    if (w->state == BOOPIE_PET_ANTIC) {
+        const char *const *g = NULL;
+        uint32_t c = 0;
+        switch (w->antic) {
+        case BOOPIE_ANTIC_LOVE: g = HEART; c = 0xf05878; break;
+        case BOOPIE_ANTIC_DANCE: g = NOTE; c = 0xfff0a0; break;
+        case BOOPIE_ANTIC_MIRROR: g = SPARK; c = 0xfff0a0; break;
+        case BOOPIE_ANTIC_SWING: g = HEART; c = 0xf8a0c0; break;
+        default: break;
+        }
+        for (int k = 0; g && k < 2; k++) {
+            float u = fmodf(look->t * 0.7f + k * 0.5f, 1.0f);
+            int gx = px + (k ? 4 : -8) + (int)(sinf(u * 6 + k) * 2), gy = py - 4 - (int)(u * 14);
+            if (u < 0.85f) {
+                glyph5(gx, gy, g, c);
+            }
+        }
+    }
+    if (w->antic == BOOPIE_ANTIC_BUTTERFLY || w->b_away > 0) {
+        bool open = ((int)(look->t * 8)) & 1;
+        uint32_t wing = w->room == BOOPIE_ROOM_WOODS ? 0x78b8f8 : 0xf8c848, edge = 0x384058;
+        int bx = (int)w->bx - s_cam, by = (int)w->by;
+        put(bx, by, edge);
+        put(bx, by + 1, edge);
+        put(bx, by + 2, edge);
+        int span = open ? 3 : 1;
+        for (int s = 1; s <= span; s++) {
+            for (int j = -2; j <= 1; j++) {
+                if (j == -2 && s == span) {
+                    continue;   /* rounded */
+                }
+                put(bx - s, by + j, wing);
+                put(bx + s, by + j, wing);
+            }
+        }
+        put(bx - 1, by + 2, wing);
+        put(bx + 1, by + 2, wing);
+    }
+}
+
+/* The TV on while it watches: the screen flickering through a show's colours. */
+static void tv_on(const boopie_world_t *w, const boopie_thing_t *t, int n, const boopie_world_look_t *look)
+{
+    if (w->state != BOOPIE_PET_ANTIC || w->antic != BOOPIE_ANTIC_TV) {
+        return;
+    }
+    static const uint32_t SHOW[] = { 0x88d0f8, 0xf8c870, 0xa0e090, 0xf898b8 };
+    uint32_t c = SHOW[(int)(look->t * 1.5f) & 3];
+    for (int i = 0; i < n; i++) {
+        if (!boopie_thing_shown(&t[i], look->level)) {
+            continue;
+        }
+        int x0, y0, x1, y1;
+        if (t[i].art == BOOPIE_ART_TV_OLD) {
+            x0 = t[i].x - 7; y0 = t[i].y - 21; x1 = t[i].x + 5; y1 = t[i].y - 12;
+        } else if (t[i].art == BOOPIE_ART_TV_FLAT) {
+            x0 = t[i].x - 11; y0 = t[i].y - 25; x1 = t[i].x + 9; y1 = t[i].y - 14;
+        } else {
+            continue;
+        }
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) {
+                put(x - s_cam, y, ((x + y + (int)(look->t * 8)) % 7) ? c : 0xffffff);
+            }
         }
     }
 }
@@ -466,12 +595,14 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
         done[next] = 1;
     }
     fishing(w, look);
+    tv_on(w, t, n, look);
     if (look->night) {
         night(t, n, look->level);
         if (w->room == BOOPIE_ROOM_WOODS) {
             fireflies(look->t);
         }
     }
+    antic_over(w, look);
     /* The hints last, over everything and never dimmed, bobbing. */
     for (int i = 0; i < n; i++) {
         if (t[i].hint && boopie_thing_shown(&t[i], look->level)) {
@@ -495,7 +626,10 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             } else if (t[i].art == BOOPIE_ART_HOUSE_FRONT) {
                 top = t[i].y - 18;   /* over its door, not its roof */
             }
-            if (hint) {
+            /* Not over the pet when it's stopped right under one: it'd hide its face. */
+            bool on_pet = w->state != BOOPIE_PET_WALKING && fabsf(t[i].x - w->x) < 10 && top > w->y - 26
+                          && top < w->y + 4;
+            if (hint && !on_pet) {
                 blit((boopie_art_id_t)hint, t[i].x, top - 1 + bob);
             }
         }

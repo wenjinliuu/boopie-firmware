@@ -59,6 +59,7 @@ typedef enum {
     BOOPIE_DO_FISH_CAUGHT,    /* ... caught (boopie_world_t.last_fish: what) */
     BOOPIE_DO_FISH_EARLY,     /* tapped before a bite: it swam off */
     BOOPIE_DO_FISH_MISSED,    /* not tapped in time */
+    BOOPIE_DO_ANTIC,          /* it's begun a little something of its own (boopie_world_t.antic) */
     BOOPIE_DO_COUNT,
 } boopie_do_t;
 
@@ -118,7 +119,32 @@ void boopie_room_floor(boopie_room_t room, int *x0, int *y0, int *x1, int *y1);
 /* How wide it is: the screen's width, or more (then the view follows the pet). */
 int boopie_room_width(boopie_room_t room);
 
-typedef enum { BOOPIE_PET_IDLE = 0, BOOPIE_PET_WALKING, BOOPIE_PET_USING, BOOPIE_PET_SLEEPING } boopie_pet_state_t;
+typedef enum {
+    BOOPIE_PET_IDLE = 0,
+    BOOPIE_PET_WALKING,
+    BOOPIE_PET_USING,
+    BOOPIE_PET_SLEEPING,
+    BOOPIE_PET_ANTIC,         /* at a little something of its own */
+} boopie_pet_state_t;
+
+/*
+ * What it gets up to, left alone (docs/boopie-world.md "小动作"): now and then,
+ * instead of wandering, something that suits the room: the TV (on the sofa
+ * once there is one), a dance by the record player, the mirror, some love
+ * for the teddy, the flowers or its sandcastle, the swing, a butterfly to
+ * chase in the yard or the woods, a swim at the beach. A tap ends it.
+ */
+typedef enum {
+    BOOPIE_ANTIC_NONE = 0,
+    BOOPIE_ANTIC_TV,
+    BOOPIE_ANTIC_DANCE,
+    BOOPIE_ANTIC_MIRROR,
+    BOOPIE_ANTIC_LOVE,        /* antic_art: what it loves */
+    BOOPIE_ANTIC_SWING,
+    BOOPIE_ANTIC_BUTTERFLY,
+    BOOPIE_ANTIC_SWIM,
+    BOOPIE_ANTIC_COUNT,
+} boopie_antic_t;
 
 /*
  * The woods' slimes: each hops about its own patch. Tap one and the pet goes
@@ -173,7 +199,21 @@ typedef struct {
     float fish_t;             /* till the bite, or while it lasts */
     int fish_kind;            /* what's biting */
     int last_fish;            /* what was caught */
+    uint8_t antic;            /* boopie_antic_t: going to it, or at it */
+    uint8_t antic_phase;      /* a swim: 0 to the water's edge, 1 in, 2 swimming, 3 out */
+    uint8_t antic_art;        /* LOVE: the thing's art */
+    float antic_left;         /* seconds more of it */
+    float bx, by, bcx, bcy;   /* the butterfly, and where it flutters round */
+    float b_away;             /* seconds it's been flying off, or 0 */
 } boopie_world_t;
+
+/* Starts one now (the simulator, the tests), if the room has it: true. */
+bool boopie_world_antic(boopie_world_t *w, int level, boopie_antic_t antic);
+/* The one going on (or being walked to), or NONE. */
+static inline boopie_antic_t boopie_world_antic_on(const boopie_world_t *w)
+{
+    return (boopie_antic_t)w->antic;
+}
 
 void boopie_world_init(boopie_world_t *w, uint32_t seed);
 

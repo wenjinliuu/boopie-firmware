@@ -30,5 +30,9 @@ bool boopie_world_ui_back(void);
  * in; false for an unknown one. For the simulator; LVGL task. */
 bool boopie_world_ui_go(const char *room);
 
+/* Its little something by name ("swim", "butterfly", "tv" ...), started now,
+ * if the room has it. For the simulator; LVGL task. */
+bool boopie_world_ui_antic(const char *name);
+
 /* The AI's garden.status: each farm plot, in English, into out. Any task. */
 void boopie_world_ui_farm_status(char *out, size_t cap);

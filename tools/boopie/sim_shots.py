@@ -231,7 +231,9 @@ FARM = [("nest-outside", ["swipe=up", "advance=600", "room=outside", "advance=15
         # 森林: in by the sign, and a slime fought (its hits and the time over it).
         ("nest-woods", ["swipe=up", "advance=600", "room=woods", "advance=2500"]),
         ("nest-slime", ["swipe=up", "advance=600", "room=woods", "advance=2500", "tap=415,300", "advance=3000"]),
-        ("nest-beach", ["swipe=up", "advance=600", "room=beach", "advance=2500"])]
+        ("nest-beach", ["swipe=up", "advance=600", "room=beach", "advance=2500"]),
+        ("nest-swim", ["swipe=up", "advance=600", "room=beach", "antic=swim", "advance=5000"]),
+        ("nest-tv", ["swipe=up", "advance=600", "room=living", "antic=tv", "advance=5000"])]
 
 
 def user_data(root: Path) -> Path:
