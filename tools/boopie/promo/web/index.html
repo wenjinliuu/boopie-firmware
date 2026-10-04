@@ -8,51 +8,40 @@
 <script src="mascots.js"></script>
 <script src="scenes.js"></script>
 <script src="lyrics.js"></script>
+<script src="beats.js"></script>
 <script src="sync.js"></script>
+<script src="mv.js"></script>
 <script>
 const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
 const layer = document.createElement('canvas');
 layer.width = W; layer.height = H;
 const lctx = layer.getContext('2d');
-const FADE = 0.3;
-// The scenes in the top of the frame (the karaoke has the bottom), pulsing on the
-// beat, each cutting in with a punch: in from a little big and blurred, the last
-// one shrinking away.
+// Each scene in its own layer, held still but for a slow push in; a new one cuts in
+// through its mask over the last, which plays on beneath until covered.
 function frame(t) {
   GT = t;
-  const kick = beatKick(), strong = inChorus(t) ? 1 : 0.45;
-  backdrop(ctx, t);
-  // the backdrop breathes with the beat
-  ctx.fillStyle = `rgba(255,255,255,${0.10 * kick * strong})`;
-  ctx.fillRect(0, 0, W, H);
-  sparkles(ctx, t, 30, 0.6 + 0.6 * kick * strong);
-  for (const [a, b, fn, natural, punch] of TIMELINE) {
-    if (t < a - FADE || t > b + FADE) continue;
-    const inK = seg(t, a - FADE, a + 0.08), outK = seg(t, b - 0.05, b + FADE);
-    const al = Math.min(inK, 1 - outK);
-    if (al <= 0) continue;
+  chapterBackdrop(ctx, t);
+  drumLights(ctx, t);
+  sparkles(ctx, t, 26, 0.6);
+  TIMELINE.forEach(([a, b, fn, natural, cut], i) => {
+    const until = TIMELINE[i + 1] ? b + CUT : b;
+    if (t < a || t >= until) return;
     lctx.clearRect(0, 0, W, H);
     lctx.save();
     fn(lctx, (t - a) * (natural || (b - a)) / (b - a));
     lctx.restore();
-    const zoomIn = (1 - easeOut(inK)) * (punch ? 0.16 : 0.08), zoomOut = easeIn(outK) * 0.06;
-    const sc = 0.88 * (1 + zoomIn - zoomOut + 0.012 * kick * strong);
+    const push = 1 + 0.018 * seg(t, a, until);
     ctx.save();
-    ctx.globalAlpha = al;
-    if (zoomIn > 0.01 || zoomOut > 0.01) ctx.filter = `blur(${(zoomIn * 60 + zoomOut * 60).toFixed(1)}px)`;
-    ctx.translate(W / 2, 475);
-    ctx.scale(sc, sc);
-    ctx.drawImage(layer, -W / 2, -540);
+    const p = cut ? seg(t, a, a + CUT) : 1;
+    if (p < 1) { cutMask(ctx, cut, p); ctx.clip(); }
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(push, push);
+    ctx.drawImage(layer, -W / 2, -H / 2);
     ctx.restore();
-    ctx.filter = 'none';
-  }
-  // a flash on the punchy cuts
-  for (const [a, , , , punch] of TIMELINE) {
-    if (!punch) continue;
-    const q = (t - a) / 0.35;
-    if (q > 0 && q < 1) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - q)})`; ctx.fillRect(0, 0, W, H); }
-  }
-  karaoke(ctx, t);
+    if (p < 1) cutRim(ctx, cut, p);
+  });
+  if (wordsMode(t) === 'head') headline(ctx, t);
+  else karaoke(ctx, t);
   const end = seg(t, DURATION - 0.6, DURATION);   // to white
   if (end > 0) { ctx.fillStyle = `rgba(255,255,255,${end})`; ctx.fillRect(0, 0, W, H); }
 }

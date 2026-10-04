@@ -18,17 +18,18 @@ from pathlib import Path
 # The lyrics as sung, one entry per heard segment; "|" breaks it into the lines
 # shown. A token is a Chinese character or a run of Latin letters.
 LINES = [
-    "Hi～布比布比|布比布比布比",
-    "Hi～布比布比|布比布比",
+    "Hi～ 布比布比|布比布比",
+    "Hi～",
+    "Hi～ 布比",
     "圆圆的小屏幕|亮起粉色的心",
     "早安对我眨眨眼|天气它都记得清",
     "扫一扫就上线|Wi-Fi 蓝牙都连通",
     "走到天涯海角|网络也畅通无阻",
     "轻轻叫一声 Muse|它就懂你",
     "远方的电脑|也替你搞定",
-    "布比布比布比布比|你的 AI 小伙伴",
-    "会听会说会撒娇|陪我每一天|一句话",
-    "它就去做|works with Muse",
+    "布比布比布比|你的 AI 小伙伴",
+    "会听会说会撒娇|陪我每一天",
+    "一句话|它就去做|works with Muse",
     "小小的它|装着大大的宇宙",
     "换上新皮肤|四十多种都好看",
     "戳一戳 歪一歪|小游戏 玩不完",
@@ -36,10 +37,10 @@ LINES = [
     "种花钓鱼去冒险|下雨就回家",
     "节日挂满小彩灯|一年四季都不一样",
     "布比布比|一直在你身旁",
-    "布比布比布比布比|你的 AI 小伙伴",
+    "布比布比|你的 AI 小伙伴",
     "布比布比布比布比布比|布比布比布比布比布比",
 ]
-TOKEN = re.compile(r"[A-Za-z][A-Za-z\-]*|～|[^\sA-Za-z|～。，,.!！?？]")
+TOKEN = re.compile(r"[A-Za-z][A-Za-z\-]*～?|[^\sA-Za-z|～。，,.!！?？]")
 
 
 def heard(segment) -> list[tuple[float, float]]:
@@ -47,7 +48,7 @@ def heard(segment) -> list[tuple[float, float]]:
     out = []
     for s, e, w in segment["words"]:
         toks = TOKEN.findall(w.strip())
-        toks = [t for t in toks if t != "～"] or [w]
+        toks = toks or [w]
         for i in range(len(toks)):
             out.append((s + (e - s) * i / len(toks), s + (e - s) * (i + 1) / len(toks)))
     return out

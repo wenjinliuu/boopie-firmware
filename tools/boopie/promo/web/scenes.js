@@ -481,7 +481,7 @@ function sSkins(ctx, t) {
   const big = backOut(seg(t, 5.6, 6.1));
   if (big > 0) {
     ctx.save();
-    ctx.translate(960, 1000);
+    ctx.translate(1700, 190);
     ctx.scale(big, big);
     text(ctx, '40+', 0, 30, { size: 110, weight: 900, gradient: BRAND, ls: -3 });
     ctx.restore();
@@ -496,10 +496,10 @@ function sMoods(ctx, t) {
   MOODS.forEach(([name, label], i) => {
     const k = backOut(seg(t, 0.2 + i * 0.08, 0.6 + i * 0.08));
     if (k <= 0) return;
-    const x = 1000 + (i % 3) * 290, y = 230 + Math.floor(i / 3) * 300;
+    const x = 1020 + (i % 3) * 270, y = 330 + Math.floor(i / 3) * 255;
     const bob = Math.sin(t * 2 + i) * 6;
-    miniScreen(ctx, name, t, x, y + bob, 112 * k);
-    text(ctx, label, x, y + 160 + bob, { size: 26, weight: 600, color: '#3a3a3f', alpha: k });
+    miniScreen(ctx, name, t, x, y + bob, 96 * k);
+    text(ctx, label, x, y + 135 + bob, { size: 26, weight: 600, color: '#3a3a3f', alpha: k });
   });
 }
 
@@ -768,7 +768,7 @@ function museApp(c, w, h, t) {
 function sRemote(ctx, t) {
   title(ctx, '手机一句话，电脑去执行', '布比实时告诉你进度', 960, 120, t, 0.1, 7.2, { size: 66 });
   const k = easeOut(seg(t, 0, 0.6));
-  phone(ctx, lerp(380, 560, k), 600, 860, (c, w, h) => museApp(c, w, h, t));
+  phone(ctx, lerp(380, 560, k), 530, 820, (c, w, h) => museApp(c, w, h, t));
   const prog = clamp((t - 2.6) / 3.4), done = prog >= 1;
   // the link between them
   if (t > 1.8) {

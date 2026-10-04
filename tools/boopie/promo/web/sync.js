@@ -239,7 +239,7 @@ function sCosmos(ctx, t) {
   for (let i = 0; i < 160; i++) {
     const a = hash(i, 1) * Math.PI * 2, sp = 0.4 + hash(i, 2);
     const d = ((t * 180 * sp + hash(i, 3) * 900) % 900) * (0.2 + grow);
-    const x = 960 + Math.cos(a) * d, y = 470 + Math.sin(a) * d * 0.75;
+    const x = 960 + Math.cos(a) * d, y = 560 + Math.sin(a) * d * 0.75;
     const c = ['255,111,165', '165,123,255', '79,182,255', '255,201,60'][i % 4];
     ctx.fillStyle = `rgba(${c},${clamp(d / 300) * 0.8})`;
     ctx.beginPath();
@@ -247,12 +247,8 @@ function sCosmos(ctx, t) {
     ctx.fill();
   }
   const kick = beatKick();
-  const R = lerp(120, 300, grow) * (1 + 0.03 * kick);
-  device(ctx, 960, 470, R, { screen: screenClip(t < 1.4 ? 'boopie_idle' : 'skin_boopie_starry', t), sweep: seg(t, 1.0, 2.2) });
-  const a = easeOut(seg(GT, sungAt('小小', 0), sungAt('小小', 0) + 0.4));
-  text(ctx, '小小的它', 960, 860, { size: 54, weight: 800, color: '#2a2a2f', alpha: a * (1 - seg(t, 1.0, 1.3)) });
-  const b = easeOut(seg(GT, sungAt('装着', 2), sungAt('装着', 2) + 0.5));
-  text(ctx, '大大的宇宙', 960, 860, { size: 64, weight: 900, gradient: BRAND, alpha: b, ls: 4 });
+  const R = lerp(120, 260, grow);
+  device(ctx, 960, 560, R, { screen: screenClip(t < 1.4 ? 'boopie_idle' : 'skin_boopie_starry', t), sweep: seg(t, 1.0, 2.2) });
 }
 
 // ---------------------------------------------------------------- 亮起粉色的心: a heart out of the screen
@@ -321,7 +317,7 @@ function sWorldSong(ctx, t) {
   text(ctx, ROOMS[room][2], 470, 660, { size: 34, weight: 600, color: '#3a3a3f', alpha: wk * seg(t, 0.4, 0.7), dy: (1 - wk) * 16 });
   const k = easeOut(seg(t, 0, 0.6));
   const kick = beatKick();
-  const cx = 1260, cy = 540, R0 = 330 * (1 + 0.012 * kick);
+  const cx = 1260, cy = 590, R0 = 300;
   device(ctx, cx, cy + (1 - k) * 60, R0 * lerp(0.92, 1, k), { screen: (c, r) => {
     const sw = easeInOut(clamp(since / 0.3));
     const one = (j, lt, dx) => drawClip(c, ROOMS[j][0], lt, dx, 0, r, { square: 1 });
@@ -384,5 +380,3 @@ const SONG_TIMELINE = [
 const CHORUS = [[38.75, 52.7], [60.7, 77.8], [77.8, 90.6]];
 const inChorus = t => CHORUS.some(([a, b]) => t >= a && t < b);
 
-const TIMELINE = SONG_TIMELINE;
-const DURATION = 90.6;

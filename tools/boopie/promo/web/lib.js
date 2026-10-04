@@ -101,7 +101,9 @@ function text(ctx, s, x, y, o = {}) {
   ctx.restore();
 }
 // A title that rises in and blurs out: (t local, in at a, out at b).
+let TITLES = true;   // off when the lyrics are the titles
 function title(ctx, main, sub, x, y, t, a, b, o = {}) {
+  if (!TITLES) return;
   const k = easeOut(seg(t, a, a + 0.6)), q = seg(t, b - 0.4, b);
   const al = k * (1 - q);
   if (al <= 0) return;
