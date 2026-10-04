@@ -58,11 +58,19 @@ class BoopiePetTest(unittest.TestCase):
         self.assertEqual(self.r["day_alone"], "idle")
 
     def test_games_capped_daily(self) -> None:
-        # 45 xp and 10 stars a day from games, then room again the next day.
-        self.assertEqual(self.r["game"], [45, 10, 15, 3])
+        # 8 rounds of 15 xp, 3 stars: whole to 45 xp and 10 stars, then half up
+        # to 67 and 15, then none; 小窝 has its own day (60 + 30 xp, 15 + 7
+        # stars); the next day, room again.
+        xp, stars, tired, wxp, wstars, nxp, ngame, nworld = self.r["game"]
+        self.assertEqual(xp, 67)
+        self.assertEqual(stars, 15)
+        self.assertEqual(tired, [0, 0, 0, 1, 1, 1, 2, 2])
+        self.assertEqual((wxp, wstars), (90, 22))
+        self.assertEqual((nxp, ngame, nworld), (15, 3, 0))
 
     def test_old_saves_load(self) -> None:
-        self.assertEqual(self.r["load_v1"], [1, 2, 0, 1])
+        self.assertEqual(self.r["load_v1"], [1, 3, 0, 1])
+        self.assertEqual(self.r["load_v2"], [1, 3, 7, 0, 0])
         self.assertEqual(self.r["load_bad"], [0, 0])
 
     def test_time_powered_off_doesnt_count(self) -> None:

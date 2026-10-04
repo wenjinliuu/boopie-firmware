@@ -57,7 +57,7 @@ static bool s_hello;   /* the first visit's hint has been said */
 
 static void say(const char *fmt, ...)
 {
-    char buf[96];
+    char buf[128];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf, sizeof buf, fmt, ap);
@@ -668,6 +668,15 @@ static void named(const char *text, bool done)
     }
 }
 
+#define DONE_FOR_TODAY "今天玩得很开心，明天再来吧"
+
+/* After a reward's own words: halved past the day's cap, or none at all. */
+static const char *tired_note(void)
+{
+    int t = boopie_avatar_tired();
+    return t == 2 ? "\n" DONE_FOR_TODAY : t == 1 ? "（今天玩了好多，减半）" : "";
+}
+
 /* ---- the farm: a plot to plant, water or pick ---- */
 
 static int s_plot = -1;   /* the plot the seeds panel is for */
@@ -733,8 +742,8 @@ static void use_plot(int plot)
         int xp = 0, stars = 0;
         if (boopie_garden_harvest(g, plot, &xp, &stars)) {
             boopie_sound_play(BOOPIE_SOUND_GOLD);
-            boopie_avatar_garden_changed(xp, stars);
-            say("收获%s！★ +%d", name, stars);
+            int got = boopie_avatar_garden_changed(xp, stars);
+            say("收获%s！★ +%d%s", name, got, tired_note());
         }
         return;
     }
@@ -766,9 +775,9 @@ static void open_chest(int chest)
     if (boopie_avatar_open_chest(chest, &stars, &xp)) {
         boopie_sound_play(BOOPIE_SOUND_GOLD);
         if (stars > 0) {
-            say("宝箱里有 ★ %d！", stars);
+            say("宝箱里有 ★ %d！%s", stars, tired_note());
         } else {
-            say("宝箱里空空的…今天的星星拿够啦");
+            say("宝箱里空空的…\n" DONE_FOR_TODAY);
         }
     } else if (boopie_avatar_chests_open() >> chest & 1) {
         say("今天开过啦，明天再来");
@@ -834,9 +843,9 @@ static void slime_won(void)
     boopie_avatar_slime_beaten(boopie_slime_stars(kind), boopie_slime_xp(kind), &got);
     boopie_sound_play(BOOPIE_SOUND_GOLD);
     if (got > 0) {
-        say("打败了%s！★ +%d", SLIME_NAMES[kind], got);
+        say("打败了%s！★ +%d%s", SLIME_NAMES[kind], got, tired_note());
     } else {
-        say("打败了%s！", SLIME_NAMES[kind]);
+        say("打败了%s！%s", SLIME_NAMES[kind], tired_note());
     }
     fight_over();
 }
@@ -864,9 +873,9 @@ static void caught(void)
         boopie_avatar_world_reward(-1, 0, 15, 3, &got);
         boopie_sound_play(BOOPIE_SOUND_GOLD);
         if (got) {
-            say("金色的鱼！★ +%d", got);
+            say("金色的鱼！★ +%d%s", got, tired_note());
         } else {
-            say("金色的鱼！摸一摸放回去啦");
+            say("金色的鱼！摸一摸放回去啦%s", tired_note());
         }
         break;
     case BOOPIE_FISH_BOOT:

@@ -939,8 +939,16 @@ static void flash_overlay(boopie_overlay_t o, float secs)
 }
 
 /* Show what a pet call earned: eating, a level-up. */
+static int s_tired;
+
+int boopie_avatar_tired(void)
+{
+    return s_tired;
+}
+
 static void show_event(const boopie_pet_event_t *ev)
 {
+    s_tired = ev->tired;
     if (ev->levels > 0) {
         boopie_sound_play(BOOPIE_SOUND_LEVEL_UP);
     } else if (ev->fed) {
@@ -1041,17 +1049,20 @@ boopie_garden_t *boopie_avatar_garden(int64_t *now, int *minute)
     return &s_garden;
 }
 
-void boopie_avatar_garden_changed(int xp, int stars)
+int boopie_avatar_garden_changed(int xp, int stars)
 {
+    int got = 0;
     if (xp || stars) {
-        /* A harvest: counted as a game's reward, toward the same daily caps. */
+        /* A harvest: 小窝's, toward its day. */
         boopie_pet_event_t ev = { 0 };
-        boopie_pet_game(&s_pet_state, xp, stars, &ev);
+        boopie_pet_world(&s_pet_state, xp, stars, &ev);
+        got = ev.stars;
         boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
         flash_overlay(BOOPIE_OVERLAY_CONFETTI, 3.0f);
         show_event(&ev);
     }
     save();
+    return got;
 }
 
 unsigned boopie_avatar_chests_open(void)
@@ -1087,7 +1098,7 @@ bool boopie_avatar_open_chest(int chest, int *stars, int *xp)
     uint32_t h = (uint32_t)day * 2654435761u + (uint32_t)chest * 40503u;
     int want = chest == 0 ? 2 + (int)(h >> 13) % 3 : 3 + (int)(h >> 13) % 4;
     boopie_pet_event_t ev = { 0 };
-    boopie_pet_game(&s_pet_state, 20, want, &ev);
+    boopie_pet_world(&s_pet_state, 20, want, &ev);
     boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
     show_event(&ev);
     *stars = ev.stars;
@@ -1100,7 +1111,7 @@ void boopie_avatar_slime_beaten(int stars, int xp, int *got_stars)
 {
     ensure_loaded();
     boopie_pet_event_t ev = { 0 };
-    boopie_pet_game(&s_pet_state, xp, stars, &ev);
+    boopie_pet_world(&s_pet_state, xp, stars, &ev);
     s_woods.slimes++;
     boopie_avatar_react(BOOPIE_EXPR_HAPPY, 2.0f);
     show_event(&ev);
@@ -1187,7 +1198,7 @@ void boopie_avatar_world_reward(int item, int count, int xp, int stars, int *got
         s_woods.items[item] = (uint16_t)(s_woods.items[item] + count > 999 ? 999 : s_woods.items[item] + count);
     }
     boopie_pet_event_t ev = { 0 };
-    boopie_pet_game(&s_pet_state, xp, stars, &ev);
+    boopie_pet_world(&s_pet_state, xp, stars, &ev);
     boopie_avatar_react(BOOPIE_EXPR_HAPPY, 2.0f);
     show_event(&ev);
     if (got_stars) {

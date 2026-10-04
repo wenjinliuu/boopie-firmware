@@ -140,7 +140,7 @@ void boopie_avatar_stroke(int strokes, bool hug);
  * garden_changed, with a harvest's reward (0, 0 for none). */
 struct boopie_garden;
 struct boopie_garden *boopie_avatar_garden(int64_t *now, int *minute);
-void boopie_avatar_garden_changed(int xp, int stars);
+int boopie_avatar_garden_changed(int xp, int stars);   /* the stars given */
 
 /* 森林 (docs/boopie-world.md): the chests opened today (bit i for chest i), and
  * opening one, its reward given toward the games' daily caps (false if it
@@ -200,6 +200,10 @@ void boopie_avatar_set_posture_on(bool on);
 
 /* The reaction showing now (boopie_avatar_react: a feed, a poke), or IDLE. */
 boopie_expr_t boopie_avatar_reacting(void);
+
+/* How the last game or 小窝 reward went against the day's caps: 0 whole,
+ * 1 halved, 2 none (done for the day). */
+int boopie_avatar_tired(void);
 
 /* Which AI answers, the AI assistant (AI 助手: chosen in the setup guide; Muse until one is), and
  * whether the guide has been through. Kept in NVS with the rest. */

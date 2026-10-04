@@ -7,8 +7,8 @@
 
 #include <string.h>
 
-static const uint16_t XP_EACH[BOOPIE_XP_SOURCE_COUNT] = { 10, 20, 2, 5, 15 };
-static const uint16_t XP_CAP[BOOPIE_XP_SOURCE_COUNT] = { 10, 40, 20, 30, 45 };
+static const uint16_t XP_EACH[BOOPIE_XP_SOURCE_COUNT] = { 10, 20, 2, 5, 15, 10 };
+static const uint16_t XP_CAP[BOOPIE_XP_SOURCE_COUNT] = { 10, 40, 20, 30, BOOPIE_GAME_XP_CAP, BOOPIE_WORLD_XP_CAP };
 #define LATE_FEED_XP 10
 #define MEET_STARS 2
 
@@ -81,6 +81,29 @@ static void add_xp(boopie_pet_t *p, int xp, boopie_pet_event_t *ev)
     }
 }
 
+/*
+ * Of `want`, what's given against a soft cap, *used counting what's been
+ * given today: whole up to the cap, half past it, nothing once half as much
+ * again is out. *tired: 1 if any was halved, 2 if none came.
+ */
+static int soft(int want, int used, int cap, uint8_t *tired)
+{
+    if (want <= 0) {
+        return 0;
+    }
+    int whole = cap - used > 0 ? cap - used : 0;
+    whole = want < whole ? want : whole;
+    int half = (want - whole + 1) / 2;
+    int hard = cap + cap / 2 - used - whole;
+    half = half < hard ? half : hard > 0 ? hard : 0;
+    int got = whole + half;
+    uint8_t t = got == 0 ? 2 : got < want ? 1 : 0;
+    if (t > *tired) {
+        *tired = t;
+    }
+    return got;
+}
+
 void boopie_pet_earn(boopie_pet_t *p, boopie_xp_source_t src, int xp, boopie_pet_event_t *ev)
 {
     if ((int)src < 0 || src >= BOOPIE_XP_SOURCE_COUNT) {
@@ -89,9 +112,17 @@ void boopie_pet_earn(boopie_pet_t *p, boopie_xp_source_t src, int xp, boopie_pet
     if (xp < 0) {
         xp = XP_EACH[src];
     }
-    int room = XP_CAP[src] - p->xp_today[src];
-    if (xp > room) {
-        xp = room;
+    if (src == BOOPIE_XP_GAME || src == BOOPIE_XP_WORLD) {
+        uint8_t tired = 0;
+        xp = soft(xp, p->xp_today[src], XP_CAP[src], &tired);
+        if (ev && tired > ev->tired) {
+            ev->tired = tired;
+        }
+    } else {
+        int room = XP_CAP[src] - p->xp_today[src];
+        if (xp > room) {
+            xp = room;
+        }
     }
     if (xp <= 0) {
         return;
@@ -100,8 +131,10 @@ void boopie_pet_earn(boopie_pet_t *p, boopie_xp_source_t src, int xp, boopie_pet
     add_xp(p, xp, ev);
 }
 
-/* Version 1 is this less game_stars_today, which sat in its tail padding. */
-_Static_assert(sizeof(boopie_pet_t) == 56, "version 1 blobs are 56 bytes");
+/* Versions 1 and 2 are the same size: xp_today one source shorter, then
+ * (2) game_stars_today where xp_today[BOOPIE_XP_WORLD] now starts. */
+_Static_assert(sizeof(boopie_pet_t) == 56, "version 1 and 2 blobs are 56 bytes");
+#define V2_GAME_STARS 50   /* its offset then */
 
 bool boopie_pet_load(boopie_pet_t *p, const void *blob, size_t n)
 {
@@ -110,8 +143,11 @@ bool boopie_pet_load(boopie_pet_t *p, const void *blob, size_t n)
         return false;
     }
     memcpy(&saved, blob, n);
-    if (saved.version == 1) {   /* the byte game_stars_today now uses was padding */
-        saved.game_stars_today = 0;
+    if (saved.version == 1 || saved.version == 2) {
+        uint8_t game = saved.version == 2 ? ((const uint8_t *)blob)[V2_GAME_STARS] : 0;
+        saved.xp_today[BOOPIE_XP_WORLD] = 0;
+        saved.game_stars_today = game;
+        saved.world_stars_today = 0;
         saved.version = BOOPIE_PET_VERSION;
     }
     if (saved.version != BOOPIE_PET_VERSION) {
@@ -121,20 +157,36 @@ bool boopie_pet_load(boopie_pet_t *p, const void *blob, size_t n)
     return true;
 }
 
+static void reward(boopie_pet_t *p, boopie_xp_source_t src, uint8_t *stars_today, int stars_cap, int xp,
+                   int stars, boopie_pet_event_t *ev)
+{
+    boopie_pet_event_t mine = { 0 };
+    boopie_pet_earn(p, src, xp, &mine);
+    stars = soft(stars, *stars_today, stars_cap, &mine.tired);
+    if (stars > 0) {
+        *stars_today = (uint8_t)(*stars_today + stars);
+        p->stars += (uint32_t)stars;
+        mine.stars += stars;
+    }
+    if (mine.tired == 2 && (mine.xp || mine.stars)) {
+        mine.tired = 1;   /* one of the two still came */
+    }
+    if (ev) {
+        ev->xp += mine.xp;
+        ev->stars += mine.stars;
+        ev->levels += mine.levels;
+        ev->tired = mine.tired > ev->tired ? mine.tired : ev->tired;
+    }
+}
+
 void boopie_pet_game(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev)
 {
-    boopie_pet_earn(p, BOOPIE_XP_GAME, xp, ev);
-    int room = BOOPIE_GAME_STARS_CAP - p->game_stars_today;
-    if (stars > room) {
-        stars = room;
-    }
-    if (stars > 0) {
-        p->game_stars_today += (uint8_t)stars;
-        p->stars += (uint32_t)stars;
-        if (ev) {
-            ev->stars += stars;
-        }
-    }
+    reward(p, BOOPIE_XP_GAME, &p->game_stars_today, BOOPIE_GAME_STARS_CAP, xp, stars, ev);
+}
+
+void boopie_pet_world(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev)
+{
+    reward(p, BOOPIE_XP_WORLD, &p->world_stars_today, BOOPIE_WORLD_STARS_CAP, xp, stars, ev);
 }
 
 void boopie_pet_resume(boopie_pet_t *p, int64_t now)
@@ -173,6 +225,7 @@ boopie_expr_t boopie_pet_tick(boopie_pet_t *p, bool known, int64_t now, int32_t 
         p->met_today = 0;
         memset(p->xp_today, 0, sizeof(p->xp_today));
         p->game_stars_today = 0;
+        p->world_stars_today = 0;
         /* It wakes up fed: the first hunger comes 3.5 h after the day starts. */
         int64_t day_start = now - (int64_t)(minute - BOOPIE_PET_DAY_START_MIN) * 60;
         if (p->last_fed < day_start) {

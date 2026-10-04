@@ -345,9 +345,10 @@ static void finish(void)
     s_def->extra(extra, sizeof extra);
     int n = snprintf(lines, sizeof lines, "%d 分%s  %s\n最高 %d 分\n", score, record ? "  新纪录！" : "", extra, best);
     if (ev.xp || ev.stars) {
-        snprintf(lines + n, sizeof lines - n, "经验 +%d   ★ +%d", ev.xp, ev.stars);
+        snprintf(lines + n, sizeof lines - n, "经验 +%d   ★ +%d%s", ev.xp, ev.stars,
+                 ev.tired ? "\n今天玩了好多，奖励减半" : "");
     } else {
-        snprintf(lines + n, sizeof lines - n, "%s", xp || stars ? "今天的奖励领完啦" : "再接再厉");
+        snprintf(lines + n, sizeof lines - n, "%s", xp || stars ? "今天玩得很开心，明天再来吧" : "再接再厉");
     }
     show_card(record ? "新纪录！" : s_def->done, lines, true);
 }

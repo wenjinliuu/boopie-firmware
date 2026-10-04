@@ -1421,6 +1421,9 @@ static void on_avatar_choice(lv_event_t *e)
     boopie_avatar_select((int)(intptr_t)lv_event_get_user_data(e));
 }
 
+static int s_skin_short = -1;      /* a skin tapped without stars enough: says so a moment */
+static uint32_t s_skin_short_at;
+
 /* A skin row: wear it if owned, else buy it (if there are stars enough). */
 static void on_skin_choice(lv_event_t *e)
 {
@@ -1428,8 +1431,9 @@ static void on_skin_choice(lv_event_t *e)
     const char *error = NULL;
     if (i < 0 || boopie_avatar_owns(i)) {
         boopie_avatar_wear(i, &error);
-    } else {
-        boopie_avatar_buy(i, &error);
+    } else if (!boopie_avatar_buy(i, &error)) {
+        s_skin_short = i;
+        s_skin_short_at = lv_tick_get();
     }
 }
 
@@ -1578,6 +1582,8 @@ static void tick_avatar(void)
             snprintf(v, sizeof v, "%s", LV_SYMBOL_OK);
         } else if (boopie_avatar_owns(i)) {
             v[0] = '\0';
+        } else if (i == s_skin_short && lv_tick_elaps(s_skin_short_at) < 2500) {
+            snprintf(v, sizeof v, "星星不够");
         } else {
             snprintf(v, sizeof v, "★ %d", boopie_skin_price(i));
         }

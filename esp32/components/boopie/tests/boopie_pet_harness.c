@@ -8,6 +8,7 @@
  * 00:00; a tick is a minute. */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "boopie_pet.h"
 
@@ -116,27 +117,48 @@ int main(void)
         }
     }
     printf(",\"month\":{\"xp\":%u,\"level\":%d,\"stars\":%u}", p.xp, boopie_pet_level(p.xp, NULL, NULL), p.stars);
-    /* Games: 5 rounds of 15 xp and 3 stars, capped at 45 xp and 10 stars a day. */
+    /* Games: 5 rounds of 15 xp and 3 stars: whole to 45 xp and 10 stars, then half. */
     boopie_pet_init(&p);
     tick_at(&p, T(0, 9, 0), 0);
     uint32_t gx0 = p.xp, st0 = p.stars;
-    for (int i = 0; i < 5; i++) {
-        boopie_pet_game(&p, 15, 3, NULL);
+    boopie_pet_event_t ev;
+    int tired[8];
+    for (int i = 0; i < 8; i++) {
+        ev = (boopie_pet_event_t){ 0 };
+        boopie_pet_game(&p, 15, 3, &ev);
+        tired[i] = ev.tired;
     }
     printf(",\"game\":[%u,%u", p.xp - gx0, p.stars - st0);
+    printf(",[%d,%d,%d,%d,%d,%d,%d,%d]", tired[0], tired[1], tired[2], tired[3], tired[4], tired[5], tired[6], tired[7]);
+    /* 小窝 has its own day: games done, it still gives. */
+    gx0 = p.xp;
+    st0 = p.stars;
+    for (int i = 0; i < 20; i++) {
+        boopie_pet_world(&p, 20, 4, NULL);
+    }
+    printf(",%u,%u", p.xp - gx0, p.world_stars_today);   /* (stars: levels gained add theirs) */
+    (void)st0;
     tick_at(&p, T(1, 9, 0), 0);   /* the next day: room again */
     gx0 = p.xp;
     boopie_pet_game(&p, 15, 3, NULL);
-    printf(",%u,%u]", p.xp - gx0, p.game_stars_today);
+    printf(",%u,%u,%u]", p.xp - gx0, p.game_stars_today, p.world_stars_today);
 
-    /* A version 1 save loads, with no game stars yet today. */
-    boopie_pet_t v1 = p, loaded;
-    v1.version = 1;
-    v1.game_stars_today = 0xAA;   /* padding then: anything */
-    bool ok1 = boopie_pet_load(&loaded, &v1, sizeof v1);
+    /* Old saves load: version 1 (padding where the game stars went), version 2. */
+    boopie_pet_t v = p, loaded;
+    uint8_t raw[sizeof v];
+    memcpy(raw, &v, sizeof v);
+    raw[0] = 1;
+    raw[50] = 0xAA;   /* padding then: anything */
+    bool ok1 = boopie_pet_load(&loaded, raw, sizeof raw);
     printf(",\"load_v1\":[%d,%d,%d,%u]", ok1, loaded.version, loaded.game_stars_today, loaded.xp == p.xp);
-    v1.version = 9;
-    printf(",\"load_bad\":[%d,%d]", boopie_pet_load(&loaded, &v1, sizeof v1), boopie_pet_load(&loaded, &v1, 10));
+    raw[0] = 2;
+    raw[50] = 7;      /* game_stars_today then */
+    raw[51] = 0x55;   /* padding then */
+    bool ok2 = boopie_pet_load(&loaded, raw, sizeof raw);
+    printf(",\"load_v2\":[%d,%d,%d,%d,%d]", ok2, loaded.version, loaded.game_stars_today,
+           loaded.xp_today[BOOPIE_XP_WORLD], loaded.world_stars_today);
+    raw[0] = 9;
+    printf(",\"load_bad\":[%d,%d]", boopie_pet_load(&loaded, raw, sizeof raw), boopie_pet_load(&loaded, raw, 10));
 
     printf(",\"unlocks\":[%d,%d,%d,%d,%d]}\n", boopie_pet_unlock_level(BOOPIE_UNLOCK_COLOUR, 2),
            boopie_pet_unlock_level(BOOPIE_UNLOCK_SCENE, 1), boopie_pet_unlock_level(BOOPIE_UNLOCK_SCENE, 8),

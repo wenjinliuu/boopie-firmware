@@ -42,11 +42,12 @@ typedef enum {
     BOOPIE_XP_POKE,         /* 2 */
     BOOPIE_XP_TALK,         /* 5 a reply */
     BOOPIE_XP_GAME,         /* 5 to 15 a round */
+    BOOPIE_XP_WORLD,        /* 小窝: chests, slimes, fishing, picking, harvests */
     BOOPIE_XP_SOURCE_COUNT,
 } boopie_xp_source_t;
 
 /* Kept in NVS as it is: only ever append, and bump version on a change. */
-#define BOOPIE_PET_VERSION 2   /* 2: game_stars_today, in what was padding */
+#define BOOPIE_PET_VERSION 3   /* 2: game_stars_today, in what was padding; 3: 小窝's own caps */
 typedef struct {
     uint8_t version;
     uint8_t hungers_today;
@@ -59,10 +60,19 @@ typedef struct {
     uint32_t xp;                    /* all ever earned */
     uint32_t stars;
     uint16_t xp_today[BOOPIE_XP_SOURCE_COUNT];
-    uint8_t game_stars_today;       /* stars from games, up to BOOPIE_GAME_STARS_CAP a day */
+    uint8_t game_stars_today;       /* stars from games today */
+    uint8_t world_stars_today;      /* stars from 小窝 today */
 } boopie_pet_t;
 
+/*
+ * Games and 小窝 each have their own day: up to the cap the reward is whole,
+ * past it half, and once half as much again has been given, nothing till
+ * tomorrow (boopie_pet_event_t says which).
+ */
+#define BOOPIE_GAME_XP_CAP 45
 #define BOOPIE_GAME_STARS_CAP 10
+#define BOOPIE_WORLD_XP_CAP 60
+#define BOOPIE_WORLD_STARS_CAP 15
 
 /* A saved pet from NVS, of this version or an older one it can update; false
  * if it's neither (then *p is untouched). */
@@ -74,6 +84,7 @@ typedef struct {
     int stars;
     int levels;                     /* gained */
     bool fed;
+    uint8_t tired;                  /* a game's or 小窝's reward: 1 halved, 2 none (done for the day) */
 } boopie_pet_event_t;
 
 /* A new pet. */
@@ -98,9 +109,10 @@ bool boopie_pet_tap(boopie_pet_t *p, int64_t now, boopie_pet_event_t *ev);
 /* A reply was spoken to it. */
 void boopie_pet_talked(boopie_pet_t *p, boopie_pet_event_t *ev);
 
-/* A game round's reward: experience (BOOPIE_XP_GAME's cap) and stars, up to
- * BOOPIE_GAME_STARS_CAP a day. */
+/* A game round's reward, toward the games' day (BOOPIE_GAME_*_CAP). */
 void boopie_pet_game(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev);
+/* A reward in 小窝, toward its own day (BOOPIE_WORLD_*_CAP). */
+void boopie_pet_world(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev);
 
 /* Experience from a source (capped per day; games pass their own amount). */
 void boopie_pet_earn(boopie_pet_t *p, boopie_xp_source_t src, int xp, boopie_pet_event_t *ev);
