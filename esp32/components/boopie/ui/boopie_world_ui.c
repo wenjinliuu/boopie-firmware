@@ -15,7 +15,6 @@
 #include "boopie_font.h"
 #include "boopie_games.h"
 #include "boopie_garden.h"
-#include "boopie_garden_ui.h"
 #include "boopie_icons.h"
 #include "boopie_input.h"
 #include "boopie_noise_ui.h"
@@ -260,7 +259,12 @@ static void on_function(int i)
     switch (i) {
     case 0: games_panel(); break;
     case 1: boopie_noise_ui_open_locked(); break;
-    case 2: boopie_garden_ui_open_locked(); break;
+    case 2:
+        if (s_world.room != BOOPIE_ROOM_OUTSIDE) {
+            boopie_world_enter(&s_world, BOOPIE_ROOM_OUTSIDE, BOOPIE_DO_OUTSIDE);
+        }
+        say("去农场看看～");
+        break;
     case 3: books_panel(); break;
     case 4: muse_ui_open_settings("avatar"); break;
     default: muse_ui_open_settings(NULL); break;
@@ -272,7 +276,7 @@ static void function_panel(void)
     lv_obj_t *box = panel("功能", on_function);
     row(box, 0, "小游戏", NULL, true);
     row(box, 1, "白噪音", NULL, true);
-    row(box, 2, "小花园", NULL, true);
+    row(box, 2, "去农场", NULL, true);
     row(box, 3, "相册和聊天记录", NULL, true);
     row(box, 4, "换装", NULL, true);
     row(box, 5, "设置", NULL, true);
@@ -305,7 +309,7 @@ static void bag_panel(void)
     }
     snprintf(v, sizeof v, "%d 件", owned);
     row(box, -1, "皮肤", v, false);
-    note(box, any ? "花园收获的都在这里。更多道具即将到来。" : "小花园收获的东西会放在这里。");
+    note(box, any ? "农场收获的都在这里。更多道具即将到来。" : "农场收获的东西会放在这里。");
 }
 
 /* ---- 商店: the current character's skins, for stars ---- */
@@ -413,6 +417,77 @@ static void named(const char *text, bool done)
     }
 }
 
+/* ---- the farm: a plot to plant, water or pick ---- */
+
+static int s_plot = -1;   /* the plot the seeds panel is for */
+
+static void on_seed(int i)
+{
+    int64_t now;
+    int minute;
+    boopie_garden_t *g = boopie_avatar_garden(&now, &minute);
+    boopie_plant_t plant = (boopie_plant_t)(i + 1);
+    close_panel();
+    if (g && s_plot >= 0 && boopie_garden_plant(g, s_plot, plant, now)) {
+        boopie_avatar_garden_changed(0, 0);
+        boopie_sound_play(BOOPIE_SOUND_WATER);
+        say("种下%s啦！每天浇一次水", boopie_plant_name(plant));
+    }
+    s_plot = -1;
+}
+
+static void seeds_panel(int plot)
+{
+    lv_obj_t *box = panel("种什么？", on_seed);
+    s_plot = plot;
+    for (int p = 1; p < BOOPIE_PLANT_COUNT; p++) {
+        char v[16];
+        snprintf(v, sizeof v, "%d 天", boopie_plant_days((boopie_plant_t)p));
+        row(box, p - 1, boopie_plant_name((boopie_plant_t)p), v, true);
+    }
+    note(box, "种下就浇好了水。土干了它就停下来等你，不会枯死。");
+}
+
+static void use_plot(int plot)
+{
+    int64_t now;
+    int minute;
+    boopie_garden_t *g = boopie_avatar_garden(&now, &minute);
+    if (!g) {
+        say("还没对上时间，连上网再来种吧");
+        return;
+    }
+    const char *name = boopie_plant_name((boopie_plant_t)g->pots[plot].plant);
+    switch (boopie_garden_stage(g, plot)) {
+    case BOOPIE_STAGE_EMPTY:
+        seeds_panel(plot);
+        return;
+    case BOOPIE_STAGE_BLOOM: {
+        int xp = 0, stars = 0;
+        if (boopie_garden_harvest(g, plot, &xp, &stars)) {
+            boopie_sound_play(BOOPIE_SOUND_GOLD);
+            boopie_avatar_garden_changed(xp, stars);
+            say("收获%s！★ +%d", name, stars);
+        }
+        return;
+    }
+    default:
+        break;
+    }
+    if (boopie_garden_water(g, plot, now)) {
+        boopie_sound_play(BOOPIE_SOUND_WATER);
+        boopie_avatar_garden_changed(0, 0);
+        say("浇好水啦");
+        return;
+    }
+    unsigned h = (unsigned)((boopie_garden_left_s(g, plot) + 3599) / 3600);
+    if (h >= 24) {
+        say("%s还要 %u 天 %u 小时开花", name, h / 24, h % 24);
+    } else {
+        say("%s还要 %u 小时开花", name, h);
+    }
+}
+
 /* ---------------------------------------------------------------- doing things */
 
 static void feed(void)
@@ -428,17 +503,21 @@ static void feed(void)
     say("好吃！谢谢你～");
 }
 
-static void act(boopie_do_t what)
+static void act(boopie_do_t what, int arg)
 {
     muse_state_poke();
     switch (what) {
+    case BOOPIE_DO_PLOT: use_plot(arg); break;
+    case BOOPIE_DO_MAIL: say("没有新的信"); break;
+    case BOOPIE_DO_WILD: say("森林还在准备中，敬请期待！"); break;
+    case BOOPIE_DO_INSIDE: say("回家咯"); break;
     case BOOPIE_DO_GAMES: games_panel(); break;
     case BOOPIE_DO_BOOKS: books_panel(); break;
     case BOOPIE_DO_RADIO: boopie_noise_ui_open_locked(); break;
     case BOOPIE_DO_FEED: feed(); break;
     case BOOPIE_DO_UPSTAIRS: say("到二楼啦"); break;
     case BOOPIE_DO_DOWNSTAIRS: say("下楼咯"); break;
-    case BOOPIE_DO_OUTSIDE: say("外面正在建设，很快就能出门啦！"); break;
+    case BOOPIE_DO_OUTSIDE: say("出门啦！"); break;
     case BOOPIE_DO_SLEEP:
         if (s_world.state == BOOPIE_PET_SLEEPING) {
             say("晚安～");
@@ -466,7 +545,7 @@ static void on_tap(lv_event_t *e)
     lv_indev_get_point(in, &p);
     lv_area_t a;
     lv_obj_get_coords(s_image, &a);
-    float x = (float)(p.x - a.x1 + 1) / 3, y = (float)(p.y - a.y1 + 1) / 3;
+    float x = (float)(p.x - a.x1 + 1) / 3 + s_world.cam, y = (float)(p.y - a.y1 + 1) / 3;
     boopie_pet_status_t st;
     boopie_avatar_pet_status(&st);
     int r = boopie_world_tap(&s_world, st.level, x, y);
@@ -510,9 +589,12 @@ static void frame(lv_timer_t *timer)
     int hour = 12;
     bool known = local_hour(&hour);
     bool night = known && (hour >= 20 || hour < 6);
+    int using = s_world.pending;
+    const boopie_thing_t *thing = boopie_world_thing(&s_world, using);
+    int arg = thing ? thing->arg : 0;
     boopie_do_t d = boopie_world_tick(&s_world, st.level, dt);
     if (d != BOOPIE_DO_NOTHING) {
-        act(d);
+        act(d, arg);
     }
     /* Late at night, left alone a while, it goes to bed by itself. */
     if (known && (hour >= 22 || hour < 6) && s_world.state == BOOPIE_PET_IDLE && s_world.state_t > 20) {
@@ -523,7 +605,10 @@ static void frame(lv_timer_t *timer)
         boopie_pixel_head_image(avatar == BOOPIE_AVATAR_MUSE ? BOOPIE_SKIN_MUSE : avatar - 1, s_pet, 1);
         s_pet_for = avatar;
     }
-    boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_HEAD_H };
+    int64_t epoch = 0;
+    int minute = 0;
+    const boopie_garden_t *garden = boopie_avatar_garden(&epoch, &minute);
+    boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_HEAD_H, garden, epoch };
     boopie_world_draw(&s_world, &look, s_rgb);
     boopie_world_scale(s_rgb, s_screen, SIZE);
     const char *clock = boopie_pages_clock();
@@ -546,7 +631,7 @@ static void frame(lv_timer_t *timer)
     if (!lv_obj_has_flag(s_say, LV_OBJ_FLAG_HIDDEN)) {
         lv_obj_update_layout(s_say);
         int w = lv_obj_get_width(s_say);
-        int x = (int)s_world.x * 3 - 1 - w / 2, y = ((int)s_world.y - 20) * 3 - 44;
+        int x = (int)(s_world.x - s_world.cam) * 3 - 1 - w / 2, y = ((int)s_world.y - 20) * 3 - 44;
         x = x < 40 ? 40 : x + w > SIZE - 40 ? SIZE - 40 - w : x;
         y = y < 84 ? 84 : y;
         lv_obj_set_pos(s_say, x, y);
@@ -656,4 +741,47 @@ bool boopie_world_ui_back(void)
     close_panel();
     muse_board->display_unlock();
     return open;
+}
+
+bool boopie_world_ui_go(const char *room)
+{
+    static const char *const NAMES[] = { [BOOPIE_ROOM_LIVING] = "living", [BOOPIE_ROOM_BEDROOM] = "bedroom",
+                                         [BOOPIE_ROOM_OUTSIDE] = "outside" };
+    for (int r = 0; r < (int)(sizeof NAMES / sizeof NAMES[0]); r++) {
+        if (NAMES[r] && !strcmp(room, NAMES[r])) {
+            boopie_world_enter(&s_world, (boopie_room_t)r, r == BOOPIE_ROOM_OUTSIDE ? BOOPIE_DO_OUTSIDE
+                                                         : r == BOOPIE_ROOM_BEDROOM ? BOOPIE_DO_UPSTAIRS
+                                                                                    : BOOPIE_DO_INSIDE);
+            return true;
+        }
+    }
+    return false;
+}
+
+/* ---------------------------------------------------------------- the AI */
+
+void boopie_world_ui_farm_status(char *out, size_t cap)
+{
+    static const char *const STAGES[] = { "a seed", "a sprout", "in leaf", "in bud", "in bloom, ready to pick" };
+    static const char *const PLANTS[] = { "", "sunflower", "tulip", "strawberry", "cactus" };
+    muse_board->display_lock(-1);
+    int64_t now;
+    int minute;
+    boopie_garden_t *g = boopie_avatar_garden(&now, &minute);
+    size_t n = 0;
+    if (!g) {
+        snprintf(out, cap, "the clock isn't set yet, so the farm can't grow");
+    }
+    for (int i = 0; g && i < BOOPIE_GARDEN_POTS && n < cap; i++) {
+        boopie_stage_t st = boopie_garden_stage(g, i);
+        if (st == BOOPIE_STAGE_EMPTY) {
+            n += (size_t)snprintf(out + n, cap - n, "plot %d: empty. ", i + 1);
+        } else {
+            n += (size_t)snprintf(out + n, cap - n, "plot %d: %s, %s, %s, %u h of damp soil to bloom. ", i + 1,
+                                  PLANTS[g->pots[i].plant], STAGES[st],
+                                  boopie_garden_dry(g, i, now) ? "thirsty" : "watered",
+                                  (unsigned)((boopie_garden_left_s(g, i) + 3599) / 3600));
+        }
+    }
+    muse_board->display_unlock();
 }

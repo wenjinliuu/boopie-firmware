@@ -22,6 +22,7 @@
 typedef enum {
     BOOPIE_ROOM_LIVING = 0,   /* 一楼客厅 */
     BOOPIE_ROOM_BEDROOM,      /* 二楼卧室 */
+    BOOPIE_ROOM_OUTSIDE,      /* 户外: the house front and the farm, wider than the screen */
     BOOPIE_ROOM_COUNT,
 } boopie_room_t;
 
@@ -39,6 +40,10 @@ typedef enum {
     BOOPIE_DO_WARDROBE,       /* 换装 */
     BOOPIE_DO_RENAME,         /* the mirror */
     BOOPIE_DO_STATUS,         /* the desk's computer */
+    BOOPIE_DO_PLOT,           /* a farm plot (arg: which): plant, water, pick */
+    BOOPIE_DO_INSIDE,         /* the house's door, from outside */
+    BOOPIE_DO_MAIL,           /* the mailbox */
+    BOOPIE_DO_WILD,           /* the sign to the woods */
     BOOPIE_DO_COUNT,
 } boopie_do_t;
 
@@ -53,6 +58,7 @@ typedef struct {
     uint8_t act;              /* boopie_do_t */
     uint8_t hint;             /* its hint bubble's art, or 0 for none */
     int8_t use_dx, use_dy;    /* where the pet stands to use it, from (x, y) */
+    uint8_t arg;              /* BOOPIE_DO_PLOT: the plot */
 } boopie_thing_t;
 
 /* A room's things, and its background at a level. */
@@ -61,6 +67,8 @@ boopie_art_id_t boopie_room_background(boopie_room_t room, int level);
 bool boopie_thing_shown(const boopie_thing_t *t, int level);
 /* Where the pet may walk: a box on the floor. */
 void boopie_room_floor(boopie_room_t room, int *x0, int *y0, int *x1, int *y1);
+/* How wide it is: the screen's width, or more (then the view follows the pet). */
+int boopie_room_width(boopie_room_t room);
 
 typedef enum { BOOPIE_PET_IDLE = 0, BOOPIE_PET_WALKING, BOOPIE_PET_USING, BOOPIE_PET_SLEEPING } boopie_pet_state_t;
 
@@ -75,6 +83,7 @@ typedef struct {
     float idle_for;           /* how long it rests before wandering on */
     int pending;              /* the thing it's walking to use, or -1 */
     float walked;             /* distance walked, for the hop */
+    float cam;                /* the view's left edge in a wide room */
 } boopie_world_t;
 
 void boopie_world_init(boopie_world_t *w, uint32_t seed);
@@ -83,7 +92,7 @@ void boopie_world_init(boopie_world_t *w, uint32_t seed);
 void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from);
 
 /*
- * A tap at (x, y): on a thing that does something, the pet goes to use it
+ * A tap at (x, y), in the room (add w->cam to a point on the screen): on a thing that does something, the pet goes to use it
  * (and its index comes back); on the floor, it walks there (-1); elsewhere
  * nothing (-2). Asleep, a tap anywhere but the bed wakes it (-3).
  */

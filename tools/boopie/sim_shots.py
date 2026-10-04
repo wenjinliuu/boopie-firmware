@@ -219,8 +219,15 @@ LOOK = [("viewer-chat", ["viewer=chat"]), ("viewer-album", ["viewer=album"]), ("
         ("game-maze", ["game=maze", "tap=233,233", "advance=3000"]),
         ("noise", ["noise=rain", "advance=3000"]),
         ("game-hop", ["game=hop", *["tap=233,233"] * 4]),
-        ("pet-stroke", ["stroke=4"]), ("pet-hug", ["stroke=0"]), ("garden", ["garden=open"]),
+        ("pet-stroke", ["stroke=4"]), ("pet-hug", ["stroke=0"]),
         ("nest", ["swipe=up", "advance=1500"]), ("nest-shop", ["swipe=up", "advance=1200", "tap=307,418"])]
+# 小窝's yard and farm (BOOPIE_GARDEN=bloom: a sunflower in bud, a dry tulip, a
+# strawberry to pick): out of the door, walked over to the plots, and the
+# seeds for an empty one.
+FARM = [("nest-outside", ["swipe=up", "advance=600", "room=outside", "advance=1500"]),
+        ("nest-farm", ["swipe=up", "advance=600", "room=outside", "tap=440,300", "advance=6000"]),
+        ("nest-seeds", ["swipe=up", "advance=600", "room=outside", "tap=440,300", "advance=6000",
+                        "tap=233,325", "advance=4000"])]
 
 
 def user_data(root: Path) -> Path:
@@ -248,6 +255,13 @@ def render_look(binary: Path, out: Path) -> list[Path]:
         return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
                       {"BOOPIE_DATA": str(data), "BOOPIE_VPN": "1"}, 400)
                 for name, steps in LOOK]
+
+
+def render_farm(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
+                      {"BOOPIE_GARDEN": "bloom", "BOOPIE_PET_XP": "900"}, 400)
+                for name, steps in FARM]
 
 
 # The settings pages, reached by a scripted finger (466 px screen).
@@ -304,6 +318,7 @@ def main() -> int:
     contact_sheet(pages, args.out / "pages.png", cols=len(PAGES))
     pages += render_phone(args.binary, args.out)
     pages += render_look(args.binary, args.out)
+    pages += render_farm(args.binary, args.out)
     settings = render_settings(args.binary, args.out)
     contact_sheet(settings, args.out / "settings.png", cols=len(SETTINGS))
     wears = render_accessories(args.binary, args.out)

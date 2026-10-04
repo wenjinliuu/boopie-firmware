@@ -39,7 +39,8 @@ int main(int argc, char **argv)
                     acts[n++] = d;
                 }
             }
-            printf("{\"room\": %d, \"x\": %.1f, \"y\": %.1f, \"state\": %d, \"acts\": [", w.room, w.x, w.y, w.state);
+            printf("{\"room\": %d, \"x\": %.1f, \"y\": %.1f, \"state\": %d, \"cam\": %.1f, \"acts\": [", w.room, w.x,
+                   w.y, w.state, w.cam);
             for (int k = 0; k < n; k++) {
                 printf("%s%d", k ? ", " : "", acts[k]);
             }

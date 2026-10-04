@@ -88,6 +88,15 @@ class BoopieGardenTest(unittest.TestCase):
         self.assertEqual(s[2]["ret"], 0)        # 42 h left of 72: still damp
         self.assertEqual(s[4]["ret"], 1)
 
+    def test_three_pots_saved_by_version_1_come_through(self) -> None:
+        s = self.run_g("plant:0:1", "plant:2:3", "at:30", "v1", "at:40")
+        self.assertEqual(s[3]["ret"], 2)
+        self.assertEqual([p[0] for p in s[4]["pots"]], [LEAVES, EMPTY, SPROUT, EMPTY, EMPTY, EMPTY])
+
+    def test_six_plots(self) -> None:
+        s = self.run_g("plant:5:4", "plant:6:1")
+        self.assertEqual([x["ret"] for x in s], [1, 0])
+
     def test_keeps_in_nvs(self) -> None:
         s = self.run_g("plant:0:1", "plant:2:3", "at:30", "save")
         self.assertEqual(s[-1]["ret"], 2)       # round trips; a wrong size doesn't load

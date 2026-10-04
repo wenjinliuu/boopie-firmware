@@ -198,16 +198,6 @@ void boopie_pixel_render_catch(const struct boopie_catch *g, int head);
 void boopie_pixel_render_maze(const struct boopie_maze *g);
 void boopie_pixel_render_hop(const struct boopie_hop *g, int head);
 
-/* 小花园 (pet/boopie_garden.h) the same way, at `now` (epoch seconds) and
- * `minute` of the local day (the sky), t seconds for the twinkling; the pot
- * `selected` underlined, the one `watering` watered `watered_t` seconds ago
- * and the one `harvested` picked `harvested_t` ago (-1: none). */
-struct boopie_garden;
-void boopie_pixel_render_garden(const struct boopie_garden *g, int64_t now, int minute, float t, int selected,
-                                int watering, float watered_t, int harvested, float harvested_t);
-/* Where pot `pot` stands on the grid: its centre and its rim's row. */
-void boopie_pixel_garden_pot(int pot, int *cx, int *top);
-
 /* A character's 13 x 10 head (as in the games) in its own colours, `scale`
  * pixels a cell, RGB565 row by row into dst (13*scale x 10*scale); black
  * round it. head as boopie_pixel_render_whack(). */

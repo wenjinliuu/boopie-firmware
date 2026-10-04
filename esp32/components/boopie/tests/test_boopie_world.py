@@ -24,9 +24,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 COMPONENT = HERE.parent
 
-(NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS) = range(12)
+(NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS,
+ PLOT, INSIDE, MAIL, WILD) = range(16)
 IDLE, WALKING, USING, SLEEPING = range(4)
-LIVING, BEDROOM = range(2)
+LIVING, BEDROOM, YARD = range(3)
 
 
 class BoopieWorldTest(unittest.TestCase):
@@ -83,7 +84,7 @@ class BoopieWorldTest(unittest.TestCase):
         for level in (1, 14, 15, 30):
             acts = {t["act"] for t in self.things(level) if t["shown"]}
             self.assertTrue({GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME,
-                             STATUS} <= acts, level)
+                             STATUS, PLOT, INSIDE, MAIL, WILD} <= acts, level)
             games = [t for t in self.things(level) if t["shown"] and t["act"] == GAMES]
             self.assertEqual(len(games), 1)
 
@@ -91,6 +92,15 @@ class BoopieWorldTest(unittest.TestCase):
         for level in (1, 20):
             for t in self.things(level):
                 if not t["shown"]:
+                    continue
+                if t["room"] == YARD:
+                    # The view follows the pet across: only up and down must fit.
+                    if t["act"]:
+                        hint_over = 0 if t["act"] == INSIDE else 16   # the house's hint is over its door
+                        self.assertGreaterEqual(t["box"][1] + 16 - hint_over, 6, t)
+                        self.assertLessEqual(t["box"][3], 128, t)
+                        self.assertLess(0, t["box"][0], t)
+                        self.assertLess(t["box"][2], 360, t)
                     continue
                 x0, y0, x1, y1 = t["box"]
                 top = y0 + (16 if t["act"] and t["art"] else 0)   # the picture, under its hint
@@ -120,6 +130,19 @@ class BoopieWorldTest(unittest.TestCase):
         self.assertNotEqual(s[6]["state"], SLEEPING)
         self.assertEqual(s[8]["state"], SLEEPING)          # sent to bed
         self.assertEqual(s[10]["acts"], [SLEEP])           # the bed again: up
+
+    def test_out_the_door_and_back(self) -> None:
+        mat = self.thing(1, OUTSIDE)
+        door = self.thing(1, INSIDE, YARD)
+        s = self.run_w(f"tap:{mat['x']}:{mat['y'] - 3}", "tick:3", f"tap:{door['x']}:{door['y'] - 10}", "tick:3")
+        self.assertEqual((s[1]["room"], s[1]["acts"]), (YARD, [OUTSIDE]))
+        self.assertLess(math.hypot(s[1]["x"] - door["use"][0], s[1]["y"] - door["use"][1]), 3)
+        self.assertEqual((s[3]["room"], s[3]["acts"]), (LIVING, [INSIDE]))
+
+    def test_the_farm_opens_with_the_level(self) -> None:
+        def plots(level: int) -> int:
+            return sum(1 for t in self.things(level) if t["act"] == PLOT and t["shown"])
+        self.assertEqual([plots(lv) for lv in (1, 5, 10, 15)], [3, 4, 5, 6])
 
     def test_floor_and_wall(self) -> None:
         s = self.run_w("tap:90:90", "tick:1.5", "tap:78:10")

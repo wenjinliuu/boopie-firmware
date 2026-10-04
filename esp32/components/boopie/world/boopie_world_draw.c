@@ -8,9 +8,12 @@
 #include <math.h>
 #include <string.h>
 
+#include "boopie_garden.h"
+
 #define N BOOPIE_WORLD_W
 
 static uint8_t *s_rgb;
+static int s_cam;   /* the view's left edge in the room: what's drawn moves left by it */
 
 static void put(int x, int y, uint32_t c)
 {
@@ -32,22 +35,36 @@ static void darken(int x, int y, float k)
     }
 }
 
-static void blit(boopie_art_id_t id, int x, int y)
+/* A picture standing at (x, y) in the room; dry, washed toward straw. */
+static void blit_tint(boopie_art_id_t id, int x, int y, bool dry)
 {
     const boopie_art_t *a = &boopie_art[id];
-    int x0 = x - a->ax, y0 = y - a->ay;
+    int x0 = x - s_cam - a->ax, y0 = y - a->ay;
+    if (x0 >= N || x0 + a->w < 0) {
+        return;
+    }
     for (int j = 0; j < a->h; j++) {
         const uint8_t *row = a->px + j * a->w;
         for (int i = 0; i < a->w; i++) {
             if (row[i]) {
-                put(x0 + i, y0 + j, boopie_art_palette[row[i]]);
+                uint32_t c = boopie_art_palette[row[i]];
+                if (dry) {
+                    c = ((((c >> 16) & 255) + 150) / 2) << 16 | ((((c >> 8) & 255) + 140) / 2) << 8 | (((c & 255) + 80) / 2);
+                }
+                put(x0 + i, y0 + j, c);
             }
         }
     }
 }
 
+static void blit(boopie_art_id_t id, int x, int y)
+{
+    blit_tint(id, x, y, false);
+}
+
 static void shadow(float cx, float cy, float rx, float ry)
 {
+    cx -= s_cam;
     for (int y = (int)(cy - ry); y <= (int)(cy + ry); y++) {
         for (int x = (int)(cx - rx); x <= (int)(cx + rx); x++) {
             float dx = (x - cx) / rx, dy = (y - cy) / ry;
@@ -67,8 +84,8 @@ static void pet(const boopie_world_t *w, const boopie_world_look_t *look)
     bool asleep = w->state == BOOPIE_PET_SLEEPING;
     /* A hop as it walks; a slow breath standing; still, asleep. */
     int hop = walking ? (int)(fabsf(sinf(w->walked * 0.45f)) * 3) : asleep ? 0 : ((int)(look->t * 2) & 1);
-    int px = (int)w->x, py = (int)w->y;
-    shadow(px, py, look->pet_w / 2.0f + 1, 2.2f);
+    int px = (int)w->x - s_cam, py = (int)w->y;
+    shadow(px + s_cam, py, look->pet_w / 2.0f + 1, 2.2f);
     int x0 = px - look->pet_w / 2, y0 = py - look->pet_h - 2 - hop;
     /* Two little feet under it, its body's colour darkened, stepping in turn as it walks. */
     uint16_t body = look->pet[(look->pet_h - 1) * look->pet_w + look->pet_w / 2];
@@ -114,6 +131,55 @@ static void pet(const boopie_world_t *w, const boopie_world_look_t *look)
     }
 }
 
+/* A plot: its soil (dark while damp), what grows in it, by kind and stage. */
+static boopie_art_id_t crop_art(boopie_plant_t plant, boopie_stage_t st)
+{
+    bool cactus = plant == BOOPIE_PLANT_CACTUS;
+    switch (st) {
+    case BOOPIE_STAGE_SEED: return BOOPIE_ART_CROP_SEED;
+    case BOOPIE_STAGE_SPROUT: return cactus ? BOOPIE_ART_CROP_CACTUS_S : BOOPIE_ART_CROP_SPROUT;
+    case BOOPIE_STAGE_LEAVES: return cactus ? BOOPIE_ART_CROP_CACTUS_M : BOOPIE_ART_CROP_LEAVES;
+    case BOOPIE_STAGE_BUD:
+        return cactus ? BOOPIE_ART_CROP_CACTUS_L : plant == BOOPIE_PLANT_SUNFLOWER ? BOOPIE_ART_CROP_BUD_SUN
+               : plant == BOOPIE_PLANT_TULIP ? BOOPIE_ART_CROP_BUD_TULIP : BOOPIE_ART_CROP_BUD_BERRY;
+    case BOOPIE_STAGE_BLOOM:
+        return cactus ? BOOPIE_ART_CROP_CACTUS : plant == BOOPIE_PLANT_SUNFLOWER ? BOOPIE_ART_CROP_SUNFLOWER
+               : plant == BOOPIE_PLANT_TULIP ? BOOPIE_ART_CROP_TULIP : BOOPIE_ART_CROP_STRAWBERRY;
+    default: return BOOPIE_ART_COUNT;
+    }
+}
+
+/* The plot's hint: plant (+), thirsty (a drop), ready (!), or none while it grows. */
+static int plot_hint(const boopie_thing_t *t, const boopie_world_look_t *look, int *top)
+{
+    *top = t->y - 16;
+    if (!look->garden) {
+        return BOOPIE_ART_HINT_PLUS;
+    }
+    boopie_stage_t st = boopie_garden_stage(look->garden, t->arg);
+    if (st == BOOPIE_STAGE_EMPTY) {
+        return BOOPIE_ART_HINT_PLUS;
+    }
+    boopie_art_id_t crop = crop_art((boopie_plant_t)look->garden->pots[t->arg].plant, st);
+    *top = t->y - 6 - boopie_art[crop].ay;
+    if (st == BOOPIE_STAGE_BLOOM) {
+        return BOOPIE_ART_HINT_BANG;
+    }
+    return boopie_garden_dry(look->garden, t->arg, look->now) ? BOOPIE_ART_HINT_WATER : 0;
+}
+
+static void plot(const boopie_thing_t *t, const boopie_world_look_t *look)
+{
+    const struct boopie_garden *g = look->garden;
+    boopie_stage_t st = g ? boopie_garden_stage(g, t->arg) : BOOPIE_STAGE_EMPTY;
+    bool damp = g && st != BOOPIE_STAGE_EMPTY && boopie_garden_damp_s(g, t->arg, look->now) > 0;
+    blit(damp ? BOOPIE_ART_PLOT_DAMP : BOOPIE_ART_PLOT_DRY, t->x, t->y);
+    if (st != BOOPIE_STAGE_EMPTY) {
+        bool dry = boopie_garden_dry(g, t->arg, look->now);
+        blit_tint(crop_art((boopie_plant_t)g->pots[t->arg].plant, st), t->x, t->y - 6, dry);
+    }
+}
+
 static boopie_art_id_t art_of(const boopie_thing_t *t, const boopie_world_look_t *look)
 {
     if (t->art == BOOPIE_ART_WINDOW_DAY && look->night) {
@@ -133,9 +199,9 @@ typedef struct {
 /* Night: everything dimmed and blue, and near a lamp the true colours back, warmed. */
 static void night(const boopie_thing_t *t, int n, int level)
 {
-    light_t lights[6];
+    light_t lights[8];
     int nl = 0;
-    for (int i = 0; i < n && nl < 6; i++) {
+    for (int i = 0; i < n && nl < 8; i++) {
         if (!boopie_thing_shown(&t[i], level)) {
             continue;
         }
@@ -145,8 +211,13 @@ static void night(const boopie_thing_t *t, int n, int level)
         case BOOPIE_ART_TV_FLAT: lights[nl++] = (light_t){ t[i].x, t[i].y - 16, 26, 0xa8d8ff }; break;
         case BOOPIE_ART_STAR_LAMP: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 30, 0xffe090 }; break;
         case BOOPIE_ART_AQUARIUM: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 26, 0x90d8ff }; break;
+        case BOOPIE_ART_LAMP_POST: lights[nl++] = (light_t){ t[i].x, t[i].y - 27, 40, 0xffe0a0 }; break;
+        case BOOPIE_ART_HOUSE_FRONT: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 40, 0xffd090 }; break;
         default: break;
         }
+    }
+    for (int k = 0; k < nl; k++) {
+        lights[k].x -= s_cam;
     }
     for (int y = 0; y < N; y++) {
         for (int x = 0; x < N; x++) {
@@ -184,28 +255,38 @@ static void night(const boopie_thing_t *t, int n, int level)
 void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look, uint8_t *rgb)
 {
     s_rgb = rgb;
+    s_cam = (int)(w->cam + 0.5f);
     const boopie_art_t *bg = &boopie_art[boopie_room_background(w->room, look->level)];
-    for (int i = 0; i < N * N; i++) {
-        uint32_t c = boopie_art_palette[bg->px[i]];
-        rgb[i * 3] = (uint8_t)(c >> 16);
-        rgb[i * 3 + 1] = (uint8_t)(c >> 8);
-        rgb[i * 3 + 2] = (uint8_t)c;
+    int cam = s_cam + N > bg->w ? bg->w - N : s_cam;
+    for (int y = 0; y < N; y++) {
+        const uint8_t *src = bg->px + y * bg->w + cam;
+        uint8_t *dst = rgb + y * N * 3;
+        for (int x = 0; x < N; x++) {
+            uint32_t c = boopie_art_palette[src[x]];
+            dst[x * 3] = (uint8_t)(c >> 16);
+            dst[x * 3 + 1] = (uint8_t)(c >> 8);
+            dst[x * 3 + 2] = (uint8_t)c;
+        }
     }
     int n;
     const boopie_thing_t *t = boopie_room_things(w->room, &n);
     for (int layer = BOOPIE_LAYER_FLOOR; layer <= BOOPIE_LAYER_WALL; layer++) {
         for (int i = 0; i < n; i++) {
             if (t[i].layer == layer && boopie_thing_shown(&t[i], look->level)) {
-                blit(art_of(&t[i], look), t[i].x, t[i].y);
+                if (t[i].act == BOOPIE_DO_PLOT) {
+                    plot(&t[i], look);
+                } else {
+                    blit(art_of(&t[i], look), t[i].x, t[i].y);
+                }
             }
         }
     }
     /* What stands, back to front, and the pet among it. */
     bool pet_drawn = false;
-    int done[32] = { 0 };
+    int done[48] = { 0 };
     for (;;) {
         int next = -1;
-        for (int i = 0; i < n && i < 32; i++) {
+        for (int i = 0; i < n && i < 48; i++) {
             if (!done[i] && t[i].layer == BOOPIE_LAYER_STAND && boopie_thing_shown(&t[i], look->level)
                 && (next < 0 || t[i].y < t[next].y)) {
                 next = i;
@@ -221,8 +302,12 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             break;
         }
         const boopie_art_t *a = &boopie_art[t[next].art];
-        shadow(t[next].x + 2, t[next].y + 1, a->w / 2.0f, 2.0f);
-        blit(art_of(&t[next], look), t[next].x, t[next].y);
+        int x = t[next].x;
+        if (t[next].art == BOOPIE_ART_CHICKEN) {
+            x += (int)(sinf(look->t * 0.8f + next) * 4);   /* pecking about */
+        }
+        shadow(x + 2, t[next].y + 1, a->w / 2.0f, 2.0f);
+        blit(art_of(&t[next], look), x, t[next].y);
         done[next] = 1;
     }
     if (look->night) {
@@ -234,10 +319,17 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             const boopie_art_t *a = &boopie_art[t[i].art];
             int bob = (int)(sinf(look->t * 3 + i) * 1.2f);
             int top = t[i].y - a->ay;
+            int hint = t[i].hint;
             if (t[i].art == BOOPIE_ART_DOOR_OUT) {
                 top = t[i].y - 6;
+            } else if (t[i].act == BOOPIE_DO_PLOT) {
+                hint = plot_hint(&t[i], look, &top);
+            } else if (t[i].art == BOOPIE_ART_HOUSE_FRONT) {
+                top = t[i].y - 18;   /* over its door, not its roof */
             }
-            blit((boopie_art_id_t)t[i].hint, t[i].x, top - 1 + bob);
+            if (hint) {
+                blit((boopie_art_id_t)hint, t[i].x, top - 1 + bob);
+            }
         }
     }
 }

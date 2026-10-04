@@ -6,6 +6,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "lvgl.h"
 
@@ -24,3 +25,10 @@ void boopie_world_ui_build(lv_obj_t *tile);
 
 /* The bottom button, from any task: closes a panel if one's open (true). */
 bool boopie_world_ui_back(void);
+
+/* Straight into a room ("living", "bedroom", "outside"), the pet at its way
+ * in; false for an unknown one. For the simulator; LVGL task. */
+bool boopie_world_ui_go(const char *room);
+
+/* The AI's garden.status: each farm plot, in English, into out. Any task. */
+void boopie_world_ui_farm_status(char *out, size_t cap);

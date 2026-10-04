@@ -344,6 +344,295 @@ def rug(L, x, y, rx, ry, a, b):
                 L.put(xx, yy, a if d < 0.65 or d > 0.85 else b)
 
 
+
+# ---------------------------------------------------------------- outdoors
+
+GRASS = (172, 206, 128)
+GRASS_D = (140, 180, 102)
+GRASS_L = (196, 224, 156)
+SAND = (226, 210, 160)
+OUT_W = 360   # the outdoor scene: about two and a third screens wide
+
+
+def bg_outside():
+    import random
+    r = random.Random(3)
+    im = Image.new("RGB", (OUT_W, W), GRASS)
+    px = im.load()
+
+    def sand(x, y):
+        if 0 <= x < OUT_W and 0 <= y < W:
+            px[x, y] = SAND
+
+    # The path: from the door down, then east to the woods; its edges dithered.
+    def band(x0, x1, y0, y1):
+        for y in range(y0 - 1, y1 + 2):
+            for x in range(x0 - 1, x1 + 2):
+                edge = x in (x0 - 1, x1 + 1) or y in (y0 - 1, y1 + 1)
+                if not edge or (x + y) % 2:
+                    sand(x, y)
+    band(62, 78, 64, 100)
+    band(62, OUT_W - 1, 92, 104)
+    for _ in range(140):   # tufts
+        x, y = r.randrange(2, OUT_W - 3), r.randrange(4, W - 3)
+        if px[x, y] == GRASS:
+            px[x, y] = GRASS_D; px[x + 2, y] = GRASS_D; px[x + 1, y + 1] = GRASS_D
+    for _ in range(80):
+        x, y = r.randrange(OUT_W), r.randrange(W)
+        if px[x, y] == GRASS:
+            px[x, y] = GRASS_L
+    for _ in range(26):   # flowers
+        x, y = r.randrange(4, OUT_W - 4), r.randrange(4, W - 4)
+        if px[x, y] == GRASS:
+            c = r.choice(((255, 255, 255), (248, 120, 120), (255, 216, 96)))
+            for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
+                if px[x + dx, y + dy] == GRASS:
+                    px[x + dx, y + dy] = c
+            px[x, y] = (248, 200, 64)
+    return im
+
+
+def house_front(L, x, y):
+    L.rect(x - 28, y - 30, x + 28, y, (248, 236, 208))
+    L.rect(x - 28, y - 4, x + 28, y, (216, 200, 168))
+    L.poly([(x - 33, y - 28), (x, y - 46), (x + 33, y - 28)], (216, 88, 72))
+    L.rect(x - 33, y - 30, x + 33, y - 26, (216, 88, 72))
+    for k in range(4):
+        L.rect(x - 32 + k * 3, y - 31 - k * 3, x + 32 - k * 3, y - 31 - k * 3, (240, 120, 96))
+    L.rect(x - 33, y - 26, x + 33, y - 25, (168, 64, 56))
+    L.rect(x + 12, y - 52, x + 18, y - 38, (176, 160, 150))
+    L.rect(x - 6, y - 18, x + 6, y, (168, 112, 72))
+    L.rect(x - 5, y - 17, x + 5, y - 11, (196, 140, 92))
+    L.put(x + 3, y - 8, (248, 216, 96))
+    for wx in (x - 22, x + 11):
+        L.rect(wx, y - 20, wx + 10, y - 11, (120, 176, 232))
+        L.rect(wx, y - 20, wx + 4, y - 16, (184, 224, 248))
+        L.rect(wx + 5, y - 20, wx + 5, y - 11, (248, 236, 208))
+
+
+def mailbox(L, x, y):
+    L.rect(x - 1, y - 7, x, y, (160, 112, 72))
+    L.rect(x - 5, y - 13, x + 4, y - 7, (232, 88, 88))
+    L.rect(x - 5, y - 13, x + 4, y - 12, (248, 140, 140))
+    L.rect(x + 5, y - 13, x + 5, y - 10, (248, 216, 96))
+
+
+def sign(L, x, y):
+    L.rect(x - 1, y - 7, x, y, (160, 112, 72))
+    L.rect(x - 8, y - 14, x + 8, y - 6, (224, 184, 128))
+    for k in range(9):
+        L.put(x - 5 + k, y - 10, (120, 80, 48))
+    for k in range(3):
+        L.put(x + 3 - k, y - 10 - k, (120, 80, 48)); L.put(x + 3 - k, y - 10 + k, (120, 80, 48))
+
+
+def tree(L, x, y):
+    L.rect(x - 2, y - 8, x + 2, y, (148, 104, 64))
+    L.rect(x + 1, y - 8, x + 2, y, (116, 80, 48))
+    L.ell(x - 12, y - 30, x + 12, y - 6, (96, 168, 88))
+    for k in range(-2, 3):
+        L.ell(x + k * 5 - 4, y - 10, x + k * 5 + 4, y - 4, (72, 140, 72))
+    L.ell(x - 9, y - 28, x + 2, y - 18, (136, 200, 104))
+
+
+def fruit_tree(L, x, y):
+    tree(L, x, y)
+    for fx, fy in ((-6, -20), (4, -24), (6, -14), (-3, -12)):
+        L.ell(x + fx - 1, y + fy - 1, x + fx + 1, y + fy + 1, (248, 144, 56))
+
+
+def pine(L, x, y):
+    L.rect(x - 1, y - 4, x + 1, y, (140, 96, 60))
+    for k, w in enumerate((9, 7, 5)):
+        top = y - 8 - k * 6
+        L.poly([(x, top - 7), (x - w, top + 4), (x + w, top + 4)], (88, 152, 88))
+        L.poly([(x, top - 7), (x - w, top + 4), (x - 1, top + 4)], (120, 184, 104))
+
+
+def fence_h(L, x, y):
+    L.rect(x - 16, y - 8, x + 16, y - 7, (208, 168, 112))
+    L.rect(x - 16, y - 4, x + 16, y - 3, (208, 168, 112))
+    for px_ in range(x - 16, x + 17, 8):
+        L.rect(px_, y - 11, px_ + 2, y, (224, 184, 128))
+        L.rect(px_ + 2, y - 11, px_ + 2, y, (184, 144, 96))
+
+
+def lamp_post(L, x, y):
+    L.rect(x - 1, y - 24, x + 1, y, (80, 80, 96))
+    L.rect(x - 3, y - 1, x + 3, y, (80, 80, 96))
+    L.rect(x - 4, y - 30, x + 4, y - 24, (80, 80, 96))
+    L.rect(x - 3, y - 29, x + 3, y - 25, (255, 232, 160))
+
+
+def bench(L, x, y):
+    L.rect(x - 12, y - 9, x + 12, y - 7, (200, 152, 100))
+    L.rect(x - 12, y - 14, x + 12, y - 12, (200, 152, 100))
+    for lx in (x - 10, x + 9):
+        L.rect(lx, y - 7, lx + 1, y, (120, 88, 64))
+
+
+def flowerbed(L, x, y):
+    L.rect(x - 14, y - 5, x + 14, y, (176, 124, 84))
+    for k in range(7):
+        c = [(248, 120, 140), (255, 216, 96), (255, 255, 255), (200, 150, 240)][k % 4]
+        fx = x - 12 + k * 4
+        L.rect(fx, y - 8, fx, y - 5, (96, 168, 72))
+        L.ell(fx - 1, y - 11, fx + 1, y - 8, c)
+
+
+def well(L, x, y):
+    L.ell(x - 9, y - 9, x + 9, y, (176, 168, 156))
+    L.ell(x - 6, y - 8, x + 6, y - 3, (80, 120, 184))
+    L.rect(x - 8, y - 22, x - 7, y - 5, (160, 112, 72)); L.rect(x + 7, y - 22, x + 8, y - 5, (160, 112, 72))
+    L.poly([(x - 11, y - 21), (x, y - 27), (x + 11, y - 21)], (216, 88, 72))
+
+
+def scarecrow(L, x, y):
+    L.rect(x, y - 16, x + 1, y, (160, 112, 72))
+    L.rect(x - 6, y - 12, x + 7, y - 11, (160, 112, 72))
+    L.rect(x - 3, y - 13, x + 4, y - 6, (120, 160, 224))
+    L.ell(x - 3, y - 21, x + 4, y - 14, (240, 224, 184))
+    L.rect(x - 5, y - 22, x + 6, y - 21, (232, 192, 96)); L.rect(x - 2, y - 25, x + 3, y - 22, (240, 200, 104))
+
+
+def coop(L, x, y):
+    L.rect(x - 14, y - 16, x + 14, y, (232, 196, 140))
+    for k in range(x - 14, x + 15, 4):
+        L.rect(k, y - 16, k, y, (200, 160, 110))
+    L.poly([(x - 17, y - 15), (x, y - 26), (x + 17, y - 15)], (200, 88, 72))
+    L.rect(x - 4, y - 9, x + 4, y, (120, 84, 56))
+
+
+def chicken(L, x, y):
+    L.ell(x - 3, y - 6, x + 3, y, (248, 248, 240))
+    L.put(x + 2, y - 7, (232, 72, 72)); L.put(x + 3, y - 7, (232, 72, 72))
+    L.put(x + 4, y - 4, (248, 192, 64)); L.put(x + 2, y - 5, (40, 40, 40))
+
+
+def beehive(L, x, y):
+    for k in range(3):
+        L.rect(x - 6, y - 5 - k * 5, x + 6, y - 1 - k * 5, (250, 225, 140) if k % 2 else (240, 210, 120))
+    L.rect(x - 7, y - 17, x + 7, y - 15, (200, 150, 90))
+    L.rect(x - 1, y - 3, x + 1, y - 2, (90, 60, 30))
+
+
+def barn(L, x, y):
+    L.rect(x - 24, y - 30, x + 24, y, (200, 72, 60))
+    for k in range(x - 24, x + 25, 5):
+        L.rect(k, y - 30, k, y, (168, 56, 48))
+    L.poly([(x - 28, y - 28), (x, y - 46), (x + 28, y - 28)], (150, 60, 52))
+    L.rect(x - 9, y - 18, x + 9, y, (236, 230, 220))
+    L.rect(x - 7, y - 16, x + 7, y, (184, 64, 52))
+    for k in range(15):
+        L.put(x - 7 + k, y - 16 + k, (236, 230, 220)); L.put(x + 7 - k, y - 16 + k, (236, 230, 220))
+    L.rect(x - 4, y - 28, x + 4, y - 22, (60, 40, 30)); L.rect(x - 3, y - 27, x + 3, y - 23, (240, 210, 140))
+
+
+def rock(L, x, y):
+    L.ell(x - 7, y - 8, x + 7, y, (168, 156, 140))
+    L.ell(x - 6, y - 8, x + 3, y - 3, (200, 190, 176))
+
+
+def plot(L, x, y, damp):
+    soil = (128, 84, 56) if damp else (176, 128, 88)
+    furrow = (104, 68, 44) if damp else (152, 108, 72)
+    L.rect(x - 12, y - 14, x + 12, y, soil)
+    for fy in range(y - 12, y - 1, 4):
+        L.rect(x - 11, fy, x + 11, fy + 1, furrow)
+
+
+def plot_damp(L, x, y):
+    plot(L, x, y, True)
+
+
+def plot_dry(L, x, y):
+    plot(L, x, y, False)
+
+
+# Crops: (x, y) the soil they grow from, in the plot's middle.
+def crop_seed(L, x, y):
+    L.ell(x - 3, y - 3, x + 3, y, (120, 80, 48))
+    L.put(x, y - 3, (96, 168, 72))
+
+
+def crop_sprout(L, x, y):
+    L.rect(x, y - 5, x, y, (96, 168, 72))
+    L.ell(x - 4, y - 6, x - 1, y - 4, (120, 200, 88)); L.ell(x + 1, y - 7, x + 4, y - 5, (120, 200, 88))
+
+
+def crop_leaves(L, x, y):
+    L.rect(x, y - 10, x, y, (88, 152, 72))
+    for k, (dx, dy) in enumerate(((-4, -3), (3, -5), (-3, -8), (3, -10))):
+        L.ell(x + dx - 2, y + dy - 1, x + dx + 2, y + dy + 1, (112, 192, 88))
+
+
+def bud(L, x, y, c):
+    crop_leaves(L, x, y)
+    L.ell(x - 2, y - 15, x + 2, y - 10, c)
+
+
+def crop_bud_sun(L, x, y):
+    bud(L, x, y, (232, 200, 72))
+
+
+def crop_bud_tulip(L, x, y):
+    bud(L, x, y, (232, 88, 112))
+
+
+def crop_bud_berry(L, x, y):
+    bud(L, x, y, (248, 248, 248))
+
+
+def crop_cactus_s(L, x, y):
+    L.rect(x - 2, y - 5, x + 2, y, (72, 168, 104))
+    L.rect(x - 1, y - 5, x - 1, y, (112, 200, 136))
+
+
+def crop_cactus_m(L, x, y):
+    L.rect(x - 2, y - 10, x + 2, y, (72, 168, 104))
+    L.rect(x - 1, y - 10, x - 1, y, (112, 200, 136))
+    L.rect(x + 3, y - 7, x + 5, y - 5, (72, 168, 104))
+
+
+def crop_cactus_l(L, x, y):
+    crop_cactus_m(L, x, y)
+    L.rect(x - 5, y - 9, x - 3, y - 7, (72, 168, 104)); L.rect(x - 5, y - 12, x - 4, y - 9, (72, 168, 104))
+    L.ell(x - 2, y - 14, x + 2, y - 10, (248, 120, 180))
+
+
+def crop_sunflower(L, x, y):
+    L.rect(x, y - 18, x, y, (88, 152, 72))
+    L.ell(x - 5, y - 9, x - 1, y - 6, (112, 192, 88)); L.ell(x + 1, y - 13, x + 5, y - 10, (112, 192, 88))
+    for a in range(0, 360, 45):
+        import math as _m
+        t = _m.radians(a)
+        cx, cy = x + 5 * _m.cos(t), y - 22 + 5 * _m.sin(t)
+        L.ell(cx - 2, cy - 2, cx + 2, cy + 2, (255, 208, 64))
+    L.ell(x - 3, y - 25, x + 3, y - 19, (136, 84, 40))
+
+
+def crop_tulip(L, x, y):
+    for dx, h, c in ((-4, 12, (232, 72, 104)), (0, 16, (248, 120, 152)), (4, 11, (232, 72, 104))):
+        L.rect(x + dx, y - h, x + dx, y, (88, 152, 72))
+        L.ell(x + dx - 2, y - h - 5, x + dx + 2, y - h, c)
+        L.put(x + dx, y - h - 6, c)
+    L.ell(x - 7, y - 4, x - 3, y - 1, (112, 192, 88)); L.ell(x + 3, y - 5, x + 7, y - 2, (112, 192, 88))
+
+
+def crop_strawberry(L, x, y):
+    L.ell(x - 9, y - 12, x + 9, y, (96, 176, 88))
+    L.ell(x - 7, y - 12, x + 2, y - 6, (128, 204, 104))
+    for bx, by in ((-5, -5), (1, -3), (5, -7), (-1, -9)):
+        L.ell(x + bx - 2, y + by - 2, x + bx + 2, y + by + 2, (232, 56, 72))
+        L.put(x + bx - 1, y + by - 1, (255, 200, 120))
+    L.ell(x + 3, y - 12, x + 5, y - 10, (255, 255, 255))
+
+
+def crop_cactus(L, x, y):
+    crop_cactus_l(L, x, y)
+    L.ell(x - 3, y - 16, x + 3, y - 10, (255, 136, 196))
+    L.put(x, y - 13, (255, 232, 120))
+
 # ---------------------------------------------------------------- hints
 
 HINT_INK = (88, 104, 168)
@@ -383,6 +672,15 @@ def hint(L, x, y, kind):
         L.rect(x, y - 1, x, y + 2, c); L.put(x, y - 3, c)
     elif kind == "bang":
         L.rect(x, y - 3, x, y, (232, 72, 72)); L.put(x, y + 2, (232, 72, 72))
+    elif kind == "water":
+        L.ell(x - 2, y - 1, x + 2, y + 3, (72, 136, 232)); L.poly([(x, y - 4), (x - 2, y), (x + 2, y)], (72, 136, 232))
+    elif kind == "plus":
+        L.rect(x - 3, y, x + 3, y, (96, 168, 72)); L.rect(x, y - 3, x, y + 3, (96, 168, 72))
+    elif kind == "mail":
+        L.rect(x - 4, y - 2, x + 4, y + 3, (248, 248, 248)); L.rect(x - 4, y - 2, x + 4, y - 2, c)
+        L.put(x - 2, y, c); L.put(x + 2, y, c); L.put(x, y + 1, c)
+    elif kind == "tree":
+        L.poly([(x, y - 4), (x - 4, y + 1), (x + 4, y + 1)], (88, 152, 88)); L.rect(x, y + 1, x, y + 3, (140, 96, 60))
 
 
 def hint_fn(kind):
@@ -454,9 +752,22 @@ SPRITES = [
     ("window_day", window_day, False), ("window_night", window_night, False),
     ("door_out", door_out, True), ("rug_small", rug_small, True), ("rug_big", rug_big, True),
     ("rug_round", rug_round, True),
+    ("house_front", house_front, False), ("mailbox", mailbox, False), ("sign", sign, False), ("tree", tree, False),
+    ("fruit_tree", fruit_tree, False), ("pine", pine, False), ("fence_h", fence_h, False),
+    ("lamp_post", lamp_post, False), ("bench", bench, False), ("flowerbed", flowerbed, False), ("well", well, False),
+    ("scarecrow", scarecrow, False), ("coop", coop, False), ("chicken", chicken, False), ("beehive", beehive, False),
+    ("barn", barn, False), ("rock", rock, False), ("plot_damp", plot_damp, False), ("plot_dry", plot_dry, False),
+    ("crop_seed", crop_seed, False), ("crop_sprout", crop_sprout, False), ("crop_leaves", crop_leaves, False),
+    ("crop_bud_sun", crop_bud_sun, False), ("crop_bud_tulip", crop_bud_tulip, False),
+    ("crop_bud_berry", crop_bud_berry, False), ("crop_cactus_s", crop_cactus_s, False),
+    ("crop_cactus_m", crop_cactus_m, False), ("crop_cactus_l", crop_cactus_l, False),
+    ("crop_sunflower", crop_sunflower, False), ("crop_tulip", crop_tulip, False),
+    ("crop_strawberry", crop_strawberry, False), ("crop_cactus", crop_cactus, False),
 ]
-HINTS = ["zzz", "shirt", "game", "pen", "note", "book", "food", "up", "down", "door", "info", "bang"]
-BACKGROUNDS = [("bg_down", bg_down), ("bg_down_fancy", bg_down_fancy), ("bg_up", bg_up), ("bg_up_stars", bg_up_stars)]
+HINTS = ["zzz", "shirt", "game", "pen", "note", "book", "food", "up", "down", "door", "info", "bang", "water", "plus",
+         "mail", "tree"]
+BACKGROUNDS = [("bg_down", bg_down), ("bg_down_fancy", bg_down_fancy), ("bg_up", bg_up), ("bg_up_stars", bg_up_stars),
+               ("bg_outside", bg_outside)]
 
 
 def draw_sprite(fn, flat):
@@ -484,13 +795,29 @@ def main() -> int:
         im, ax, ay = draw_sprite(hint_fn(kind), False)
         images.append((f"hint_{kind}", im, ax, ay, False))
 
-    palette = {}
+    def pixels(im):
+        return im.get_flattened_data() if hasattr(im, "get_flattened_data") else im.getdata()
+
+    seen = {}
     for _, im, *_ in images:
-        for r, g, b, a in im.convert('RGBA').get_flattened_data() if hasattr(im, 'get_flattened_data') else im.getdata():
-            if a and (r, g, b) not in palette:
-                palette[(r, g, b)] = len(palette) + 1
-    if len(palette) > 255:
-        raise SystemExit(f"{len(palette)} colours: more than a byte holds")
+        for r, g, b, a in pixels(im):
+            if a:
+                seen[(r, g, b)] = seen.get((r, g, b), 0) + 1
+    # Up to 255 colours: more, and the nearest are merged (median cut, weighted by use).
+    remap = {c: c for c in seen}
+    if len(seen) > 255:
+        swatch = Image.new("RGB", (len(seen), 1))
+        swatch.putdata(list(seen))
+        q = swatch.quantize(colors=255, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+        pal = q.getpalette()[:255 * 3]
+        idx = list(q.getdata())
+        for c, i in zip(seen, idx):
+            remap[c] = tuple(pal[i * 3:i * 3 + 3])
+    palette = {}
+    for c in seen:
+        m = remap[c]
+        if m not in palette:
+            palette[m] = len(palette) + 1
 
     h = ['/*', ' * Copyright (c) 2026 Boopie contributors', ' * SPDX-License-Identifier: Apache-2.0', ' *',
          ' * Generated by tools/boopie/world_art.py: do not edit.', ' */', '', '#pragma once', '',
@@ -512,7 +839,7 @@ def main() -> int:
     c.append('};')
     total = 0
     for name, im, ax, ay, _ in images:
-        data = bytes(palette[(r, g, b)] if a else 0 for r, g, b, a in (im.get_flattened_data() if hasattr(im, 'get_flattened_data') else im.getdata()))
+        data = bytes(palette[remap[(r, g, b)]] if a else 0 for r, g, b, a in pixels(im))
         total += len(data)
         c.append(f'\nstatic const uint8_t PX_{name.upper()}[{len(data)}] = {{')
         for k in range(0, len(data), 24):
@@ -529,7 +856,7 @@ def main() -> int:
 
     if args.png:
         args.png.mkdir(parents=True, exist_ok=True)
-        sheet = Image.new("RGBA", (W * 4 + 30, W + 10 + 70 * 6), (40, 44, 56, 255))
+        sheet = Image.new("RGBA", (W * 4 + 30 + OUT_W, W + 10 + 70 * 6), (40, 44, 56, 255))
         x = y = 0
         for i, (name, im, *_) in enumerate(images):
             if i < len(BACKGROUNDS):

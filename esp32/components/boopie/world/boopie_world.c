@@ -27,49 +27,101 @@
  * bag at 11, a big bed at 14, a telescope at 18, and the starry wallpaper at 10.
  */
 static const boopie_thing_t LIVING[] = {
-    { A(WINDOW_DAY), 72, 38, 1, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(PICTURE), 46, 32, 4, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(RUG_SMALL), 78, 106, 1, 7, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(RUG_BIG), 78, 110, 8, 0, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(DOOR_OUT), 104, 126, 1, 0, FLOOR, BOOPIE_DO_OUTSIDE, A(HINT_DOOR), 0, -4 },
-    { A(TV_OLD), 32, 64, 1, 14, STAND, BOOPIE_DO_GAMES, A(HINT_GAME), 2, 10 },
-    { A(TV_FLAT), 32, 64, 15, 0, STAND, BOOPIE_DO_GAMES, A(HINT_GAME), 2, 10 },
-    { A(BOOKSHELF), 104, 64, 1, 0, STAND, BOOPIE_DO_BOOKS, A(HINT_BOOK), 0, 10 },
-    { A(STAIRS_UP), 134, 68, 1, 0, STAND, BOOPIE_DO_UPSTAIRS, A(HINT_UP), 0, 6 },
-    { A(LAMP), 56, 66, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(TABLE), 78, 98, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(RADIO), 20, 98, 1, 0, STAND, BOOPIE_DO_RADIO, A(HINT_NOTE), 8, 4 },
-    { A(BOWL_FULL), 32, 116, 1, 0, STAND, BOOPIE_DO_FEED, A(HINT_FOOD), 9, 0 },
-    { A(PLANT), 60, 122, 2, 11, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(AQUARIUM), 60, 122, 12, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(SOFA), 126, 98, 6, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(TROPHY), 14, 80, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
+    { A(WINDOW_DAY), 72, 38, 1, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PICTURE), 46, 32, 4, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(RUG_SMALL), 78, 106, 1, 7, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(RUG_BIG), 78, 110, 8, 0, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(DOOR_OUT), 104, 126, 1, 0, FLOOR, BOOPIE_DO_OUTSIDE, A(HINT_DOOR), 0, -4, 0 },
+    { A(TV_OLD), 32, 64, 1, 14, STAND, BOOPIE_DO_GAMES, A(HINT_GAME), 2, 10, 0 },
+    { A(TV_FLAT), 32, 64, 15, 0, STAND, BOOPIE_DO_GAMES, A(HINT_GAME), 2, 10, 0 },
+    { A(BOOKSHELF), 104, 64, 1, 0, STAND, BOOPIE_DO_BOOKS, A(HINT_BOOK), 0, 10, 0 },
+    { A(STAIRS_UP), 134, 68, 1, 0, STAND, BOOPIE_DO_UPSTAIRS, A(HINT_UP), 0, 6, 0 },
+    { A(LAMP), 56, 66, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(TABLE), 78, 98, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(RADIO), 20, 98, 1, 0, STAND, BOOPIE_DO_RADIO, A(HINT_NOTE), 8, 4, 0 },
+    { A(BOWL_FULL), 32, 116, 1, 0, STAND, BOOPIE_DO_FEED, A(HINT_FOOD), 9, 0, 0 },
+    { A(PLANT), 60, 122, 2, 11, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(AQUARIUM), 60, 122, 12, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(SOFA), 126, 98, 6, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(TROPHY), 14, 80, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
 };
 
 static const boopie_thing_t BEDROOM[] = {
-    { A(WINDOW_DAY), 70, 38, 1, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(POSTER), 42, 34, 9, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(MIRROR), 96, 44, 1, 0, WALL, BOOPIE_DO_RENAME, A(HINT_PEN), 0, 28 },
-    { A(RUG_ROUND), 82, 114, 3, 0, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(BED), 26, 84, 1, 13, STAND, BOOPIE_DO_SLEEP, A(HINT_ZZZ), 0, -12 },
-    { A(BED_BIG), 30, 88, 14, 0, STAND, BOOPIE_DO_SLEEP, A(HINT_ZZZ), 0, -14 },
-    { A(PLANT), 50, 62, 5, 17, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(TELESCOPE), 52, 64, 18, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(WARDROBE), 120, 66, 1, 0, STAND, BOOPIE_DO_WARDROBE, A(HINT_SHIRT), -2, 8 },
-    { A(DESK), 128, 104, 1, 0, STAND, BOOPIE_DO_STATUS, A(HINT_INFO), -4, 10 },
-    { A(STAR_LAMP), 66, 122, 7, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(BEANBAG), 104, 120, 11, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0 },
-    { A(STAIRS_DOWN), 42, 124, 1, 0, STAND, BOOPIE_DO_DOWNSTAIRS, A(HINT_DOWN), 6, -4 },
+    { A(WINDOW_DAY), 70, 38, 1, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(POSTER), 42, 34, 9, 0, WALL, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(MIRROR), 96, 44, 1, 0, WALL, BOOPIE_DO_RENAME, A(HINT_PEN), 0, 28, 0 },
+    { A(RUG_ROUND), 82, 114, 3, 0, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BED), 26, 84, 1, 13, STAND, BOOPIE_DO_SLEEP, A(HINT_ZZZ), 0, -12, 0 },
+    { A(BED_BIG), 30, 88, 14, 0, STAND, BOOPIE_DO_SLEEP, A(HINT_ZZZ), 0, -14, 0 },
+    { A(PLANT), 50, 62, 5, 17, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(TELESCOPE), 52, 64, 18, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(WARDROBE), 120, 66, 1, 0, STAND, BOOPIE_DO_WARDROBE, A(HINT_SHIRT), -2, 8, 0 },
+    { A(DESK), 128, 104, 1, 0, STAND, BOOPIE_DO_STATUS, A(HINT_INFO), -4, 10, 0 },
+    { A(STAR_LAMP), 66, 122, 7, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BEANBAG), 104, 120, 11, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(STAIRS_DOWN), 42, 124, 1, 0, STAND, BOOPIE_DO_DOWNSTAIRS, A(HINT_DOWN), 6, -4, 0 },
+};
+
+/*
+ * Outside: the house front on the left, the path east past the farm to the
+ * woods' sign. The farm's six plots open as the pet grows (three, then at 5,
+ * 10 and 15), and the yard fills: a lamp post at 3, flowers at 5, the well
+ * at 8, the coop and its chickens and a scarecrow at 10, a bench at 12,
+ * bee hives at 15, the barn and a fruit tree at 20.
+ */
+static const boopie_thing_t OUTSIDE[] = {
+    { A(TREE), 20, 76, 1, 19, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FRUIT_TREE), 20, 76, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(HOUSE_FRONT), 70, 64, 1, 0, STAND, BOOPIE_DO_INSIDE, A(HINT_DOOR), 0, 6, 0 },
+    { A(MAILBOX), 100, 72, 1, 0, STAND, BOOPIE_DO_MAIL, A(HINT_MAIL), -7, 4, 0 },
+    { A(TREE), 116, 58, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(LAMP_POST), 48, 94, 3, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FLOWERBED), 102, 126, 5, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BENCH), 30, 122, 12, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(ROCK), 140, 118, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PINE), 8, 136, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(COOP), 148, 78, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(CHICKEN), 140, 88, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(CHICKEN), 156, 90, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FENCE_H), 180, 56, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FENCE_H), 214, 56, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FENCE_H), 248, 56, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PLOT_DRY), 180, 80, 1, 0, FLOOR, BOOPIE_DO_PLOT, A(HINT_PLUS), 0, 6, 0 },
+    { A(PLOT_DRY), 214, 80, 1, 0, FLOOR, BOOPIE_DO_PLOT, A(HINT_PLUS), 0, 6, 1 },
+    { A(PLOT_DRY), 248, 80, 1, 0, FLOOR, BOOPIE_DO_PLOT, A(HINT_PLUS), 0, 6, 2 },
+    { A(PLOT_DRY), 180, 116, 5, 0, FLOOR, BOOPIE_DO_PLOT, A(HINT_PLUS), 0, 6, 3 },
+    { A(PLOT_DRY), 214, 116, 10, 0, FLOOR, BOOPIE_DO_PLOT, A(HINT_PLUS), 0, 6, 4 },
+    { A(PLOT_DRY), 248, 116, 15, 0, FLOOR, BOOPIE_DO_PLOT, A(HINT_PLUS), 0, 6, 5 },
+    { A(WELL), 284, 74, 8, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(SCARECROW), 282, 112, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BEEHIVE), 302, 128, 15, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BEEHIVE), 316, 130, 15, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BARN), 326, 70, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(SIGN), 344, 114, 1, 0, STAND, BOOPIE_DO_WILD, A(HINT_TREE), -8, 2, 0 },
 };
 
 static const struct {
     const boopie_thing_t *things;
     int count;
     int x0, y0, x1, y1;       /* the floor the pet walks */
+    int width;
 } ROOMS[BOOPIE_ROOM_COUNT] = {
-    [BOOPIE_ROOM_LIVING] = { LIVING, (int)(sizeof LIVING / sizeof LIVING[0]), 16, 70, 142, 124 },
-    [BOOPIE_ROOM_BEDROOM] = { BEDROOM, (int)(sizeof BEDROOM / sizeof BEDROOM[0]), 16, 70, 142, 124 },
+    [BOOPIE_ROOM_LIVING] = { LIVING, (int)(sizeof LIVING / sizeof LIVING[0]), 16, 70, 142, 124, BOOPIE_WORLD_W },
+    [BOOPIE_ROOM_BEDROOM] = { BEDROOM, (int)(sizeof BEDROOM / sizeof BEDROOM[0]), 16, 70, 142, 124, BOOPIE_WORLD_W },
+    [BOOPIE_ROOM_OUTSIDE] = { OUTSIDE, (int)(sizeof OUTSIDE / sizeof OUTSIDE[0]), 10, 70, 350, 126, 360 },
 };
+
+int boopie_room_width(boopie_room_t room)
+{
+    return (int)room >= 0 && room < BOOPIE_ROOM_COUNT ? ROOMS[room].width : BOOPIE_WORLD_W;
+}
+
+/* Where the view would be, the pet in its middle. */
+static float cam_for(const boopie_world_t *w)
+{
+    float c = w->x - BOOPIE_WORLD_W / 2.0f, max = (float)(boopie_room_width(w->room) - BOOPIE_WORLD_W);
+    return c < 0 ? 0 : c > max ? max : c;
+}
 
 const boopie_thing_t *boopie_room_things(boopie_room_t room, int *count)
 {
@@ -83,6 +135,9 @@ const boopie_thing_t *boopie_room_things(boopie_room_t room, int *count)
 
 boopie_art_id_t boopie_room_background(boopie_room_t room, int level)
 {
+    if (room == BOOPIE_ROOM_OUTSIDE) {
+        return BOOPIE_ART_BG_OUTSIDE;
+    }
     if (room == BOOPIE_ROOM_BEDROOM) {
         return level >= 10 ? BOOPIE_ART_BG_UP_STARS : BOOPIE_ART_BG_UP;
     }
@@ -122,6 +177,9 @@ static void on_floor(const boopie_world_t *w, float *x, float *y)
     boopie_room_floor(w->room, &x0, &y0, &x1, &y1);
     *x = *x < x0 ? x0 : *x > x1 ? x1 : *x;
     *y = *y < y0 ? y0 : *y > y1 ? y1 : *y;
+    if (boopie_room_width(w->room) > BOOPIE_WORLD_W) {
+        return;   /* the view follows it: only the floor's box */
+    }
     float dx = *x - 78, dy = *y - 78, d = sqrtf(dx * dx + dy * dy);
     if (d > 66) {
         *x = 78 + dx * 66 / d;
@@ -165,8 +223,11 @@ void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
     w->x = 78;
     w->y = 100;
     /* At the way in: the stairs it came by, or the door. */
-    boopie_do_t way = from == BOOPIE_DO_UPSTAIRS ? BOOPIE_DO_DOWNSTAIRS : from == BOOPIE_DO_DOWNSTAIRS
-                                                                              ? BOOPIE_DO_UPSTAIRS : from;
+    boopie_do_t way = from == BOOPIE_DO_UPSTAIRS     ? BOOPIE_DO_DOWNSTAIRS
+                      : from == BOOPIE_DO_DOWNSTAIRS ? BOOPIE_DO_UPSTAIRS
+                      : from == BOOPIE_DO_OUTSIDE    ? BOOPIE_DO_INSIDE
+                      : from == BOOPIE_DO_INSIDE     ? BOOPIE_DO_OUTSIDE
+                                                     : from;
     int n;
     const boopie_thing_t *t = boopie_room_things(room, &n);
     for (int i = 0; i < n && way != BOOPIE_DO_NOTHING; i++) {
@@ -178,6 +239,7 @@ void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
     }
     w->tx = w->x;
     w->ty = w->y;
+    w->cam = cam_for(w);
 }
 
 /* A thing's box on screen: its picture, and its hint over it. */
@@ -253,6 +315,9 @@ void boopie_world_sleep(boopie_world_t *w, int level, bool on)
 boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
 {
     w->state_t += dt;
+    /* The view eases after the pet in a wide room. */
+    float want = cam_for(w);
+    w->cam += (want - w->cam) * (dt * 4 > 1 ? 1 : dt * 4);
     switch (w->state) {
     case BOOPIE_PET_WALKING: {
         float dx = w->tx - w->x, dy = w->ty - w->y, d = sqrtf(dx * dx + dy * dy);
@@ -286,6 +351,10 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
         w->idle_for = 3.0f + 4.0f * frand(w);
         if (act == BOOPIE_DO_UPSTAIRS || act == BOOPIE_DO_DOWNSTAIRS) {
             boopie_world_enter(w, act == BOOPIE_DO_UPSTAIRS ? BOOPIE_ROOM_BEDROOM : BOOPIE_ROOM_LIVING, act);
+        } else if (act == BOOPIE_DO_OUTSIDE) {
+            boopie_world_enter(w, BOOPIE_ROOM_OUTSIDE, act);
+        } else if (act == BOOPIE_DO_INSIDE) {
+            boopie_world_enter(w, BOOPIE_ROOM_LIVING, act);
         }
         (void)level;
         return act;

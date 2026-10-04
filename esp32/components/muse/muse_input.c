@@ -21,7 +21,6 @@
 #include "boopie_setup.h"   /* Boopie: phone setup */
 #include "boopie_viewers.h" /* Boopie: looking back */
 #include "boopie_noise_ui.h" /* Boopie: 白噪音 */
-#include "boopie_garden_ui.h" /* Boopie: 小花园 */
 #include "boopie_world_ui.h"  /* Boopie: 小窝 */
 #include "boopie_sound.h"   /* Boopie: goodbye */
 #include "boopie_avatar.h"  /* Boopie: 姿势感应 */
@@ -158,8 +157,6 @@ static void aux_single(void)
         boopie_viewer_close();     /* the chat history, the album, a question */
     } else if (boopie_noise_ui_active()) {
         boopie_noise_ui_close();   /* the sound plays on */
-    } else if (boopie_garden_ui_active()) {
-        boopie_garden_ui_close();
     } else if (boopie_world_ui_back()) {
         /* a panel in 小窝 closed */
     } else if (boopie_setup_active()) {

@@ -40,7 +40,7 @@
 #include "boopie_setup.h"
 #include "boopie_viewers.h"
 #include "boopie_noise_ui.h"
-#include "boopie_garden_ui.h"
+#include "boopie_world_ui.h"
 #include "boopie_pages.h"
 #include "sim_platform.h"
 #include "sim_services.h"
@@ -77,6 +77,7 @@ static void usage(FILE *out, const char *argv0)
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
             "  tap=X,Y            swipe=left|right|up|down   menu=power|setup\n"
+            "  room=living|bedroom|outside (小窝, swipe=up first)\n"
             "  game=whack         input=TEXT             settings=PAGE\n"
             "  viewer=chat|album  ask=chat|album|notes|all\n"
             "\n"
@@ -403,8 +404,10 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
         render_for(400, real_time);
         return true;
     }
-    if (!strcmp(key, "garden")) {   /* 小花园, as from the apps page (BOOPIE_GARDEN plants it) */
-        boopie_garden_ui_open_locked();
+    if (!strcmp(key, "room")) {   /* 小窝's room: living, bedroom or outside (BOOPIE_GARDEN plants the farm) */
+        if (!boopie_world_ui_go(value)) {
+            return false;
+        }
         render_for(300, real_time);
         return true;
     }

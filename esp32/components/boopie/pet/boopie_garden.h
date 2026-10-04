@@ -10,14 +10,15 @@
 #include <stdint.h>
 
 /*
- * 小花园 (docs/boopie-interaction.md): three pots; plant a seed, water it,
+ * The farm (docs/boopie-world.md), once 小花园: six plots, three to start
+ * and more as the pet grows (the world decides which); plant a seed, water it,
  * and it grows while its soil is damp, through sprout, leaves and bud to a
  * bloom that's harvested for stars and experience. Gentle as the pet is:
  * nothing dies, a dry plant only waits (and droops) till it's watered. Plain
  * C with the time passed in (epoch seconds); kept in NVS as it is.
  */
 
-#define BOOPIE_GARDEN_POTS 3
+#define BOOPIE_GARDEN_POTS 6
 
 typedef enum {
     BOOPIE_PLANT_NONE = 0,
@@ -46,7 +47,7 @@ typedef struct {
 } boopie_pot_t;
 
 /* Kept in NVS as it is: only ever append, and bump version on a change. */
-#define BOOPIE_GARDEN_VERSION 1
+#define BOOPIE_GARDEN_VERSION 2   /* 2: six plots (1 had three: loaded into the first three) */
 typedef struct boopie_garden {
     uint8_t version;
     uint8_t pad[3];

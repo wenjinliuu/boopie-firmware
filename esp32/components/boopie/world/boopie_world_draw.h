@@ -10,6 +10,8 @@
 
 #include "boopie_world.h"
 
+struct boopie_garden;
+
 /*
  * Drawing the world (docs/boopie-world.md): a room at 156 x 156 into an RGB
  * buffer, then three times over into the 466 px screen, with the clock and
@@ -23,6 +25,8 @@ typedef struct {
     float t;                  /* seconds, for the bobbing and twinkling */
     const uint16_t *pet;      /* the pet's picture, RGB565, 0 see-through */
     int pet_w, pet_h;
+    const struct boopie_garden *garden;   /* the farm's plots (NULL: all bare) */
+    int64_t now;              /* epoch seconds, for the garden */
 } boopie_world_look_t;
 
 /* The room into rgb (BOOPIE_WORLD_W squared, 3 bytes a pixel). */

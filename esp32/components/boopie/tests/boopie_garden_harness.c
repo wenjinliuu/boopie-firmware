@@ -4,7 +4,8 @@
  *
  * Drives pet/boopie_garden.c for test_boopie_garden.py. Each argument is a
  * step at the hour set by the last "at:H": "plant:POT:KIND", "water:POT",
- * "harvest:POT", "save" (round trips the blob) or "at:H". After each, a JSON
+ * "harvest:POT", "save" (round trips the blob), "v1" (saves the first three pots
+ * as version 1 did and loads that) or "at:H". After each, a JSON
  * line: what the step returned, and each pot's stage, hours grown, dry, and
  * hours left.
  */
@@ -38,6 +39,20 @@ int main(int argc, char **argv)
         } else if (strcmp(op, "harvest") == 0) {
             boopie_garden_update(&g, now);
             ret = boopie_garden_harvest(&g, a, &xp, &stars);
+        } else if (strcmp(op, "v1") == 0) {
+            struct {
+                uint8_t version;
+                uint8_t pad[3];
+                boopie_pot_t pots[3];
+                uint16_t harvested[BOOPIE_PLANT_COUNT];
+            } old = { .version = 1 };
+            memcpy(old.pots, g.pots, sizeof old.pots);
+            memcpy(old.harvested, g.harvested, sizeof old.harvested);
+            boopie_garden_t back;
+            ret = boopie_garden_load(&back, &old, sizeof old);
+            ret += back.version == BOOPIE_GARDEN_VERSION && memcmp(back.pots, g.pots, sizeof old.pots) == 0
+                   && back.pots[3].plant == 0 && back.pots[5].plant == 0;
+            g = back;
         } else if (strcmp(op, "save") == 0) {
             boopie_garden_t back;
             char blob[sizeof g];

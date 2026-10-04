@@ -174,7 +174,6 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_viewers.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_icons.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_noise_ui.c"
-    "${BOOPIE_COMPONENT_DIR}/ui/boopie_garden_ui.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_world_ui.c"
     "${BOOPIE_COMPONENT_DIR}/world/boopie_world.c"
     "${BOOPIE_COMPONENT_DIR}/world/boopie_world_draw.c"

@@ -29,14 +29,29 @@ void boopie_garden_init(boopie_garden_t *g)
     g->version = BOOPIE_GARDEN_VERSION;
 }
 
+/* Version 1: three pots. */
+typedef struct {
+    uint8_t version;
+    uint8_t pad[3];
+    boopie_pot_t pots[3];
+    uint16_t harvested[BOOPIE_PLANT_COUNT];
+} garden_v1_t;
+
 bool boopie_garden_load(boopie_garden_t *g, const void *blob, size_t n)
 {
     boopie_garden_t saved;
-    if (n != sizeof saved) {
-        return false;
-    }
-    memcpy(&saved, blob, n);
-    if (saved.version != BOOPIE_GARDEN_VERSION) {
+    if (n == sizeof(garden_v1_t) && ((const uint8_t *)blob)[0] == 1) {
+        garden_v1_t old;
+        memcpy(&old, blob, n);
+        boopie_garden_init(&saved);
+        memcpy(saved.pots, old.pots, sizeof old.pots);
+        memcpy(saved.harvested, old.harvested, sizeof old.harvested);
+    } else if (n == sizeof saved) {
+        memcpy(&saved, blob, n);
+        if (saved.version != BOOPIE_GARDEN_VERSION) {
+            return false;
+        }
+    } else {
         return false;
     }
     for (int i = 0; i < BOOPIE_GARDEN_POTS; i++) {

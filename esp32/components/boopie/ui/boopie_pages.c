@@ -15,7 +15,6 @@
 #include "boopie_heads.h"
 #include "boopie_icons.h"
 #include "boopie_noise_ui.h"
-#include "boopie_garden_ui.h"
 #include "boopie_world_ui.h"
 #include "boopie_viewers.h"
 #include "boopie_input.h"
@@ -119,7 +118,6 @@ static const app_t APPS[] = {
     { "接零食", "倾斜接住掉下的零食", "catch", BOOPIE_ICON_CATCH },
     { "重力迷宫", "倾斜把小球滚出迷宫", "maze", BOOPIE_ICON_MAZE },
     { "跳跳布比", "点一下跳，钻过柱子", "hop", BOOPIE_ICON_HOP },
-    { "小花园", "种花浇水，开花收星星", "garden", BOOPIE_ICON_GARDEN },
     { "聊天记录", "最近 100 条", "chat", BOOPIE_ICON_CHAT },
     { "相册", "Muse 给你看过的图", "album", BOOPIE_ICON_ALBUM },
     { "白噪音", "雨声、海浪，助眠专注", "noise", BOOPIE_ICON_NOISE },
@@ -141,8 +139,6 @@ static void on_app(lv_event_t *e)
         boopie_viewer_album_locked();
     } else if (strcmp(a->id, "noise") == 0) {
         boopie_noise_ui_open_locked();
-    } else if (strcmp(a->id, "garden") == 0) {
-        boopie_garden_ui_open_locked();
     } else {
         boopie_games_open_locked(a->id);
     }
