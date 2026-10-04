@@ -2674,7 +2674,10 @@ typedef struct {
 } skin_t;
 
 
-enum { MUSE_FX_NONE = 0, MUSE_FX_SHORTS, MUSE_FX_KNIGHT };
+enum {
+    MUSE_FX_NONE = 0, MUSE_FX_SHORTS, MUSE_FX_KNIGHT,
+    MUSE_FX_BEAR, MUSE_FX_BUNNY, MUSE_FX_CAT, MUSE_FX_FROG, MUSE_FX_DINO, MUSE_FX_WIZARD,
+};
 
 #define SKIN(k, n, c, coll, stars, sc, col) .key = k, .name = n, .character = c, .collector = coll, \
     .price = stars, .scene = sc, .colour = col
@@ -2733,6 +2736,13 @@ static const skin_t SKINS[] = {
       .glow = SET(0xffd34a), .outline = SET(0x145a28), .belly = { SET(0xd8f0d8), SET(0xf4fff4) }, .limited = 1u << 4 },
     { SKIN("muse_knight", "骑士", BOOPIE_SKIN_MUSE, true, 300, BOOPIE_SCENE_DEFAULT, 0xd9c7a8),
       .muse_fx = MUSE_FX_KNIGHT },
+    /* Muse in animal hoods and a wizard's robe: ears, eyes, spikes or a hat on top (muse_headgear). */
+    { SKIN("muse_bear", "小熊", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_DEFAULT, 0xa9784e), .muse_fx = MUSE_FX_BEAR },
+    { SKIN("muse_bunny", "小兔", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_PETALS, 0xf6f2f4), .muse_fx = MUSE_FX_BUNNY },
+    { SKIN("muse_cat", "猫咪", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_DEFAULT, 0xb4b8c4), .muse_fx = MUSE_FX_CAT },
+    { SKIN("muse_frog", "青蛙", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_FIREFLIES, 0x8cc864), .muse_fx = MUSE_FX_FROG },
+    { SKIN("muse_dino", "恐龙", BOOPIE_SKIN_MUSE, false, 250, BOOPIE_SCENE_DEFAULT, 0x5fb08a), .muse_fx = MUSE_FX_DINO },
+    { SKIN("muse_wizard", "巫师", BOOPIE_SKIN_MUSE, true, 300, BOOPIE_SCENE_STARS, 0x6a4fb8), .muse_fx = MUSE_FX_WIZARD },
     /* Themes: 蕾姆, and two of 海绵宝宝's friends. */
     { SKIN("doubao_rem", "蕾姆", BOOPIE_CHAR_DOUBAO, true, 300, BOOPIE_SCENE_PETALS, 0xf2c9b4),
       .hair = SET(0x8cc0f0), .top = SET(0xf3a6c4), .look = LOOK_REM },
@@ -2745,7 +2755,7 @@ static const skin_t SKINS[] = {
       .eye = SET(0x1e1e2c), .outline = SET(0x7882aa), .look = LOOK_GHOST },
     { SKIN("boopie_tangyuan", "汤圆", BOOPIE_CHAR_BOOPIE, true, 200, BOOPIE_SCENE_DEFAULT, 0xfbf8f2),
       .outline = SET(0xaaa096), .look = LOOK_TANGYUAN, .limited = 1u << 1 | 1u << 10 },
-    { SKIN("boopie_jellyfish", "水母", BOOPIE_CHAR_BOOPIE, false, 250, BOOPIE_SCENE_BUBBLES, 0xc4b4ff),
+    { SKIN("boopie_jellyfish", "水母", BOOPIE_CHAR_BOOPIE, true, 300, BOOPIE_SCENE_BUBBLES, 0xc4b4ff),
       .glow = SET(0x96f0ff), .look = LOOK_JELLYFISH },
     { SKIN("boopie_slime", "史莱姆", BOOPIE_CHAR_BOOPIE, false, 0, BOOPIE_SCENE_DEFAULT, 0x7cc8ff),
       .outline = SET(0x2864aa), .look = LOOK_SLIME },
@@ -3719,10 +3729,108 @@ void boopie_pixel_set_slots(const float slots[5])
 #define MUSE_FUR0 3
 #define MUSE_FUR1 6
 
-static void muse_skin_over(const uint8_t *fb)
+/* A little sprite over Muse's frame, centred on x with its bottom row on y:
+ * o outline, b fur, l fur light, p inner pink, w white, k black, d a skin's own second colour. */
+static void muse_sprite(const char *const *rows, int n, float x, float y, const ramp_t *fur, rgb_t d)
+{
+    int w = (int)strlen(rows[0]);
+    int x0 = (int)rint(x - w / 2.0f), y0 = (int)rint(y) - n + 1;
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < w; i++) {
+            rgb_t c;
+            switch (rows[j][i]) {
+            case 'o': c = fur->out; break;
+            case 'b': c = fur->mid; break;
+            case 'l': c = fur->light; break;
+            case 'p': c = (rgb_t){ 250, 170, 180 }; break;
+            case 'w': c = WHITE; break;
+            case 'k': c = (rgb_t){ 20, 20, 24 }; break;
+            case 'd': c = d; break;
+            default: continue;
+            }
+            put(x0 + i, y0 + j, c);
+        }
+    }
+}
+
+/* Ears, eyes, spikes or a hat on top of the hood (the 'hat' slot), by the skin. */
+static void muse_headgear(const skin_t *sk, double t)
+{
+    ramp_t fur = ramp(sk->colour);
+    float hx = s_slots.hat_x, hy = s_slots.hat_y, sp = s_slots.neck_w * 0.34f;
+    switch (sk->muse_fx) {
+    case MUSE_FX_BEAR: {
+        static const char *const EAR[] = { ".ooo.", "obbbo", "obpbo", "obbbo" };
+        muse_sprite(EAR, 4, hx - sp, hy + 2, &fur, fur.mid);
+        muse_sprite(EAR, 4, hx + sp, hy + 2, &fur, fur.mid);
+        break;
+    }
+    case MUSE_FX_BUNNY: {
+        static const char *const EAR[] = { ".o.", "obo", "obo", "opo", "opo", "opo", "obo", "obo" };
+        float lean = (float)sin(t * 1.5) * 0.6f;   /* a twitch */
+        muse_sprite(EAR, 8, hx - sp * 0.7f - lean, hy + 2, &fur, fur.mid);
+        muse_sprite(EAR, 8, hx + sp * 0.7f + lean, hy + 2, &fur, fur.mid);
+        break;
+    }
+    case MUSE_FX_CAT: {
+        static const char *const L_EAR[] = { "o....", "oo...", "obo..", "opbo.", "obbbo" };
+        static const char *const R_EAR[] = { "....o", "...oo", "..obo", ".obpo", "obbbo" };
+        muse_sprite(L_EAR, 5, hx - sp, hy + 2, &fur, fur.mid);
+        muse_sprite(R_EAR, 5, hx + sp, hy + 2, &fur, fur.mid);
+        break;
+    }
+    case MUSE_FX_FROG: {
+        static const char *const EYE[] = { ".ooo.", "owwwo", "owkwo", "obbbo" };
+        static const char *const BLINK[] = { ".....", ".ooo.", "obbbo", "obbbo" };
+        const char *const *e = pymodd(t, 4.0) < 0.15 ? BLINK : EYE;
+        muse_sprite(e, 4, hx - sp * 0.8f, hy + 2, &fur, fur.mid);
+        muse_sprite(e, 4, hx + sp * 0.8f, hy + 2, &fur, fur.mid);
+        break;
+    }
+    case MUSE_FX_DINO: {
+        static const char *const SPIKE[] = { "..o..", ".odo.", "oddd" "o" };
+        rgb_t d = { 255, 170, 70 };
+        for (int k = -1; k <= 1; k++) {
+            muse_sprite(SPIKE, 3, hx + k * sp * 0.75f, hy + 1 + (k ? 1 : 0), &fur, d);
+        }
+        break;
+    }
+    case MUSE_FX_WIZARD: {
+        static const char *const HAT[] = { "........oo...", ".......odo...", "......oddo...", ".....odddo...",
+                                           ".....oddddo..", "....odddddo..", "....odddddo..", "...odddddddo.",
+                                           "...odddddddo.", "..odddddddddo", "ooooooooooooo", "obbbbbbbbbbbo" };
+        ramp_t hat = ramp(0x3c2a80);
+        muse_sprite(HAT, 12, hx, hy + 3, &fur, hat.mid);
+        float x0 = hx - 6.5f, y0 = hy + 3 - 11;   /* its stars, twinkling */
+        static const int8_t STARS[2][2] = { { 6, 5 }, { 8, 8 } };
+        for (int i = 0; i < 2; i++) {
+            put(x0 + STARS[i][0], y0 + STARS[i][1], sin(t * 3 + i * 2) > 0 ? (rgb_t){ 255, 230, 110 } : hat.light);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+static void muse_skin_over(const uint8_t *fb, double t)
 {
     const skin_t *sk = skin_at(s_skin);
     if (!sk || sk->character != BOOPIE_SKIN_MUSE || !sk->muse_fx || !s_slots_set) {
+        return;
+    }
+    if (sk->muse_fx >= MUSE_FX_BEAR) {
+        if (sk->muse_fx == MUSE_FX_WIZARD) {   /* stars on the robe, twinkling */
+            for (int y = (int)s_slots.neck_y + 1; y < N; y++) {
+                for (int x = 0; x < N; x++) {
+                    uint8_t i = fb[y * N + x];
+                    if (i >= MUSE_FUR0 && i <= MUSE_FUR1 && (x * 5 + y * 7) % 19 == 0) {
+                        s_img[y][x] = sin(t * 2 + x) > 0 ? (rgb_t){ 255, 230, 110 } : (rgb_t){ 200, 180, 255 };
+                    }
+                }
+            }
+        }
+        muse_headgear(sk, t);
         return;
     }
     int bottom = -1;
@@ -3817,7 +3925,7 @@ void boopie_pixel_compose(const uint8_t *fb, const uint16_t *palette, uint32_t b
         }
     }
     scene_front(scene, in->scene_t);
-    muse_skin_over(fb);
+    muse_skin_over(fb, in->scene_t);
     if (s_slots_set) {
         wear_all(&s_slots);
     }

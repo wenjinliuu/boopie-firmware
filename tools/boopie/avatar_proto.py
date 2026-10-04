@@ -1231,6 +1231,13 @@ SKINS = {
                        extra={"belly": ((216, 240, 216), (244, 255, 244))}, limited="xmas"),
     # Muse in armour: silver plates from the neck down, a pink bow, a sword (drawn over Muse's own frame).
     "muse_knight": Skin("muse_knight", "muse", "骑士", "典藏", 300, "default", "d9c7a8"),
+    # Muse in animal hoods and a wizard's robe (drawn over Muse's own frame: boopie_pixel.c muse_headgear).
+    "muse_bear": Skin("muse_bear", "muse", "小熊", "普通", 200, "default", "a9784e"),
+    "muse_bunny": Skin("muse_bunny", "muse", "小兔", "普通", 200, "petals", "f6f2f4"),
+    "muse_cat": Skin("muse_cat", "muse", "猫咪", "普通", 200, "default", "b4b8c4"),
+    "muse_frog": Skin("muse_frog", "muse", "青蛙", "普通", 200, "fireflies", "8cc864"),
+    "muse_dino": Skin("muse_dino", "muse", "恐龙", "普通", 250, "default", "5fb08a"),
+    "muse_wizard": Skin("muse_wizard", "muse", "巫师", "典藏", 300, "stars", "6a4fb8"),
     # Themes: 蕾姆, and two of 海绵宝宝's friends.
     "doubao_rem": Skin("doubao_rem", "doubao", "蕾姆", "典藏", 300, "petals", "f2c9b4",
                        extra={"hair": "8cc0f0", "top": "f3a6c4", "rem": True}),
@@ -1243,7 +1250,7 @@ SKINS = {
                          outline=(120, 130, 170), extra={"look": "ghost"}),
     "boopie_tangyuan": Skin("boopie_tangyuan", "boopie", "汤圆", "典藏", 200, "default", "fbf8f2",
                             outline=(170, 160, 150), extra={"look": "tangyuan"}, limited="spring,lantern"),
-    "boopie_jellyfish": Skin("boopie_jellyfish", "boopie", "水母", "普通", 250, "bubbles", "c4b4ff",
+    "boopie_jellyfish": Skin("boopie_jellyfish", "boopie", "水母", "典藏", 300, "bubbles", "c4b4ff",
                              glow=(150, 240, 255), extra={"look": "jellyfish"}),
     "boopie_slime": Skin("boopie_slime", "boopie", "史莱姆", "成就", 0, "default", "7cc8ff",
                          outline=(40, 100, 170), extra={"look": "slime"}),
