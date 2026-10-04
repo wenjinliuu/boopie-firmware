@@ -1154,6 +1154,11 @@ static void on_sleep_now(lv_event_t *e)
     muse_state_set_asleep(true);
 }
 
+static void on_posture(lv_event_t *e)
+{
+    boopie_avatar_set_posture_on(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
+}
+
 static void build_sleep_page(lv_obj_t *tile)
 {
     lv_obj_t *list;
@@ -1167,6 +1172,9 @@ static void build_sleep_page(lv_obj_t *tile)
     }
     button(list, LV_SYMBOL_EYE_CLOSE "  现在熄屏", COLOR_ACCENT, on_sleep_now, NULL);
     note(list, "点屏幕或按任一个键就会亮。");
+    /* Boopie: 姿势感应. */
+    switch_row(list, "姿势感应", boopie_avatar_posture_on(), on_posture);
+    note(list, "屏幕朝下扣在桌上就熄屏；翻回来或拿起来就亮，宠物会打招呼。倒过来拿它会慌。");
 }
 
 static const char *sleep_name(int secs)

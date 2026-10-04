@@ -218,7 +218,8 @@ LOOK = [("viewer-chat", ["viewer=chat"]), ("viewer-album", ["viewer=album"]), ("
         ("game-catch", ["game=catch", "tap=233,233", "advance=9000"]),
         ("game-maze", ["game=maze", "tap=233,233", "advance=3000"]),
         ("noise", ["noise=rain", "advance=3000"]),
-        ("game-hop", ["game=hop", *["tap=233,233"] * 4])]
+        ("game-hop", ["game=hop", *["tap=233,233"] * 4]),
+        ("pet-stroke", ["stroke=4"]), ("pet-hug", ["stroke=0"])]
 
 
 def user_data(root: Path) -> Path:

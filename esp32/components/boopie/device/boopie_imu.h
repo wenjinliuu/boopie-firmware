@@ -35,5 +35,17 @@ void boopie_imu_keepalive(void);
  * while the gyroscope is off). False if there's no IMU. */
 bool boopie_imu_read(float accel[3], float gyro[3]);
 
+/*
+ * Which way gravity pulls, in the screen's frame and in g: +x toward the
+ * screen's right, +y toward its bottom, +z out of its face (so lying face up
+ * reads about (0, 0, -1)). The screen's x follows the accelerometer's y and
+ * its y the x, as Waveshare's own tilt demo for this board reads them
+ * (examples/esp-idf/04_Immersive_block); z is taken as pointing out of the
+ * screen. Not yet checked on the board: flip a BOOPIE_IMU_*_SIGN in
+ * boopie_imu.c if a game rolls the wrong way or face down reads as face up.
+ * False if there's no IMU.
+ */
+bool boopie_imu_gravity(float g[3]);
+
 /* Turn the gyroscope on (games) or off. */
 esp_err_t boopie_imu_gyro(bool on);

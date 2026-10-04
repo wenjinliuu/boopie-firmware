@@ -121,6 +121,21 @@ typedef struct {
 
 void boopie_avatar_pet_status(boopie_pet_status_t *out);
 
+/*
+ * Touch and posture (docs/boopie-interaction.md "摸摸" and "姿势感应").
+ * stroke: the LVGL task, each back and forth of a finger held on the pet
+ * (strokes so far this time), or a hug (held still); the first of a time
+ * earns a little experience. greet / upside_down: any task, as the board is
+ * picked up or turned over. posture_on: the switch, kept in NVS.
+ */
+void boopie_avatar_stroke(int strokes, bool hug);
+void boopie_avatar_greet(void);
+void boopie_avatar_upside_down(bool on);
+/* Being stroked or hugged now: "好舒服" / "抱抱" for the face's word, or NULL. */
+const char *boopie_avatar_soothed(void);
+bool boopie_avatar_posture_on(void);
+void boopie_avatar_set_posture_on(bool on);
+
 /* The reaction showing now (boopie_avatar_react: a feed, a poke), or IDLE. */
 boopie_expr_t boopie_avatar_reacting(void);
 

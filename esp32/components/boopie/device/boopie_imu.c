@@ -148,6 +148,24 @@ void boopie_imu_keepalive(void)
     s_awake_until_us = esp_timer_get_time() + 1000000;
 }
 
+#define BOOPIE_IMU_X_AXIS 1
+#define BOOPIE_IMU_Y_AXIS 0
+#define BOOPIE_IMU_X_SIGN 1.0f
+#define BOOPIE_IMU_Y_SIGN 1.0f
+#define BOOPIE_IMU_Z_SIGN (-1.0f)   /* at rest it reads +1 g up its z: face up, gravity goes into the screen */
+
+bool boopie_imu_gravity(float g[3])
+{
+    float a[3], gy[3];
+    if (!boopie_imu_read(a, gy)) {
+        return false;
+    }
+    g[0] = a[BOOPIE_IMU_X_AXIS] * BOOPIE_IMU_X_SIGN;
+    g[1] = a[BOOPIE_IMU_Y_AXIS] * BOOPIE_IMU_Y_SIGN;
+    g[2] = a[2] * BOOPIE_IMU_Z_SIGN;
+    return true;
+}
+
 bool boopie_imu_read(float accel[3], float gyro[3])
 {
     if (!s_dev) {

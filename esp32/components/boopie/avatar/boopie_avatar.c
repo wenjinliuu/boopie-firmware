@@ -90,6 +90,9 @@ static uint32_t s_acc[BOOPIE_AVATAR_COUNT];  /* the accessories each wears, BOOP
 static char s_name[BOOPIE_PET_NAME_MAX];  /* the pet's name, or "" for its character's */
 static uint32_t s_best[BOOPIE_GAME_COUNT];   /* each game's best score */
 static uint8_t s_brain = BOOPIE_BRAIN_XIAOZHI;
+static uint8_t s_posture = 1;             /* 姿势感应: on unless turned off */
+static float s_soothed_until = -1;        /* stroked or hugged till then, in pose.t */
+static bool s_soothed_hug;
 #ifdef ESP_PLATFORM
 static uint8_t s_guided;                  /* the setup guide's been through */
 #else
@@ -300,6 +303,7 @@ static void load(void)
     }
     nvs_get_u8(h, "brain", &s_brain);
     nvs_get_u8(h, "guided", &s_guided);
+    nvs_get_u8(h, "posture", &s_posture);
     size_t pn = sizeof s_pet_state;
     boopie_pet_t saved;
     if (nvs_get_blob(h, "pet", &saved, &pn) == ESP_OK) {
@@ -342,6 +346,7 @@ static void save(void)
     }
     nvs_set_u8(h, "brain", s_brain);
     nvs_set_u8(h, "guided", s_guided);
+    nvs_set_u8(h, "posture", s_posture);
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_commit(h);
     nvs_close(h);
@@ -787,6 +792,64 @@ bool boopie_avatar_tap(int gx, int gy)
     }
     show_event(&ev);
     return fed;
+}
+
+void boopie_avatar_stroke(int strokes, bool hug)
+{
+    ensure_loaded();
+    boopie_avatar_react(BOOPIE_EXPR_HAPPY, hug ? 3.0f : 2.0f);
+    flash_overlay(BOOPIE_OVERLAY_BLUSH, hug ? 3.5f : 2.5f);
+    flash_overlay(BOOPIE_OVERLAY_HEARTS, hug ? 3.5f : 2.5f);
+    s_soothed_until = s_now + (hug ? 3.0f : 2.0f);
+    s_soothed_hug = hug;
+    if (hug || strokes == 2) {
+        /* The first of a time: a purr, and a little experience (as a poke's, capped a day). */
+        boopie_sound_play(BOOPIE_SOUND_PURR);
+        boopie_pet_event_t ev = { 0 };
+        boopie_pet_earn(&s_pet_state, BOOPIE_XP_POKE, -1, &ev);
+        show_event(&ev);
+    }
+    muse_state_poke();
+}
+
+const char *boopie_avatar_soothed(void)
+{
+    return s_now < s_soothed_until ? (s_soothed_hug ? "抱抱" : "好舒服") : NULL;
+}
+
+void boopie_avatar_greet(void)
+{
+    boopie_avatar_react(BOOPIE_EXPR_HAPPY, 2.5f);
+    boopie_sound_play(BOOPIE_SOUND_HELLO);
+    muse_state_set_caption("嗨！");
+}
+
+void boopie_avatar_upside_down(bool on)
+{
+    /* The "!" stays up while it's upside down. */
+    boopie_avatar_set_overlay(BOOPIE_OVERLAY_SURPRISE, on);
+    if (on) {
+        boopie_avatar_react(BOOPIE_EXPR_DIZZY, 30.0f);
+        muse_state_set_caption("哇！放我下来！");
+    } else {
+        boopie_avatar_react(BOOPIE_EXPR_HAPPY, 1.5f);
+        muse_state_set_caption("呼～");
+    }
+}
+
+bool boopie_avatar_posture_on(void)
+{
+    ensure_loaded();
+    return s_posture;
+}
+
+void boopie_avatar_set_posture_on(bool on)
+{
+    ensure_loaded();
+    if (on != (bool)s_posture) {
+        s_posture = on;
+        save();
+    }
 }
 
 boopie_brain_t boopie_avatar_brain(void)

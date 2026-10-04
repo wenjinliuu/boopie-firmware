@@ -452,8 +452,80 @@ static void build_button_icons(lv_obj_t *face)
     lv_obj_align(s_aux_icon, a->align, a->x, a->y);
 }
 
+/*
+ * Boopie: 摸摸 (docs/boopie-interaction.md). A finger held still on the pet a
+ * moment starts it, and the pages stop turning till it lifts; then each back
+ * and forth is a stroke, and held still on is a hug. A quick swipe still turns
+ * the page, and a tap is still a poke.
+ */
+#define STROKE_PX 14
+#define HUG_MS 1500
+static bool s_petting, s_skip_click, s_hugged;
+static int s_strokes;
+static int s_dir[2];            /* each axis: the way it's going, -1, 0, 1 */
+static int32_t s_turn[2];       /* where it last turned, or got furthest */
+static uint32_t s_held_since;
+
+static void on_canvas_touch(lv_event_t *e)
+{
+    lv_point_t pt = { 0 };
+    lv_indev_get_point(lv_indev_active(), &pt);
+    int32_t at[2] = { pt.x, pt.y };
+    switch (lv_event_get_code(e)) {
+    case LV_EVENT_PRESSED:
+        s_petting = s_skip_click = s_hugged = false;
+        break;
+    case LV_EVENT_LONG_PRESSED:
+        s_petting = true;
+        s_strokes = 0;
+        s_dir[0] = s_dir[1] = 0;
+        s_turn[0] = at[0];
+        s_turn[1] = at[1];
+        s_held_since = lv_tick_get();
+        lv_obj_remove_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE);   /* update_chrome() leaves it till release */
+        break;
+    case LV_EVENT_PRESSING:
+        if (!s_petting) {
+            break;
+        }
+        for (int k = 0; k < 2; k++) {
+            int32_t d = at[k] - s_turn[k];
+            if (s_dir[k] == 0) {
+                if (LV_ABS(d) >= STROKE_PX) {
+                    s_dir[k] = d > 0 ? 1 : -1;
+                    s_turn[k] = at[k];
+                }
+            } else if (d * s_dir[k] > 0) {
+                s_turn[k] = at[k];   /* still going: further */
+            } else if (-d * s_dir[k] >= STROKE_PX) {
+                s_dir[k] = -s_dir[k];   /* back the other way: a stroke */
+                s_turn[k] = at[k];
+                if (++s_strokes >= 2) {
+                    boopie_avatar_stroke(s_strokes, false);
+                }
+            }
+        }
+        if (!s_strokes && !s_hugged && !s_dir[0] && !s_dir[1] && lv_tick_elaps(s_held_since) >= HUG_MS) {
+            s_hugged = true;
+            boopie_avatar_stroke(0, true);
+        }
+        break;
+    case LV_EVENT_RELEASED:
+    case LV_EVENT_PRESS_LOST:
+        s_skip_click = s_petting;   /* the click that follows isn't a poke */
+        s_petting = false;
+        break;
+    default:
+        break;
+    }
+}
+
 static void on_canvas_clicked(lv_event_t *e)
 {
+    if (s_skip_click) {
+        s_skip_click = false;
+        return;
+    }
     /* Boopie: tapping the food bowl feeds the pet; anywhere else is a poke. */
     lv_point_t pt = { 0 };
     lv_area_t a;
@@ -863,6 +935,11 @@ static void build_screen(void)
     s_muse_y = s_big_y;
     lv_obj_add_flag(s_canvas, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(s_canvas, on_canvas_clicked, LV_EVENT_CLICKED, NULL);
+    static const lv_event_code_t TOUCH[] = { LV_EVENT_PRESSED, LV_EVENT_LONG_PRESSED, LV_EVENT_PRESSING,
+                                             LV_EVENT_RELEASED, LV_EVENT_PRESS_LOST };
+    for (size_t i = 0; i < sizeof TOUCH / sizeof TOUCH[0]; i++) {
+        lv_obj_add_event_cb(s_canvas, on_canvas_touch, TOUCH[i], NULL);   /* Boopie: 摸摸 */
+    }
     if (s_ring) {
         /* The canvas's black corners reach the bezel; keep the ring on top. */
         lv_obj_move_foreground(s_ring);
@@ -1163,6 +1240,10 @@ static const char *idle_name(muse_wifi_state_t wifi)
     switch (wifi) {
     case MUSE_WIFI_CONNECTED: {
         joined = true;
+        const char *soothed = boopie_avatar_soothed();   /* stroked: "好舒服" */
+        if (soothed) {
+            return soothed;
+        }
         switch (boopie_avatar_reacting()) {
         case BOOPIE_EXPR_HAPPY: return "开心";
         case BOOPIE_EXPR_EATING: return "好吃";
@@ -1200,7 +1281,7 @@ static void update_chrome(float now)
         lv_obj_t *active = lv_tileview_get_tile_active(s_tv);
         int page = active == s_settings;
         bool subpage = muse_settings_ui_in_subpage();
-        bool swipe = !page || !subpage;
+        bool swipe = (!page || !subpage) && !s_petting;   /* Boopie: not while being stroked */
         if (swipe != lv_obj_has_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE)) {
             lv_obj_set_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE, swipe);
         }

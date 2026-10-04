@@ -22,6 +22,9 @@
 #include "boopie_viewers.h" /* Boopie: looking back */
 #include "boopie_noise_ui.h" /* Boopie: 白噪音 */
 #include "boopie_sound.h"   /* Boopie: goodbye */
+#include "boopie_avatar.h"  /* Boopie: 姿势感应 */
+#include "boopie_imu.h"
+#include "boopie_posture.h"
 #include "muse_input.h"
 
 #include <stdint.h>
@@ -318,9 +321,69 @@ static void talk_button(unsigned ev)
     s_talk_down = talk_down;
 }
 
+/*
+ * Boopie: 姿势感应 (docs/boopie-interaction.md). Put face down, the screen
+ * sleeps; turned back over or picked up after lying still, it wakes and the
+ * pet says hi; held upside down, the pet protests. Not in a game (the maze
+ * is played tilted), and not with the switch off.
+ */
+static void check_posture(void)
+{
+    static boopie_posture_t pose;
+    static bool started;
+    static bool upside;
+    float g[3];
+    if (!boopie_imu_gravity(g)) {
+        return;
+    }
+    if (!started) {
+        boopie_posture_init(&pose);
+        started = true;
+    }
+    boopie_pose_event_t ev = boopie_posture_feed(&pose, g, SLEEP_CHECK_MS / 1000.0f);
+    if (!boopie_avatar_posture_on() || boopie_games_active()) {
+        if (upside) {
+            boopie_avatar_upside_down(false);
+            upside = false;
+        }
+        return;
+    }
+    float mode_t;
+    bool idle = muse_state_mode(&mode_t) == MUSE_MODE_IDLE;
+    switch (ev) {
+    case BOOPIE_POSE_FACE_DOWN:
+        if (idle && !muse_state_asleep()) {
+            set_asleep(true, "face down");
+        }
+        break;
+    case BOOPIE_POSE_FACE_UP:
+    case BOOPIE_POSE_LIFTED:
+        if (muse_state_asleep()) {
+            set_asleep(false, ev == BOOPIE_POSE_LIFTED ? "picked up" : "turned over");
+            boopie_avatar_greet();
+        }
+        break;
+    case BOOPIE_POSE_UPSIDE_DOWN:
+        if (!muse_state_asleep() && idle) {
+            boopie_avatar_upside_down(true);
+            upside = true;
+        }
+        break;
+    case BOOPIE_POSE_RIGHT_WAY_UP:
+        if (upside) {
+            boopie_avatar_upside_down(false);
+            upside = false;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 /* A pairing prompt wakes the screen and keeps it on; otherwise idle sleeps. */
 static void check_sleep(void)
 {
+    check_posture();   /* Boopie */
     muse_ble_status_t ble;
     muse_ble_status(&ble);
     /* Boopie: so does phone setup, while a phone reads the screen. */

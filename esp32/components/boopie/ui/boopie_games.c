@@ -36,17 +36,8 @@
 #define COLOR_ACCENT 0xa77dff
 #define COLOR_GOLD 0xffd246
 
-/*
- * Tilt, for 接零食 and 重力迷宫: the screen's x follows the accelerometer's
- * y and its y the x, as Waveshare's own tilt demo for this board reads them
- * (examples/esp-idf/04_Immersive_block). Not yet checked on the board: flip a
- * sign here if a game rolls the wrong way. Level is wherever it's held when
- * the round starts.
- */
-#define TILT_X_AXIS 1
-#define TILT_Y_AXIS 0
-#define TILT_X_SIGN 1.0f
-#define TILT_Y_SIGN 1.0f
+/* Tilt, for 接零食 and 重力迷宫: gravity in the screen's frame
+ * (boopie_imu_gravity), less where it pulled when the round started. */
 #define TILT_DEAD 0.04f   /* g */
 
 typedef enum { G_OFF, G_READY, G_PLAY, G_PAUSE, G_OVER } state_t;
@@ -223,16 +214,16 @@ static const game_def_t GAMES[] = {
 static bool read_tilt(float *tx, float *ty, bool level)
 {
 #ifdef ESP_PLATFORM
-    float a[3], gy[3];
+    float g[3];
     boopie_imu_keepalive();   /* read it fast: the face isn't drawing meanwhile */
-    if (!boopie_imu_read(a, gy)) {
+    if (!boopie_imu_gravity(g)) {
         return false;
     }
     if (level) {
-        memcpy(s_bias, a, sizeof s_bias);
+        memcpy(s_bias, g, sizeof s_bias);
     }
-    float x = (a[TILT_X_AXIS] - s_bias[TILT_X_AXIS]) * TILT_X_SIGN;
-    float y = (a[TILT_Y_AXIS] - s_bias[TILT_Y_AXIS]) * TILT_Y_SIGN;
+    float x = g[0] - s_bias[0];
+    float y = g[1] - s_bias[1];
     *tx = fabsf(x) < TILT_DEAD ? 0 : x;
     *ty = fabsf(y) < TILT_DEAD ? 0 : y;
     return true;

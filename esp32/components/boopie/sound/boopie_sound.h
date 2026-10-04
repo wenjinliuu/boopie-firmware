@@ -33,6 +33,8 @@ typedef enum {
     BOOPIE_SOUND_CLOUD,        /* the rain cloud */
     BOOPIE_SOUND_GAME_OVER,
     BOOPIE_SOUND_NOTIFY,       /* a card, a reminder */
+    BOOPIE_SOUND_PURR,         /* stroked: a soft rumble */
+    BOOPIE_SOUND_HELLO,        /* picked up: hi! */
     BOOPIE_SOUND_COUNT,
 } boopie_sound_t;
 

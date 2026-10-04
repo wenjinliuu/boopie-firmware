@@ -335,6 +335,23 @@ static bool tap(const char *value, bool real_time)
     return true;
 }
 
+/* A finger held on the pet, then rubbed back and forth `value` times (0: held still, a hug). */
+static bool stroke(const char *value, bool real_time)
+{
+    int n = atoi(value), c = 233;
+    finger(true, c, c, 600, real_time);   /* held still past a long press */
+    if (!n) {
+        finger(true, c, c, 1500, real_time);
+    }
+    for (int i = 0; i < n; i++) {
+        for (int k = 0; k <= 6; k++) {
+            finger(true, c + (i % 2 ? 30 - k * 10 : -30 + k * 10), c, 25, real_time);
+        }
+    }
+    finger(false, c, c, 100, real_time);
+    return true;
+}
+
 static bool swipe(const char *value, bool real_time)
 {
     static const struct { const char *name; int dx, dy; } WAYS[] = {
@@ -359,6 +376,9 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
 {
     if (!strcmp(key, "tap")) {
         return tap(value, real_time);
+    }
+    if (!strcmp(key, "stroke")) {   /* 摸摸: rubs; 0 a hug */
+        return stroke(value, real_time);
     }
     if (!strcmp(key, "swipe")) {
         return swipe(value, real_time);

@@ -10,6 +10,7 @@ set(srcs
     "avatar/boopie_pixel.c"
     "device/boopie_shake.c"
     "pet/boopie_pet.c"
+    "pet/boopie_posture.c"
     "game/boopie_whack.c"
     "game/boopie_catch.c"
     "game/boopie_maze.c"
