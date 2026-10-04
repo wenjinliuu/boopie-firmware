@@ -1132,8 +1132,10 @@ static void frame(lv_timer_t *timer)
 
     /* What it says: over its head, for a while, then something new now and then. */
     if (!s_hello) {
-        s_hello = true;
-        say("点冒气泡的东西试试看");
+        s_hello = true;   /* once a power-up, and only the first few times ever */
+        if (boopie_avatar_world_hint()) {
+            say("点冒气泡的东西试试看");
+        }
         s_chat_at = s_t + CHAT_EVERY_S;
     }
     if (s_t - s_said_at > SAY_S) {

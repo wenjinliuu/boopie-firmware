@@ -301,8 +301,8 @@ def render_farm(binary: Path, out: Path) -> list[Path]:
 # The settings pages, reached by a scripted finger (466 px screen).
 SETTINGS = [
     ("settings-home", ["swipe=left"]),
-    ("settings-wifi", ["swipe=left", "tap=230,113", "advance=600"]),
-    ("settings-wifi-password", ["swipe=left", "tap=230,113", "advance=600", "tap=230,459", "advance=600"]),
+    ("settings-wifi", ["settings=wifi", "advance=600"]),
+    ("settings-wifi-password", ["settings=wifi", "advance=600", "tap=230,459", "advance=600"]),
     ("settings-avatar", ["settings=avatar", "advance=600"]),
     *[(f"settings-{page}", [f"settings={page}", "advance=600"])
       for page in ("brain", "xiaozhi", "muse", "vpn", "bluetooth", "sound", "sleep", "battery")],

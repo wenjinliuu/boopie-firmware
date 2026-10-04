@@ -366,7 +366,7 @@ static esp_err_t on_save(httpd_req_t *req)
     if (!error && field(body, "brain", val, 4)) {
         brain = atoi(val);
         if (brain < 0 || brain >= BOOPIE_BRAIN_COUNT) {
-            error = "不认识这个大脑";
+            error = "不认识这个 AI 助手";
         }
     }
     char sdk[BOOPIE_SDK_TOKEN_LEN + 2] = "";

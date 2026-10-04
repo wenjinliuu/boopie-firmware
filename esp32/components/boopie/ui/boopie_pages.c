@@ -235,20 +235,84 @@ static void tick_apps(void)
 
 /* ---------------------------------------------------------------- cards */
 
-static lv_obj_t *s_date;
+/* The page pulled down from the top: the date, the battery, the volume and
+ * the brightness to hand, and under them the cards the AI sends. */
+static lv_obj_t *s_date, *s_batt_big, *s_batt_note, *s_vol_sl, *s_vol_val, *s_vol_icon, *s_lux_sl, *s_lux_val;
+
+static void on_volume(lv_event_t *e)
+{
+    int v = lv_slider_get_value(lv_event_get_target_obj(e));
+    muse_settings_set_volume(v);
+    if (v > 0 && !muse_settings_speaker_on()) {
+        muse_settings_set_speaker_on(true);   /* turning it up means wanting to hear it */
+    }
+}
+
+static void on_mute(lv_event_t *e)
+{
+    (void)e;
+    muse_settings_set_speaker_on(!muse_settings_speaker_on());
+}
+
+static void on_brightness(lv_event_t *e)
+{
+    muse_settings_set_brightness(lv_slider_get_value(lv_event_get_target_obj(e)));
+}
+
+/* A control card: an icon (tappable, for the volume's mute), a name and value, a slider. */
+static lv_obj_t *control(lv_obj_t *page, int y, const char *icon, const char *name, int lo, int hi, int v,
+                         lv_obj_t **icon_out, lv_obj_t **val_out, lv_event_cb_t cb)
+{
+    lv_obj_t *c = card(page, 330, 78);
+    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, y);
+    lv_obj_t *ic = text(c, &lv_font_montserrat_20, COLOR_ACCENT, icon);
+    lv_obj_align(ic, LV_ALIGN_TOP_LEFT, 18, 10);
+    lv_obj_set_ext_click_area(ic, 14);
+    if (icon_out) {
+        *icon_out = ic;
+    }
+    lv_obj_align(text(c, &lv_font_montserrat_20, COLOR_TEXT, name), LV_ALIGN_TOP_LEFT, 52, 10);
+    *val_out = text(c, &lv_font_montserrat_16, COLOR_DIM, "");
+    lv_obj_align(*val_out, LV_ALIGN_TOP_RIGHT, -18, 13);
+    lv_obj_t *sl = lv_slider_create(c);
+    lv_obj_set_size(sl, 280, 10);
+    lv_obj_align(sl, LV_ALIGN_BOTTOM_MID, 0, -16);
+    lv_slider_set_range(sl, lo, hi);
+    lv_slider_set_value(sl, v, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(sl, lv_color_hex(0x3a3358), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(sl, lv_color_hex(COLOR_ACCENT), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(sl, lv_color_hex(0xffffff), LV_PART_KNOB);
+    lv_obj_set_style_pad_all(sl, 5, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(sl, 16);
+    lv_obj_add_event_cb(sl, cb, LV_EVENT_VALUE_CHANGED, NULL);
+    return sl;
+}
 
 static void build_cards(lv_obj_t *page)
 {
-    title(page, "今天");
     s_date = text(page, &lv_font_montserrat_28, COLOR_TEXT, "");
-    lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, 96);
-    lv_obj_t *c = card(page, 330, 150);
-    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, 160);
-    lv_obj_t *t = text(c, &lv_font_montserrat_20, COLOR_TEXT, "还没有卡片");
-    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 26);
-    lv_obj_t *n = text(c, &lv_font_montserrat_20, COLOR_DIM, "AI 推送的天气、\n日程和提醒会在这里");
+    lv_obj_align(s_date, LV_ALIGN_TOP_MID, 0, 46);
+
+    lv_obj_t *b = card(page, 330, 64);
+    lv_obj_align(b, LV_ALIGN_TOP_MID, 0, 96);
+    s_batt_big = text(b, &lv_font_montserrat_28, COLOR_TEXT, "");
+    lv_obj_align(s_batt_big, LV_ALIGN_LEFT_MID, 18, 0);
+    s_batt_note = text(b, &lv_font_montserrat_16, COLOR_DIM, "");
+    lv_obj_set_style_text_align(s_batt_note, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_align(s_batt_note, LV_ALIGN_RIGHT_MID, -18, 0);
+
+    s_vol_sl = control(page, 170, LV_SYMBOL_VOLUME_MAX, "音量", 0, 100, muse_settings_volume(), &s_vol_icon,
+                       &s_vol_val, on_volume);
+    lv_obj_add_flag(s_vol_icon, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s_vol_icon, on_mute, LV_EVENT_CLICKED, NULL);
+    s_lux_sl = control(page, 258, LV_SYMBOL_EYE_OPEN, "亮度", 10, 100, muse_settings_brightness(), NULL, &s_lux_val,
+                       on_brightness);
+
+    lv_obj_t *c = card(page, 300, 70);
+    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, 346);
+    lv_obj_t *n = text(c, &lv_font_montserrat_16, COLOR_DIM, "还没有卡片\nAI 推送的天气、提醒会在这里");
     lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(n, LV_ALIGN_TOP_MID, 0, 70);
+    lv_obj_center(n);
 }
 
 static void tick_cards(void)
@@ -261,6 +325,37 @@ static void tick_cards(void)
         snprintf(buf, sizeof buf, "%s", "等待校时…");
     }
     set_text(s_date, buf);
+
+    muse_power_t p = muse_state_power();
+    if (p.battery_pct < 0) {
+        set_text(s_batt_big, LV_SYMBOL_USB);
+        set_text(s_batt_note, "没接电池\n用 USB 供电");
+    } else {
+        snprintf(buf, sizeof buf, "%s %d%%", p.charging ? LV_SYMBOL_CHARGE : LV_SYMBOL_BATTERY_FULL, p.battery_pct);
+        set_text(s_batt_big, buf);
+        lv_obj_set_style_text_color(s_batt_big, lv_color_hex(p.battery_pct <= 20 && !p.charging ? 0xff6b6b : COLOR_TEXT), 0);
+        char note[48];
+        const char *how = p.charging ? "正在充电" : p.usb ? "已充满" : "用电池";
+        if (p.battery_mv > 0) {
+            snprintf(note, sizeof note, "%s\n%d.%02d V", how, p.battery_mv / 1000, p.battery_mv % 1000 / 10);
+        } else {
+            snprintf(note, sizeof note, "%s", how);
+        }
+        set_text(s_batt_note, note);
+    }
+    /* Changed elsewhere too (settings, the power menu): follow, unless a finger's on it. */
+    bool on = muse_settings_speaker_on();
+    if (!lv_obj_has_state(s_vol_sl, LV_STATE_PRESSED)) {
+        lv_slider_set_value(s_vol_sl, muse_settings_volume(), LV_ANIM_OFF);
+    }
+    snprintf(buf, sizeof buf, on ? "%d%%" : "静音", muse_settings_volume());
+    set_text(s_vol_val, buf);
+    set_text(s_vol_icon, on ? LV_SYMBOL_VOLUME_MAX : LV_SYMBOL_MUTE);
+    if (!lv_obj_has_state(s_lux_sl, LV_STATE_PRESSED)) {
+        lv_slider_set_value(s_lux_sl, muse_settings_brightness(), LV_ANIM_OFF);
+    }
+    snprintf(buf, sizeof buf, "%d%%", muse_settings_brightness());
+    set_text(s_lux_val, buf);
 }
 
 /* ---------------------------------------------------------------- the pet */
@@ -375,10 +470,19 @@ static void build_menu(bool reset_ask)
         menu_button(col, "取消", COLOR_TEXT, ACT_CANCEL);
         return;
     }
+    lv_obj_t *title = text(col, &boopie_font_pixel_24, COLOR_ACCENT, "电源");
+    lv_obj_set_style_pad_bottom(title, 4, 0);
     menu_button(col, "关机", COLOR_TEXT, ACT_OFF);
     menu_button(col, "重启", COLOR_TEXT, ACT_RESTART);
     menu_button(col, muse_settings_speaker_on() ? "静音" : "取消静音", COLOR_TEXT, ACT_MUTE);
-    menu_button(col, "恢复出厂", COLOR_DANGER, ACT_RESET);
+    /* Apart and smaller, so it isn't hit for 关机: it asks again anyway. */
+    lv_obj_t *gap = lv_obj_create(col);
+    lv_obj_remove_style_all(gap);
+    lv_obj_set_size(gap, 10, 14);
+    lv_obj_t *b = card(col, 180, 40);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_center(text(b, &lv_font_montserrat_16, COLOR_DANGER, "恢复出厂"));
+    lv_obj_add_event_cb(b, on_action, LV_EVENT_CLICKED, (void *)(intptr_t)ACT_RESET);
 }
 
 void boopie_pages_power_menu(void)

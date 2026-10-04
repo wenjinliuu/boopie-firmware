@@ -203,7 +203,7 @@ boopie_xz_state_t boopie_xiaozhi_status(char *code, size_t code_cap, char *note,
         snprintf(code, code_cap, "%s", c ? c : "");
     }
     if (note_cap) {
-        snprintf(note, note_cap, "%s", st == BOOPIE_XZ_CODE ? "打开 xiaozhi.me，控制台 › 添加设备，输入激活码"
+        snprintf(note, note_cap, "%s", st == BOOPIE_XZ_CODE ? "到 xiaozhi.me 添加设备，输入它"
                                        : st == BOOPIE_XZ_READY ? "已连接小智" : "等 Wi-Fi 连上");
     }
     return st;

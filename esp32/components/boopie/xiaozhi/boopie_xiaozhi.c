@@ -256,7 +256,7 @@ static void xz_task(void *arg)
         }
         backoff = 10000;
         if (ota->has_code || ota->has_challenge) {
-            set_state(BOOPIE_XZ_CODE, ota->code, "打开 xiaozhi.me，控制台 › 添加设备，输入激活码");
+            set_state(BOOPIE_XZ_CODE, ota->code, "到 xiaozhi.me 添加设备，输入它");
             if (!told_code && ota->has_code) {
                 told_code = true;   /* once a power-up on the face: it's in settings after */
                 boopie_sound_play(BOOPIE_SOUND_NOTIFY);

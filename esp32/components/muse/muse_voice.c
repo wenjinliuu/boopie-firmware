@@ -484,7 +484,7 @@ static const char *not_set_up(void)
     char sdk[BOOPIE_SDK_TOKEN_LEN + 1];
     bool has = boopie_sdk_token(sdk);
     memset(sdk, 0, sizeof sdk);
-    return has ? "先在 设置 › 大脑 里配好 Muse" : "先填开发者 token：设置 › 手机扫码设置";
+    return has ? "先在 设置 › AI 助手 里配好 Muse" : "先填开发者 token：设置 › 手机扫码设置";
 }
 
 /* Why a press can't go to Hatch; voice notes only go there. */

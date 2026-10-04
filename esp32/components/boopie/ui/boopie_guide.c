@@ -247,15 +247,15 @@ static void show_step(step_t step)
         button(col, 220, "开始", true, on_next, 0);
         break;
     case S_ONLINE:
-        col = page("先连上网", "用手机扫码，一次填完 Wi-Fi、\n大脑和密钥；或者在我这里选。");
+        col = page("先连上网", "用手机扫码，一次填完 Wi-Fi、\nAI 助手和密钥；或者在我这里选。");
         button(col, 260, "手机扫码设置", true, on_phone, 0);
         button(col, 260, "在屏幕上选 Wi-Fi", false, on_wifi, 0);
         button(col, 260, "稍后再说", false, on_next, 0);
         break;
     case S_BRAIN:
-        col = page("选一个大脑", "说话时用哪个 AI 回答？\n以后在设置里也能换。");
-        button(col, 300, "小智 · 国内（推荐）", true, on_brain, BOOPIE_BRAIN_XIAOZHI);
-        button(col, 300, "Muse · 需要海外网络", false, on_brain, BOOPIE_BRAIN_MUSE);
+        col = page("选 AI 助手", "说话时用哪个 AI 回答？\n以后在设置里也能换。");
+        button(col, 300, "Muse（推荐，需海外网络）", true, on_brain, BOOPIE_BRAIN_MUSE);
+        button(col, 300, "小智（备用，国内网络）", false, on_brain, BOOPIE_BRAIN_XIAOZHI);
         break;
     case S_BRAIN_SETUP:
         if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
@@ -264,7 +264,7 @@ static void show_step(step_t step)
             button(col, 220, "稍后再说", false, on_next, 0);
             break;
         } else {
-            col = page("小智", "小智的服务器还在准备中。\n接通以后，\n这里会显示激活码。");
+            col = page("小智", "联网后，设置 › AI 助手 ›\n小智接入 里会显示激活码，\n到 xiaozhi.me 添加设备。");
         }
         button(col, 220, "好的", true, on_next, 0);
         break;

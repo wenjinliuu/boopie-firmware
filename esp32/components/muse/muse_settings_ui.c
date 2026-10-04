@@ -101,9 +101,8 @@ static char s_join_ssid[MUSE_SSID_MAX + 1];
 
 /* Hatch page. */
 static lv_obj_t *s_hatch_status, *s_hatch_host, *s_hatch_vm, *s_hatch_token;
-static lv_obj_t *s_muse_howto;   /* Boopie: getting Muse on */
 static lv_obj_t *s_sdk_value;    /* Boopie: whether the developer token's in */
-static lv_obj_t *s_link_status, *s_link_reset_lbl;
+static lv_obj_t *s_link_status, *s_link_state, *s_link_reset_lbl;
 static int64_t s_link_reset_armed_us;
 
 /* Bluetooth page. */
@@ -379,6 +378,60 @@ static lv_obj_t *info_row(lv_obj_t *list, const char *text)
     lv_obj_t *t = label(c, &lv_font_montserrat_16, COLOR_TEXT, text);
     lv_obj_set_flex_grow(t, 1);
     return label(c, &lv_font_montserrat_16, COLOR_ACCENT, "");
+}
+
+/* Boopie: how-to steps, a card of them: a heading, then each step on its own
+ * lines, big enough to read on the round screen. */
+static lv_obj_t *steps(lv_obj_t *list, const char *heading, const char *const *lines, int n)
+{
+    lv_obj_t *c = lv_obj_create(list);
+    lv_obj_remove_style_all(c);
+    lv_obj_set_size(c, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_radius(c, 18, 0);
+    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(c, lv_color_hex(COLOR_CARD), 0);
+    lv_obj_set_style_pad_all(c, 14, 0);
+    lv_obj_set_flex_flow(c, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(c, 8, 0);
+    lv_obj_remove_flag(c, LV_OBJ_FLAG_SCROLLABLE);
+    if (heading) {
+        label(c, &lv_font_montserrat_20, COLOR_ACCENT, heading);
+    }
+    for (int i = 0; i < n; i++) {
+        char line[160];
+        snprintf(line, sizeof line, "%d. %s", i + 1, lines[i]);
+        lv_obj_t *l = label(c, &lv_font_montserrat_20, COLOR_TEXT, line);
+        lv_obj_set_width(l, lv_pct(100));
+        lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
+    }
+    return c;
+}
+
+/* Boopie: a heading row that opens and closes what's under it (the debug readings). */
+static void on_fold(lv_event_t *e)
+{
+    lv_obj_t *body = lv_event_get_user_data(e);
+    lv_obj_t *arrow = lv_obj_get_child(lv_event_get_current_target(e), -1);
+    bool hidden = lv_obj_has_flag(body, LV_OBJ_FLAG_HIDDEN);
+    if (hidden) {
+        lv_obj_remove_flag(body, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(body, LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_label_set_text(arrow, hidden ? LV_SYMBOL_DOWN : LV_SYMBOL_RIGHT);
+}
+
+static lv_obj_t *fold(lv_obj_t *list, const char *text)
+{
+    lv_obj_t *head = card(list, true);
+    lv_obj_set_height(head, 48);
+    lv_obj_t *t = label(head, &lv_font_montserrat_16, COLOR_DIM, text);
+    lv_obj_set_flex_grow(t, 1);
+    label(head, &lv_font_montserrat_16, COLOR_DIM, LV_SYMBOL_RIGHT);
+    lv_obj_t *body = column(list);
+    lv_obj_add_flag(body, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(head, on_fold, LV_EVENT_CLICKED, body);
+    return body;
 }
 
 /* ---------- navigation ---------- */
@@ -936,16 +989,24 @@ static void build_hatch_page(lv_obj_t *tile)
     lv_obj_t *list;
     s_hatch = page(tile, "Muse", true, &list);
     s_link_reset_armed_us = 0;
-    s_link_status = note(list, "");
-    s_hatch_status = note(list, "");
+    s_link_status = info_row(list, "App 配对");
+    s_link_state = info_row(list, "连接");
+    s_hatch_status = info_row(list, "Muse 服务");
     /* Boopie: the developer token, entered by whoever sets it up, and the
      * device token, which pairing fetches: neither is typed here. */
     row(list, NULL, "开发者 token", &s_sdk_value, on_sdk_token, NULL);
     s_hatch_token = info_row(list, "设备 token");
     button(list, "测试连接", COLOR_ACCENT, on_hatch_test, NULL);
     /* Boopie: how to get Muse on, step by step (docs/boopie-interaction.md). */
-    s_muse_howto = note(list, "");
-    lv_obj_set_style_text_align(s_muse_howto, LV_TEXT_ALIGN_LEFT, 0);
+    static const char *const HOWTO[] = {
+        "开发者 token：gadgets.muse.ai 登录，Account › SDK tokens 生成，用手机扫码设置粘贴",
+        "打开 设置 › VPN，板子要能上海外网络",
+        "手机装 Muse App 并登录，设置 › 设备 › 打开开发者模式",
+        "设置 › 设备 › 右上角 +，添加这块板子",
+        "屏幕提示时，按一下上面的键确认",
+        "上面显示\"已配对\"\"已连上\"就好了",
+    };
+    steps(list, "怎样接入 Muse", HOWTO, (int)(sizeof HOWTO / sizeof HOWTO[0]));
     note(list, "高级");
     row(list, NULL, "服务器", &s_hatch_host, on_hatch_host, NULL);
     row(list, NULL, "VM ID", &s_hatch_vm, on_hatch_vm, NULL);
@@ -956,24 +1017,10 @@ static void build_hatch_page(lv_obj_t *tile)
 
 static void tick_hatch(void)
 {
-    char link[64];
-    snprintf(link, sizeof(link), "Muse App：%s\n%s", muse_link_hatch_linked() ? "已配对" : "未配对",
-             link_state_text(muse_link_state()));
-    set_text(s_link_status, link);
-    muse_ble_status_t ble;
-    muse_ble_status(&ble);
-    char howto[720];
-    snprintf(howto, sizeof(howto),
-             "怎样接入 Muse\n"
-             "1. 开发者 token：在 gadgets.muse.ai 登录，Account › SDK tokens 生成一个，"
-             "用 设置 › 手机扫码设置 粘贴。点上面\"开发者 token\"也能打开。\n"
-             "2. 板子要能访问海外网络：设置 › VPN 打开。\n"
-             "3. 手机装好 Muse App 并登录，打开 设置 › 设备 › 开发者模式。\n"
-             "4. 设置 › 设备 › 右上角 + 添加设备，选 %s。\n"
-             "5. 屏幕提示按键时，按一下上面的键确认。设备 token 会自动拿到。\n"
-             "6. 这里显示\"已配对\"、\"已连上\"就好了。",
-             ble.name[0] ? ble.name : "这块板子");
-    set_text(s_muse_howto, howto);
+    bool linked = muse_link_hatch_linked();
+    set_text(s_link_status, linked ? "已配对" : "未配对");
+    lv_obj_set_style_text_color(s_link_status, lv_color_hex(linked ? COLOR_OK : COLOR_WARN), 0);
+    set_text(s_link_state, link_state_text(muse_link_state()));
     if (s_link_reset_armed_us && esp_timer_get_time() - s_link_reset_armed_us >= 5000000) {
         s_link_reset_armed_us = 0;
         set_text(s_link_reset_lbl, "重置配对");
@@ -981,9 +1028,7 @@ static void tick_hatch(void)
 
     muse_hatch_status_t h;
     muse_hatch_status(&h);
-    char buf[96];
-    snprintf(buf, sizeof(buf), "%s\n%s", hatch_state_text(h.state), h.detail);
-    set_text(s_hatch_status, buf);
+    set_text(s_hatch_status, hatch_state_text(h.state));
     lv_obj_set_style_text_color(s_hatch_status, lv_color_hex(h.state == MUSE_HATCH_REACHABLE ? COLOR_OK :
                                                              h.state == MUSE_HATCH_UNREACHABLE ? COLOR_WARN : COLOR_DIM), 0);
 
@@ -1105,9 +1150,9 @@ static void build_sound_page(lv_obj_t *tile)
     s_gain_sl = slider(list, "麦克风灵敏度", 0, MUSE_MIC_GAIN_MAX / 3, muse_settings_mic_gain() / 3, &s_gain_val, on_gain);
     note(list, "关掉\"说话出声\"，回复只显示文字。");
 
-    /* Boopie: the level meter is for tuning, so it's last, under its own heading. */
-    note(list, "调试：麦克风电平");
-    lv_obj_t *meter = lv_obj_create(list);
+    /* Boopie: the level meter is for tuning, so it's last, folded away. */
+    lv_obj_t *dbg = fold(list, "调试信息：麦克风电平");
+    lv_obj_t *meter = lv_obj_create(dbg);
     lv_obj_remove_style_all(meter);
     lv_obj_set_size(meter, lv_pct(100), LV_SIZE_CONTENT);
     lv_obj_set_style_pad_hor(meter, 8, 0);
@@ -1121,7 +1166,7 @@ static void build_sound_page(lv_obj_t *tile)
     lv_bar_set_range(s_mic_bar, 0, 60);   /* -70..-10 dBFS */
     lv_obj_set_style_bg_color(s_mic_bar, lv_color_hex(0x2a2345), LV_PART_MAIN);
     lv_obj_set_style_anim_duration(s_mic_bar, 80, 0);
-    note(list, "离一臂远说话：电平条到绿色（-30 到 -15 dBFS）、不变橙色最合适。");
+    note(dbg, "离一臂远说话：电平条到绿色\n（-30 到 -15 dBFS），\n不变橙色最合适。");
 
     set_val(s_vol_val, "%d%%", muse_settings_volume());
     set_val(s_gain_val, "%d dB", muse_settings_mic_gain() / 3 * 3);
@@ -1212,17 +1257,17 @@ static void build_battery_page(lv_obj_t *tile)
     s_batt_shown_us = 0;
     s_batt_level = info_row(list, "电量");
     s_batt_full = info_row(list, "充满能用");
-    /* Boopie: the rest measures power use, for tuning: last, under a heading. */
-    note(list, "调试：耗电测量");
-    s_batt_status = note(list, "");
-    s_batt_drain = info_row(list, "已用");
-    s_batt_off = info_row(list, "熄屏时间");
-    s_batt_slept = info_row(list, "芯片睡眠");
-    s_batt_wakes = info_row(list, "唤醒次数");
-    s_batt_busy = info_row(list, "CPU 忙碌");
-    s_batt_awake = note(list, "");
-    button(list, LV_SYMBOL_REFRESH "  重新测量", COLOR_ACCENT, on_battery_reset, NULL);
-    note(list, "从拔掉 USB 开始测，插上 USB 结束。电量按 1% 变化，测几个小时才准。");
+    /* Boopie: the rest measures power use, for tuning: last, folded away. */
+    lv_obj_t *dbg = fold(list, "调试信息：耗电测量");
+    s_batt_status = note(dbg, "");
+    s_batt_drain = info_row(dbg, "已用");
+    s_batt_off = info_row(dbg, "熄屏时间");
+    s_batt_slept = info_row(dbg, "芯片睡眠");
+    s_batt_wakes = info_row(dbg, "唤醒次数");
+    s_batt_busy = info_row(dbg, "CPU 忙碌");
+    s_batt_awake = note(dbg, "");
+    button(dbg, LV_SYMBOL_REFRESH "  重新测量", COLOR_ACCENT, on_battery_reset, NULL);
+    note(dbg, "从拔掉 USB 开始测，\n插上 USB 结束。\n测几个小时才准。");
 }
 
 /* A per-mille figure as a percentage. */
@@ -1597,14 +1642,14 @@ static void build_xiaozhi_page(lv_obj_t *tile)
     lv_obj_set_style_text_letter_space(s_xz_code, 6, 0);
     s_xz_note = note(list, "");
     button(list, LV_SYMBOL_REFRESH "  重新连接", COLOR_ACCENT, on_xz_recheck, NULL);
-    lv_obj_t *n = note(list,
-        "怎么绑定：\n"
-        "1. 在 设置 › 大脑 里选\"小智\"，板子联网。\n"
-        "2. 这里会显示一个 6 位激活码。\n"
-        "3. 手机浏览器打开 xiaozhi.me，登录控制台。\n"
-        "4. 添加设备，输入激活码。\n"
-        "绑定一次就好，国内网络，不用代理。角色、音色在控制台里改。");
-    lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_LEFT, 0);
+    static const char *const HOWTO[] = {
+        "在 AI 助手 里选\"小智\"，连上网",
+        "这里会显示 6 位激活码",
+        "手机打开 xiaozhi.me 登录",
+        "点\"添加设备\"，输入激活码",
+    };
+    steps(list, "怎样绑定小智", HOWTO, (int)(sizeof HOWTO / sizeof HOWTO[0]));
+    note(list, "绑定一次就好。\n角色、音色在控制台里改。");
 }
 
 static void tick_xiaozhi(void)
@@ -1612,7 +1657,7 @@ static void tick_xiaozhi(void)
     char code[16], said[96];
     boopie_xz_state_t st = boopie_xiaozhi_status(code, sizeof code, said, sizeof said);
     set_text(s_xz_code, st == BOOPIE_XZ_CODE ? code : st == BOOPIE_XZ_READY ? LV_SYMBOL_OK : "");
-    set_text(s_xz_note, st == BOOPIE_XZ_OFF ? "现在的大脑是 Muse。在 设置 › 大脑 里选小智就开始连接。" : said);
+    set_text(s_xz_note, st == BOOPIE_XZ_OFF ? "现在用的是 Muse。\n在 AI 助手 里选小智\n就开始连接。" : said);
 }
 
 static const page_t XIAOZHI = { &s_xiaozhi, build_xiaozhi_page };
@@ -1620,16 +1665,20 @@ static const page_t XIAOZHI = { &s_xiaozhi, build_xiaozhi_page };
 static void build_brain_page(lv_obj_t *tile)
 {
     lv_obj_t *list;
-    s_brain = page(tile, "大脑", true, &list);
+    s_brain = page(tile, "AI 助手", true, &list);
     note(list, "说话时用哪个 AI 回答？");
-    static const char *const NAMES[BOOPIE_BRAIN_COUNT] = { "小智（国内）", "Muse（海外）" };
-    for (int i = 0; i < BOOPIE_BRAIN_COUNT; i++) {
+    /* Muse first: it's the one recommended; 小智 is there when the network won't do. */
+    static const int ORDER[BOOPIE_BRAIN_COUNT] = { BOOPIE_BRAIN_MUSE, BOOPIE_BRAIN_XIAOZHI };
+    static const char *const NAMES[BOOPIE_BRAIN_COUNT] = { [BOOPIE_BRAIN_MUSE] = "Muse  推荐",
+                                                           [BOOPIE_BRAIN_XIAOZHI] = "小智  备用" };
+    for (int k = 0; k < BOOPIE_BRAIN_COUNT; k++) {
+        int i = ORDER[k];
         row(list, NULL, NAMES[i], &s_brain_checks[i], on_brain_choice, (void *)(intptr_t)i);
         lv_obj_set_style_text_color(s_brain_checks[i], lv_color_hex(COLOR_ACCENT), 0);
     }
-    note(list, "小智：国内服务器，不用代理，在 xiaozhi.me 绑定一次。\nMuse：需要 Muse App 配对和海外网络。");
-    nav_row(list, "小智接入", on_nav, (void *)&XIAOZHI);
+    note(list, "Muse：要海外网络（开 VPN）\n和 Muse App 配对。\n小智：国内网络，不用 VPN，\n在 xiaozhi.me 绑定一次。");
     nav_row(list, "Muse 接入与设置", on_nav, (void *)&HATCH);
+    nav_row(list, "小智接入", on_nav, (void *)&XIAOZHI);
 }
 
 static void tick_brain(void)
@@ -1861,18 +1910,19 @@ static void build_home(lv_obj_t *tile)
     lv_obj_t *list;
     s_home = page(tile, "设置", false, &list);
     /* Boopie: pixel icons on coloured tiles, as the apps page's. */
-    icon_row(list, BOOPIE_ICON_WIFI, "无线网络", &s_home_wifi, on_nav, (void *)&WIFI);
-    icon_row(list, BOOPIE_ICON_PHONE, "手机扫码设置", NULL, on_phone_setup, NULL);
-    icon_row(list, BOOPIE_ICON_BRAIN, "大脑", &s_home_brain, on_nav, (void *)&BRAIN);
+    /* Boopie: what's set up most first: the pet, getting online, the phone, the guide. */
     icon_row(list, BOOPIE_ICON_PAW, "伙伴", &s_home_avatar, on_nav, (void *)&AVATAR);
-    icon_row(list, BOOPIE_ICON_VPN, "VPN", &s_home_vpn, on_nav, (void *)&VPN);
+    icon_row(list, BOOPIE_ICON_WIFI, "无线网络", &s_home_wifi, on_nav, (void *)&WIFI);
     icon_row(list, BOOPIE_ICON_BLUETOOTH, "蓝牙", &s_home_ble, on_nav, (void *)&BLE);
+    icon_row(list, BOOPIE_ICON_VPN, "VPN", &s_home_vpn, on_nav, (void *)&VPN);
+    icon_row(list, BOOPIE_ICON_PHONE, "手机扫码设置", NULL, on_phone_setup, NULL);
+    icon_row(list, BOOPIE_ICON_GUIDE, "新手引导", NULL, on_guide, NULL);   /* Boopie: the setup guide again */
+    icon_row(list, BOOPIE_ICON_BRAIN, "AI 助手", &s_home_brain, on_nav, (void *)&BRAIN);
     icon_row(list, BOOPIE_ICON_SOUND, "声音", &s_home_sound, on_nav, (void *)&SOUND);
     icon_row(list, BOOPIE_ICON_DISPLAY, "显示与熄屏", &s_home_sleep, on_nav, (void *)&SLEEP);
     icon_row(list, BOOPIE_ICON_BATTERY, "电池", &s_home_battery, on_nav, (void *)&BATTERY);
     icon_row(list, BOOPIE_ICON_STORAGE, "存储空间", &s_home_storage, on_nav, (void *)&STORAGE);
     /* Boopie: no power off here; holding the bottom button opens the power menu. */
-    icon_row(list, BOOPIE_ICON_GUIDE, "重新引导", NULL, on_guide, NULL);   /* Boopie: the setup guide again */
     s_about = note(list, "");
 }
 

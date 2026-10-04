@@ -92,7 +92,7 @@ static uint32_t s_owned;                  /* bit per skin index */
 static uint32_t s_acc[BOOPIE_AVATAR_COUNT];  /* the accessories each wears, BOOPIE_ACC_BIT()s */
 static char s_name[BOOPIE_PET_NAME_MAX];  /* the pet's name, or "" for its character's */
 static uint32_t s_best[BOOPIE_GAME_COUNT];   /* each game's best score */
-static uint8_t s_brain = BOOPIE_BRAIN_XIAOZHI;
+static uint8_t s_brain = BOOPIE_BRAIN_MUSE;   /* the AI assistant: Muse, recommended, unless 小智 is chosen */
 static uint8_t s_posture = 1;             /* 姿势感应: on unless turned off */
 static float s_soothed_until = -1;        /* stroked or hugged till then, in pose.t */
 static bool s_soothed_hug;
@@ -123,6 +123,7 @@ static struct {
     uint8_t pad[3];
     int32_t mail_key;    /* the festival whose gift's been opened: year * 16 + festival */
     uint8_t birth_month, birth_day;   /* the pet's birthday (0: not set) */
+    uint8_t hints;                    /* times 小窝's how-to has been said */
 } s_woods;
 static int s_sim_fest = -1;   /* the simulator's BOOPIE_FEST */
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
@@ -863,6 +864,17 @@ boopie_fest_t boopie_avatar_festival(void)
     return boopie_fest_on(year, month, mday);
 }
 
+bool boopie_avatar_world_hint(void)
+{
+    ensure_loaded();
+    if (s_woods.hints >= 3) {
+        return false;
+    }
+    s_woods.hints++;
+    save();
+    return true;
+}
+
 bool boopie_avatar_birthday(int *month, int *mday)
 {
     ensure_loaded();
@@ -1308,7 +1320,7 @@ void boopie_avatar_set_posture_on(bool on)
 boopie_brain_t boopie_avatar_brain(void)
 {
     ensure_loaded();
-    return s_brain < BOOPIE_BRAIN_COUNT ? (boopie_brain_t)s_brain : BOOPIE_BRAIN_XIAOZHI;
+    return s_brain < BOOPIE_BRAIN_COUNT ? (boopie_brain_t)s_brain : BOOPIE_BRAIN_MUSE;
 }
 
 void boopie_avatar_set_brain(boopie_brain_t brain)

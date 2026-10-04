@@ -104,7 +104,7 @@ static lv_obj_t *s_face;
 static lv_obj_t *s_settings;
 /* Boopie: the pages round the face (boopie_pages.c): apps, cards, the pet. */
 static lv_obj_t *s_apps, *s_cards, *s_pet;
-static lv_obj_t *s_dots[3];
+static lv_obj_t *s_dots[5];   /* Boopie: a cross: apps, face, settings, cards above, 小窝 below */
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_ble_icon;
 static lv_obj_t *s_cover;
@@ -122,6 +122,7 @@ static lv_obj_t *s_power_lbl;
 static lv_obj_t *s_time_lbl;      /* Boopie: the time, in the status line */
 static lv_obj_t *s_vpn_lbl;       /* Boopie: "VPN" while it's on */
 static lv_obj_t *s_batt_icon;     /* Boopie: the battery as an icon beside its % */
+static void arc_layout(void);
 static lv_obj_t *s_caption_lbl;
 static lv_obj_t *s_reply_lbl;   /* full layout: the reply's page while answering */
 static lv_obj_t *s_meter[METER_SEGS];
@@ -946,15 +947,21 @@ static void build_screen(void)
     }
     build_button_icons(face);
 
-    /* Status line: connectivity icons + power. */
-    lv_obj_t *status = lv_obj_create(face);
-    lv_obj_remove_style_all(status);
-    lv_obj_remove_flag(status, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(status, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(status, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(status, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(status, s_small ? 4 : 8, 0);
-    lv_obj_align(status, LV_ALIGN_TOP_MID, 0, s_small ? 1 : 20 + s_dy);
+    /* Status line: connectivity icons + power. Boopie: on the round screen, the
+     * time alone at the top middle and the rest following the edge down either
+     * side of it (arc_layout), so nothing runs off the curve; a small screen
+     * keeps them in a row. */
+    lv_obj_t *status = face;
+    if (s_small) {
+        status = lv_obj_create(face);
+        lv_obj_remove_style_all(status);
+        lv_obj_remove_flag(status, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_size(status, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow(status, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(status, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(status, 4, 0);
+        lv_obj_align(status, LV_ALIGN_TOP_MID, 0, 1);
+    }
     s_wifi_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     s_ble_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     /* Boopie: Wi-Fi, a phone if one's connected, the time, the battery. */
@@ -962,6 +969,10 @@ static void build_screen(void)
     s_time_lbl = make_label(status, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, COLOR_DIM);
     s_batt_icon = make_label(status, &lv_font_montserrat_14, COLOR_DIM);
     s_power_lbl = make_label(status, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, 0xff6b6b);
+    if (!s_small) {
+        lv_obj_align(s_time_lbl, LV_ALIGN_TOP_MID, 0, 18 + s_dy);
+        arc_layout();
+    }
 
     /* The compact layout leaves the state to the avatar and the caption,
      * unless the screen is tall enough to fit it in small type above Muse. */
@@ -1104,16 +1115,18 @@ static void build_overlays(void)
 {
     lv_obj_t *scr = lv_screen_active();
 
-    /* Page dots. */
-    for (int i = 0; i < 3 && s_tv; i++) {
+    /* Page dots. Boopie: a little cross, a dot each way the face swipes to:
+     * apps left, settings right, the cards above, 小窝 below; the page shown lit. */
+    static const int8_t AT[5][2] = { { -12, -22 }, { 0, -22 }, { 12, -22 }, { 0, -34 }, { 0, -10 } };
+    for (int i = 0; i < 5 && s_tv; i++) {
         lv_obj_t *d = lv_obj_create(scr);
         lv_obj_remove_style_all(d);
-        lv_obj_set_size(d, 8, 8);
+        lv_obj_set_size(d, 7, 7);
         lv_obj_set_style_radius(d, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(d, lv_color_hex(COLOR_DOT_OFF), 0);
         lv_obj_remove_flag(d, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_align(d, LV_ALIGN_BOTTOM_MID, (i - 1) * 16, -14);   /* Boopie: apps, face, settings */
+        lv_obj_align(d, LV_ALIGN_BOTTOM_MID, AT[i][0], AT[i][1]);
         s_dots[i] = d;
     }
 
@@ -1285,14 +1298,15 @@ static void update_chrome(float now)
         if (swipe != lv_obj_has_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE)) {
             lv_obj_set_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE, swipe);
         }
-        /* Boopie: three dots for the row (apps, face, settings), none above or below it. */
-        int dot = active == s_apps ? 0 : page ? 2 : 1;
-        bool off_row = active == s_cards || active == s_pet;
-        int shown = dot * 4 + subpage * 2 + off_row;
+        /* Boopie: the cross of dots, the page shown lit; not over a settings
+         * page further in, nor over 小窝's buttons. */
+        int dot = active == s_apps ? 0 : page ? 2 : active == s_cards ? 3 : active == s_pet ? 4 : 1;
+        bool hide = page || active == s_pet;   /* not over the settings list, nor 小窝's buttons */
+        int shown = dot * 4 + subpage * 2 + hide;
         if (shown != s_shown_page) {
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 5; i++) {
                 lv_obj_set_style_bg_color(s_dots[i], lv_color_hex(i == dot ? COLOR_ACCENT : COLOR_DOT_OFF), 0);
-                lv_obj_set_flag(s_dots[i], LV_OBJ_FLAG_HIDDEN, (page && subpage) || off_row);
+                lv_obj_set_flag(s_dots[i], LV_OBJ_FLAG_HIDDEN, hide);
             }
             s_shown_page = shown;
         }
@@ -1319,6 +1333,7 @@ static void update_chrome(float now)
         lv_label_set_text(s_ble_icon, ble);
         lv_obj_set_style_text_color(s_ble_icon, lv_color_hex(b.state == MUSE_BLE_CONNECTED ? COLOR_ACCENT : COLOR_DIM), 0);
     }
+    arc_layout();
 
     /* Paired, the name has done its job (picking this one out in the Muse
      * app) and the speaker button has replies to mute. */
@@ -1412,6 +1427,38 @@ static void set_meter_visible(bool visible)
     s_shown_lit = -1;
 }
 
+/* Boopie: the status icons round the top edge, either side of the time:
+ * Wi-Fi, the phone, the VPN going left and down the curve, the battery and its
+ * number (when low) going right; only those showing take a place. */
+static void arc_place(lv_obj_t *o, float deg)
+{
+    float a = deg * 3.14159265f / 180.0f, r = s_w / 2.0f - 19.0f;
+    lv_obj_align(o, LV_ALIGN_CENTER, (int)(r * cosf(a)), (int)(-r * sinf(a)) + s_dy);
+}
+
+static void arc_layout(void)
+{
+    if (s_small) {
+        return;
+    }
+    lv_obj_t *const left[] = { s_wifi_icon, s_ble_icon, s_vpn_lbl };
+    lv_obj_t *const right[] = { s_batt_icon, s_power_lbl };
+    float deg = 108;
+    for (size_t i = 0; i < sizeof left / sizeof left[0]; i++) {
+        if (lv_label_get_text(left[i])[0]) {
+            arc_place(left[i], left[i] == s_vpn_lbl ? deg + 2 : deg);
+            deg += left[i] == s_vpn_lbl ? 11 : 8;
+        }
+    }
+    deg = 72;
+    for (size_t i = 0; i < sizeof right / sizeof right[0]; i++) {
+        if (lv_label_get_text(right[i])[0]) {
+            arc_place(right[i], right[i] == s_power_lbl ? deg - 2 : deg);
+            deg -= 10;
+        }
+    }
+}
+
 static void update_power(float now)
 {
     if (now < s_next_power_update) {
@@ -1452,6 +1499,7 @@ static void update_power(float now)
     if (strcmp(buf, lv_label_get_text(s_power_lbl)) != 0) {
         lv_label_set_text(s_power_lbl, buf);
     }
+    arc_layout();
 }
 
 static void update_status(muse_mode_t mode, float now)

@@ -167,6 +167,8 @@ boopie_weather_t boopie_avatar_weather(void);
 bool boopie_avatar_set_weather(boopie_weather_t w);
 boopie_fest_t boopie_avatar_festival(void);
 bool boopie_avatar_mail_waiting(void);
+/* 小窝's how-to (点冒气泡的东西试试看): true for its first three times, counted. */
+bool boopie_avatar_world_hint(void);
 /* The pet's birthday (false while it isn't set), and setting it (false for no such day). */
 bool boopie_avatar_birthday(int *month, int *mday);
 bool boopie_avatar_set_birthday(int month, int mday);
@@ -195,7 +197,7 @@ void boopie_avatar_set_posture_on(bool on);
 /* The reaction showing now (boopie_avatar_react: a feed, a poke), or IDLE. */
 boopie_expr_t boopie_avatar_reacting(void);
 
-/* Which AI answers (chosen in the setup guide; Xiaozhi until one is), and
+/* Which AI answers, the AI assistant (AI 助手: chosen in the setup guide; Muse until one is), and
  * whether the guide has been through. Kept in NVS with the rest. */
 typedef enum { BOOPIE_BRAIN_XIAOZHI = 0, BOOPIE_BRAIN_MUSE, BOOPIE_BRAIN_COUNT } boopie_brain_t;
 boopie_brain_t boopie_avatar_brain(void);

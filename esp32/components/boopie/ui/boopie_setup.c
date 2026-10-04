@@ -107,7 +107,7 @@ static void view(view_t v)
     case V_SAVED: {
         uint32_t saved = 0;
         boopie_setup_web_saves(&saved);
-        static const char *const WHAT[] = { "Wi-Fi", "大脑", "Muse", "代理订阅", "名字" };
+        static const char *const WHAT[] = { "Wi-Fi", "AI 助手", "Muse", "代理订阅", "名字" };
         size_t n = 0;
         line[0] = '\0';
         for (int i = 0; i < 5; i++) {
