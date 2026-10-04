@@ -589,10 +589,237 @@ function sOutro(ctx, t) {
   }
 }
 
+// ---------------------------------------------------------------- the song's beat
+// The song (song/boopie.mp3): 129 BPM, its first downbeat at 1.0 s. GT is the video's time.
+let GT = 0;
+const BEAT_S = 60 / 129.2, BEAT0 = 1.0;
+const beatPhase = () => { const b = (GT - BEAT0) / BEAT_S; return b - Math.floor(b); };
+const beatKick = () => Math.exp(-beatPhase() * 6);      // 1 on the beat, falling away
+
+// ---------------------------------------------------------------- the chorus: 布比布比 Boopie
+function sChorus(ctx, t) {
+  const kick = beatKick();
+  // rings pulsing out on the beat
+  for (let i = 0; i < 4; i++) {
+    const p = ((GT - BEAT0) / BEAT_S / 2 + i / 4) % 1;
+    ctx.strokeStyle = `rgba(${['255,111,165', '165,123,255', '79,182,255', '140,220,190'][i]},${0.35 * (1 - p)})`;
+    ctx.lineWidth = 10 * (1 - p) + 2;
+    ctx.beginPath();
+    ctx.arc(960, 470, 120 + p * 700, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // 布 比 布 比, a character a beat
+  const chars = ['布', '比', '布', '比'];
+  chars.forEach((c, i) => {
+    const k = backOut(seg(t, 0.15 + i * BEAT_S, 0.45 + i * BEAT_S));
+    if (k <= 0) return;
+    const x = 960 + (i - 1.5) * 190, y = 380 + Math.sin(t * 6 + i) * 6;
+    ctx.save();
+    ctx.translate(x, y);
+    const sc = k * (1 + 0.08 * kick);
+    ctx.scale(sc, sc);
+    ctx.rotate((i % 2 ? 1 : -1) * 0.06);
+    text(ctx, c, 0, 60, { size: 180, weight: 900, gradient: [BRAND[i % 3], BRAND[(i + 1) % 3]] });
+    ctx.restore();
+  });
+  const b = easeOut(seg(t, 2.0, 2.6));
+  if (b > 0) {
+    ctx.save();
+    ctx.translate(960, 600);
+    ctx.scale(1 + 0.04 * kick, 1 + 0.04 * kick);
+    text(ctx, 'Boopie', 0, 40, { size: 130, weight: 800, gradient: BRAND, alpha: b, ls: -3, blur: (1 - b) * 8 });
+    ctx.restore();
+    text(ctx, '你的 AI 小伙伴', 960, 720, { size: 46, weight: 700, color: '#2a2a2f', alpha: easeOut(seg(t, 2.5, 3.1)), ls: 6 });
+  }
+  // the two of them bouncing to it
+  const sq = Math.sin(beatPhase() * Math.PI) * 0.12 - 0.04;
+  const pb = backOut(seg(t, 0.3, 0.8)), pm = backOut(seg(t, 0.5, 1.0));
+  if (pb > 0) drawBoopie(ctx, 330, 960 - 40 * Math.abs(Math.sin(beatPhase() * Math.PI)), 260 * pb, pose(t, { squash: sq, happy: true, wave: 1 }));
+  if (pm > 0) drawMuse(ctx, 1600, 990 - 30 * Math.abs(Math.sin(beatPhase() * Math.PI + 1)), 360 * pm, pose(t, { squash: sq, wave: 1 }));
+}
+
+// ---------------------------------------------------------------- Muse on the phone, a computer far away, Boopie in step
+function museApp(c, w, h, t) {
+  // the Muse app: dark, its avatar on top, a chat, an input bar and tabs
+  c.fillStyle = '#121214';
+  c.fillRect(-w / 2, -h / 2, w, h);
+  const top = -h / 2;
+  c.save();
+  c.beginPath();
+  c.arc(0, top + 92, 46, 0, Math.PI * 2);
+  c.fillStyle = '#e9e1d2';
+  c.fill();
+  c.clip();
+  drawMuse(c, 0, top + 175, 150, pose(t, { bow: false }));
+  c.restore();
+  pill(c, 'muse', 0, top + 150, { size: 18, fill: 'rgba(60,60,64,0.95)', color: '#fff', pad: 30 });
+  // the chat
+  const bub = (s, right, y, k, o = {}) => {
+    if (k <= 0) return;
+    c.save();
+    c.globalAlpha = k;
+    c.font = `500 20px ${SANS}`;
+    const lines = s.split('\n'), bw = Math.max(...lines.map(l => c.measureText(l).width)) + 36, bh = 22 + lines.length * 28;
+    const x = right ? w / 2 - 24 - bw : -w / 2 + 24;
+    c.translate(0, (1 - k) * 12);
+    c.fillStyle = right ? '#3a3a40' : '#232326';
+    c.beginPath();
+    roundRect(c, x, y, bw, bh, 18);
+    c.fill();
+    c.fillStyle = o.color || '#f2f2f4';
+    c.textAlign = 'left';
+    lines.forEach((l, i) => c.fillText(l, x + 18, y + 34 + i * 28));
+    c.restore();
+  };
+  const typed = '帮我把这周的照片整理成相册';
+  const n = Math.floor(clamp((t - 0.5) / 0.9) * typed.length);
+  bub(typed.slice(0, Math.max(1, n)), true, top + 190, seg(t, 0.4, 0.6));
+  bub('好的～我用电脑帮你弄', false, top + 260, easeOut(seg(t, 1.6, 1.9)));
+  // the computer far away, in a window
+  const wk = easeOut(seg(t, 2.1, 2.5));
+  if (wk > 0) {
+    const x0 = -w / 2 + 22, y0 = top + 330, ww = w - 44, wh = h - 560;
+    c.save();
+    c.globalAlpha = wk;
+    c.translate(0, (1 - wk) * 20);
+    c.fillStyle = '#e9edf5';
+    c.beginPath();
+    roundRect(c, x0, y0, ww, wh, 16);
+    c.fill();
+    c.save();
+    c.clip();
+    // its desktop: a menu bar, a folder of photos, an album
+    c.fillStyle = 'rgba(255,255,255,0.8)';
+    c.fillRect(x0, y0, ww, 22);
+    ['#ff5f57', '#febc2e', '#28c840'].forEach((cc, i) => { c.fillStyle = cc; c.beginPath(); c.arc(x0 + 14 + i * 14, y0 + 11, 4.5, 0, 7); c.fill(); });
+    text(c, '远程电脑', x0 + ww / 2, y0 + 16, { size: 13, weight: 600, color: '#555' });
+    c.fillStyle = '#fff';
+    c.beginPath();
+    roundRect(c, x0 + 12, y0 + 34, ww * 0.56, wh - 46, 10);
+    c.fill();
+    const prog = clamp((t - 2.6) / 3.4);
+    const moved = Math.floor(prog * 12);
+    const cols = ['#ffb3c7', '#b9e4ff', '#ffe08a', '#c8f2c2', '#d9c8ff', '#ffd0a8'];
+    for (let i = 0; i < 12; i++) {
+      if (i < moved) continue;
+      const gx = x0 + 22 + (i % 4) * 44, gy = y0 + 44 + Math.floor(i / 4) * 52;
+      c.fillStyle = cols[i % 6];
+      c.beginPath();
+      roundRect(c, gx, gy, 36, 42, 5);
+      c.fill();
+    }
+    // the album, filling up
+    const ax = x0 + ww * 0.62, ay = y0 + 40;
+    c.fillStyle = '#fff';
+    c.beginPath();
+    roundRect(c, ax, ay, ww * 0.34, wh - 60, 10);
+    c.fill();
+    text(c, '相册', ax + ww * 0.17, ay + 24, { size: 14, weight: 700, color: '#444' });
+    for (let i = 0; i < moved; i++) {
+      c.fillStyle = cols[i % 6];
+      c.fillRect(ax + 10 + (i % 3) * 30, ay + 36 + Math.floor(i / 3) * 30, 24, 24);
+    }
+    // the photo on its way, and the pointer moving it
+    const ph = (prog * 12) % 1, k2 = easeInOut(ph);
+    if (prog < 1) {
+      const i = moved, sx = x0 + 40 + (i % 4) * 44, sy = y0 + 65 + Math.floor(i / 4) * 52;
+      const ex = ax + 22 + (i % 3) * 30, ey = ay + 48 + Math.floor(i / 3) * 30;
+      const px = lerp(sx, ex, k2), py = lerp(sy, ey, k2) - Math.sin(k2 * Math.PI) * 30;
+      c.fillStyle = cols[i % 6];
+      c.fillRect(px - 14, py - 16, 28, 32);
+      c.fillStyle = '#111';
+      c.beginPath();
+      c.moveTo(px + 6, py + 4);
+      c.lineTo(px + 6, py + 26);
+      c.lineTo(px + 12, py + 20);
+      c.lineTo(px + 20, py + 22);
+      c.closePath();
+      c.fill();
+    }
+    c.restore();
+    c.restore();
+    // live
+    const live = 0.5 + 0.5 * Math.sin(t * 8);
+    c.fillStyle = `rgba(255,70,70,${0.6 + 0.4 * live})`;
+    c.beginPath();
+    c.arc(x0 + 8, y0 + wh + 22, 5, 0, 7);
+    c.fill();
+    text(c, prog < 1 ? `Muse 正在远程操作… ${moved}/12` : '已完成 · 12 张照片整理好了', x0 + 20, y0 + wh + 29,
+      { size: 17, weight: 500, align: 'left', color: prog < 1 ? '#c9c9ce' : '#5be39a' });
+  }
+  // input bar and tabs
+  c.fillStyle = '#232326';
+  c.beginPath();
+  roundRect(c, -w / 2 + 18, h / 2 - 150, w - 36, 54, 27);
+  c.fill();
+  text(c, '+   发消息', -w / 2 + 44, h / 2 - 115, { size: 19, weight: 500, align: 'left', color: '#8a8a90' });
+  c.fillStyle = '#1c1c1f';
+  c.beginPath();
+  roundRect(c, -w / 2 + 18, h / 2 - 82, w - 36, 60, 30);
+  c.fill();
+  for (let i = 0; i < 5; i++) {
+    c.strokeStyle = i === 0 ? '#f2f2f4' : '#8a8a90';
+    c.lineWidth = 2.5;
+    c.beginPath();
+    roundRect(c, -w / 2 + 50 + i * (w - 100) / 4.6, h / 2 - 64, 22, 22, 6);
+    c.stroke();
+  }
+}
+function sRemote(ctx, t) {
+  title(ctx, '手机一句话，电脑去执行', '布比实时告诉你进度', 960, 120, t, 0.1, 7.2, { size: 66 });
+  const k = easeOut(seg(t, 0, 0.6));
+  phone(ctx, lerp(380, 560, k), 600, 860, (c, w, h) => museApp(c, w, h, t));
+  const prog = clamp((t - 2.6) / 3.4), done = prog >= 1;
+  // the link between them
+  if (t > 1.8) {
+    for (let i = 0; i < 12; i++) {
+      const q = ((t * 0.8) + i / 12) % 1;
+      const x = lerp(760, 1150, q), y = 560 - Math.sin(q * Math.PI) * 120;
+      ctx.fillStyle = i % 2 ? 'rgba(255,111,165,0.85)' : 'rgba(79,182,255,0.85)';
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const dk = easeOut(seg(t, 0.2, 0.8));
+  device(ctx, 1390, 560, 250 * lerp(0.92, 1, dk), { screen: (c, r) => {
+    drawClip(c, done ? 'muse_happy' : 'muse_idle', t, 0, 0, r);
+    if (t > 2.2) {
+      // a ring of progress round the screen, a badge and a count
+      c.strokeStyle = done ? '#2fd07a' : '#a57bff';
+      c.lineWidth = r * 0.05;
+      c.lineCap = 'round';
+      c.beginPath();
+      c.arc(0, 0, r * 0.95, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+      c.stroke();
+      if (!done) pill(c, `整理相册 ${Math.floor(prog * 12)}/12`, 0, r * 0.66, { size: r * 0.075, fill: 'rgba(30,30,40,0.85)', color: '#fff' });
+    }
+  } });
+  const bk = backOut(seg(t, 2.2, 2.6));
+  if (bk > 0) pill(ctx, done ? '完成！' : 'Muse 联动中', 1390, 920, { scale: bk, size: 28, fill: done ? '#2fd07a' : '#6b4fd8', color: '#fff' });
+  if (done) {
+    for (let i = 0; i < 40; i++) {   // confetti
+      const q = clamp((t - 6.0) * 0.9 - hash(i, 3) * 0.2);
+      if (q <= 0 || q >= 1) continue;
+      const a = hash(i, 1) * Math.PI * 2, d = 120 + hash(i, 2) * 260;
+      ctx.fillStyle = ['#ff6fa5', '#a57bff', '#4fb6ff', '#ffc93c', '#2fd07a'][i % 5];
+      ctx.save();
+      ctx.translate(1390 + Math.cos(a) * d * easeOut(q), 580 + Math.sin(a) * d * easeOut(q) + q * q * 120);
+      ctx.rotate(q * 8 + i);
+      ctx.globalAlpha = 1 - q;
+      ctx.fillRect(-6, -3, 12, 6);
+      ctx.restore();
+    }
+  }
+}
+
 // ---------------------------------------------------------------- the timeline
+// [start, end, scene, its natural length]: a scene plays faster or slower to fit
+// the song's sections (song/boopie.mp3, 90.9 s; bars 1.858 s from 1.0 s).
 const TIMELINE = [
-  [0, 6.5, sIntro], [6.5, 10.5, sProduct], [10.5, 14, sSetup], [14, 19, sConnect], [19, 27, sMuse],
-  [27, 33, sVoice], [33, 37, sCommand], [37, 45, sSkins], [45, 49, sMoods], [49, 55, sGames],
-  [55, 67, sWorld], [67, 75, sOutro],
+  [0, 6.6, sIntro, 6.6], [6.6, 10.3, sProduct, 4], [10.3, 14.0, sSetup, 3.6], [14.0, 17.7, sConnect, 4.6],
+  [17.7, 25.2, sMuse, 8], [25.2, 32.6, sRemote, 7.4],
+  [32.6, 37.2, sChorus, 4.6], [37.2, 43.0, sVoice, 6], [43.0, 47.6, sCommand, 4], [47.6, 53.0, sMoods, 4.4],
+  [53.0, 58.6, sSkins, 7.6], [58.6, 64.2, sGames, 5.6], [64.2, 79.0, sWorld, 12.4], [79.0, 90.6, sOutro, 11.6],
 ];
-const DURATION = 75;
+const DURATION = 90.6;

@@ -16,13 +16,14 @@ const FADE = 0.35;
 function frame(t) {
   backdrop(ctx, t);
   sparkles(ctx, t, 26, 0.8);
-  for (const [a, b, fn] of TIMELINE) {
+  GT = t;
+  for (const [a, b, fn, natural] of TIMELINE) {
     if (t < a - FADE || t > b + FADE) continue;
     const al = Math.min(seg(t, a - FADE, a + 0.05), 1 - seg(t, b - 0.05, b + FADE));
     if (al <= 0) continue;
     lctx.clearRect(0, 0, W, H);
     lctx.save();
-    fn(lctx, t - a);
+    fn(lctx, (t - a) * (natural || (b - a)) / (b - a));
     lctx.restore();
     ctx.save();
     ctx.globalAlpha = al;

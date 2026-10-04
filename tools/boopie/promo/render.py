@@ -40,7 +40,8 @@ def main() -> None:
     a.add_argument("--stills", help="comma-separated seconds: only these, as PNGs")
     a.add_argument("--fps", type=int, default=30)
     a.add_argument("--start", type=float, default=0)
-    a.add_argument("--end", type=float, default=75)
+    a.add_argument("--end", type=float, default=90.6)
+    a.add_argument("--music", type=Path, help="the soundtrack (default: <work>/music.wav)")
     args = a.parse_args()
     site = stage(args.work, args.fonts)
     from playwright.sync_api import sync_playwright
@@ -70,7 +71,7 @@ def main() -> None:
                 print(f"{i / args.fps:.0f}s", flush=True)
         b.close()
     out = args.work / "boopie-promo.mp4"
-    music = args.work / "music.wav"
+    music = args.music or args.work / "music.wav"
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(args.fps), "-start_number", "0",
            "-i", str(frames / "%05d.jpg")]
     if music.exists():
