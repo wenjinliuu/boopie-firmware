@@ -5,7 +5,10 @@
  * Drives world/boopie_world.c for test_boopie_world.py. Arguments are steps:
  * "lv:N" (the level), "tap:X:Y", "tick:SECONDS" (in 1/30 s steps), "sleep:0|1",
  * "things" (each room's things: art, x, y, shown, its box), "wander:SECONDS"
- * (the furthest it strays). Each prints one JSON line.
+ * (the furthest it strays), "woods" (straight into the woods), "chase" (tap the
+ * first slime about, tick till the fight's on), "hit:N" (tap the slime fought
+ * N times, a quarter second apart, ticking on to the end), "kinds:N" (the
+ * kinds of N slimes met at the level). Each prints one JSON line.
  */
 
 #include <math.h>
@@ -59,6 +62,89 @@ int main(int argc, char **argv)
             }
             printf("{\"far\": %.1f, \"x\": [%.1f, %.1f], \"y\": [%.1f, %.1f], \"walked\": %.1f}\n", far, min_x, max_x,
                    min_y, max_y, w.walked);
+        } else if (!strcmp(op, "woods")) {
+            w.level = level;
+            boopie_world_enter(&w, BOOPIE_ROOM_WOODS, BOOPIE_DO_WILD);
+            printf("{\"room\": %d, \"x\": %.1f, \"y\": %.1f}\n", w.room, w.x, w.y);
+        } else if (!strcmp(op, "chase")) {
+            int s = 0;
+            while (s < BOOPIE_SLIMES && w.slimes[s].state != BOOPIE_SLIME_ROAM) {
+                s++;
+            }
+            int r = s < BOOPIE_SLIMES ? boopie_world_tap(&w, level, w.slimes[s].x, w.slimes[s].y - 5) : -9;
+            int got = 0;
+            float secs = 0;
+            for (; secs < 20 && !got; secs += 1.0f / 30) {
+                got = boopie_world_tick(&w, level, 1.0f / 30) == BOOPIE_DO_SLIME_FIGHT;
+            }
+            printf("{\"tap\": %d, \"fight\": %d, \"slime\": %d, \"secs\": %.1f, \"hp\": %d, \"kind\": %d}\n", r, got,
+                   w.fight, secs, w.fight >= 0 ? w.slimes[w.fight].hp : -1, w.fight >= 0 ? w.slimes[w.fight].kind : -1);
+        } else if (!strcmp(op, "hit")) {
+            int f = w.fight, taps[16], nt = 0, acts[8], na = 0;
+            float px = w.x, py = w.y, lo = 999, hi = -999, ylo = 999, yhi = -999;
+            for (int k = 0; k < (int)a && w.fight >= 0; k++) {
+                for (int j = 0; j < 8; j++) {   /* a quarter second, the slime hopping */
+                    boopie_do_t d = boopie_world_tick(&w, level, 1.0f / 30);
+                    if (d != BOOPIE_DO_NOTHING && na < 8) {
+                        acts[na++] = d;
+                    }
+                    if (w.slimes[f].state == BOOPIE_SLIME_FIGHT) {
+                        lo = fminf(lo, w.slimes[f].x - w.cam); hi = fmaxf(hi, w.slimes[f].x - w.cam);
+                        ylo = fminf(ylo, w.slimes[f].y); yhi = fmaxf(yhi, w.slimes[f].y);
+                    }
+                }
+                const boopie_slime_t *s = &w.slimes[f];
+                int r = boopie_world_tap(&w, level, s->x, s->y - s->z - 5);
+                if (nt < 16) {
+                    taps[nt++] = r;
+                }
+            }
+            for (int k = 0; k < 30; k++) {
+                boopie_do_t d = boopie_world_tick(&w, level, 1.0f / 30);
+                if (d != BOOPIE_DO_NOTHING && na < 8) {
+                    acts[na++] = d;
+                }
+            }
+            printf("{\"taps\": [");
+            for (int k = 0; k < nt; k++) {
+                printf("%s%d", k ? ", " : "", taps[k]);
+            }
+            printf("], \"acts\": [");
+            for (int k = 0; k < na; k++) {
+                printf("%s%d", k ? ", " : "", acts[k]);
+            }
+            printf("], \"fight\": %d, \"state\": %d, \"last\": %d, \"moved\": %.1f, \"view\": [%.1f, %.1f], "
+                   "\"y\": [%.1f, %.1f]}\n",
+                   w.fight, f >= 0 ? w.slimes[f].state : -1, w.last_slime, hypotf(w.x - px, w.y - py), lo, hi, ylo, yhi);
+        } else if (!strcmp(op, "watch")) {
+            /* The slime fought, untouched for SECONDS: where it hops, on screen. */
+            int f = w.fight, fled = 0;
+            float lo = 999, hi = -999, yhi = -999;
+            for (int k = 0; k < (int)(a * 30); k++) {
+                fled |= boopie_world_tick(&w, level, 1.0f / 30) == BOOPIE_DO_SLIME_FLED;
+                if (f >= 0 && w.slimes[f].state == BOOPIE_SLIME_FIGHT) {
+                    lo = fminf(lo, w.slimes[f].x - w.cam); hi = fmaxf(hi, w.slimes[f].x - w.cam);
+                    yhi = fmaxf(yhi, w.slimes[f].y);
+                }
+            }
+            printf("{\"view\": [%.1f, %.1f], \"y\": %.1f, \"fled\": %d}\n", lo, hi, yhi, fled);
+        } else if (!strcmp(op, "slimes")) {
+            printf("[");
+            for (int k = 0; k < BOOPIE_SLIMES; k++) {
+                printf("%s{\"state\": %d, \"kind\": %d, \"x\": %.1f, \"y\": %.1f}", k ? ", " : "", w.slimes[k].state,
+                       w.slimes[k].kind, w.slimes[k].x, w.slimes[k].y);
+            }
+            printf("]\n");
+        } else if (!strcmp(op, "kinds")) {
+            int count[BOOPIE_SLIME_KINDS] = { 0 };
+            w.level = level;
+            for (int k = 0; k < (int)a; k += BOOPIE_SLIMES) {
+                boopie_world_enter(&w, BOOPIE_ROOM_WOODS, BOOPIE_DO_WILD);
+                for (int s = 0; s < BOOPIE_SLIMES; s++) {
+                    count[w.slimes[s].kind]++;
+                }
+            }
+            printf("[%d, %d, %d, %d]\n", count[0], count[1], count[2], count[3]);
         } else if (!strcmp(op, "things")) {
             printf("[");
             for (int r = 0; r < BOOPIE_ROOM_COUNT; r++) {

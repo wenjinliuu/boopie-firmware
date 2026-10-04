@@ -100,6 +100,48 @@ static const boopie_thing_t OUTSIDE[] = {
     { A(SIGN), 344, 114, 1, 0, STAND, BOOPIE_DO_WILD, A(HINT_TREE), -8, 2, 0 },
 };
 
+/*
+ * The woods, east of the yard: the path winds on past oaks and pines. A chest
+ * from the start and another at 8 (once a day each); berry bushes at 4, a
+ * fairy ring of mushrooms at 6 (lit at night), a pond at 12 with a frog from
+ * 14, and at 18 a tree house where the pine was.
+ */
+static const boopie_thing_t WOODS[] = {
+    { A(MUSHROOM_RING), 236, 126, 6, 0, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(POND), 452, 128, 12, 0, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(SIGN_HOME), 14, 110, 1, 0, STAND, BOOPIE_DO_HOME_PATH, A(HINT_HOUSE), 8, 2, 0 },
+    { A(OAK), 40, 70, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PINE), 96, 64, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(OAK), 156, 66, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(OAK), 262, 70, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PINE), 330, 66, 1, 17, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(TREE_HOUSE), 330, 70, 18, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(OAK), 400, 64, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(OAK), 494, 70, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FERN), 60, 84, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FERN), 228, 80, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FERN), 300, 132, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FERN), 462, 82, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(MUSHROOM), 88, 122, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(MUSHROOM), 190, 80, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(MUSHROOM), 372, 84, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BUSH), 66, 134, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BUSH), 206, 136, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BUSH), 404, 136, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BERRY_BUSH), 124, 132, 4, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BERRY_BUSH), 352, 134, 4, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(LOG), 166, 126, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(STUMP), 280, 126, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(FROG), 444, 120, 14, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(CHEST_SHUT), 248, 76, 1, 0, STAND, BOOPIE_DO_CHEST, A(HINT_KEY), 0, 6, 0 },
+    { A(CHEST_SHUT), 500, 112, 8, 0, STAND, BOOPIE_DO_CHEST, A(HINT_KEY), -10, 2, 1 },
+};
+
+/* Where each slime keeps to: its patch's middle, and how far it strays. */
+static const float SLIME_HOME[BOOPIE_SLIMES] = { 130, 300, 430 };
+#define SLIME_RANGE 36.0f
+#define SLIME_BACK_S 40.0f    /* gone this long, beaten or fled */
+
 static const struct {
     const boopie_thing_t *things;
     int count;
@@ -109,6 +151,7 @@ static const struct {
     [BOOPIE_ROOM_LIVING] = { LIVING, (int)(sizeof LIVING / sizeof LIVING[0]), 16, 70, 142, 124, BOOPIE_WORLD_W },
     [BOOPIE_ROOM_BEDROOM] = { BEDROOM, (int)(sizeof BEDROOM / sizeof BEDROOM[0]), 16, 70, 142, 124, BOOPIE_WORLD_W },
     [BOOPIE_ROOM_OUTSIDE] = { OUTSIDE, (int)(sizeof OUTSIDE / sizeof OUTSIDE[0]), 10, 70, 350, 126, 360 },
+    [BOOPIE_ROOM_WOODS] = { WOODS, (int)(sizeof WOODS / sizeof WOODS[0]), 10, 70, 510, 126, 520 },
 };
 
 int boopie_room_width(boopie_room_t room)
@@ -137,6 +180,9 @@ boopie_art_id_t boopie_room_background(boopie_room_t room, int level)
 {
     if (room == BOOPIE_ROOM_OUTSIDE) {
         return BOOPIE_ART_BG_OUTSIDE;
+    }
+    if (room == BOOPIE_ROOM_WOODS) {
+        return BOOPIE_ART_BG_WOODS;
     }
     if (room == BOOPIE_ROOM_BEDROOM) {
         return level >= 10 ? BOOPIE_ART_BG_UP_STARS : BOOPIE_ART_BG_UP;
@@ -203,6 +249,7 @@ void boopie_world_init(boopie_world_t *w, uint32_t seed)
     w->rng = seed ? seed : 1;
     w->facing = 1;
     w->pending = -1;
+    w->level = 1;
     boopie_world_enter(w, BOOPIE_ROOM_LIVING, BOOPIE_DO_NOTHING);
 }
 
@@ -211,6 +258,158 @@ const boopie_thing_t *boopie_world_thing(const boopie_world_t *w, int i)
     int n;
     const boopie_thing_t *t = boopie_room_things(w->room, &n);
     return i >= 0 && i < n ? &t[i] : NULL;
+}
+
+/* ---- the slimes ---- */
+
+int boopie_slime_stars(boopie_slime_kind_t kind)
+{
+    static const int STARS[BOOPIE_SLIME_KINDS] = { 1, 2, 3, 5 };
+    return (int)kind >= 0 && kind < BOOPIE_SLIME_KINDS ? STARS[kind] : 0;
+}
+
+int boopie_slime_xp(boopie_slime_kind_t kind)
+{
+    static const int XP[BOOPIE_SLIME_KINDS] = { 8, 10, 12, 15 };
+    return (int)kind >= 0 && kind < BOOPIE_SLIME_KINDS ? XP[kind] : 0;
+}
+
+/* Hits it takes, and how quick its hops are (seconds a hop, and between) in a fight. */
+static const uint8_t SLIME_HP[BOOPIE_SLIME_KINDS] = { 3, 4, 5, 3 };
+static const float SLIME_HOP_S[BOOPIE_SLIME_KINDS] = { 0.55f, 0.48f, 0.42f, 0.32f };
+static const float SLIME_WAIT_S[BOOPIE_SLIME_KINDS] = { 0.55f, 0.45f, 0.35f, 0.22f };
+
+static void spawn(boopie_world_t *w, int i)
+{
+    boopie_slime_t *s = &w->slimes[i];
+    memset(s, 0, sizeof *s);
+    int roll = (int)(rnd(w) % 100);
+    s->kind = roll < 6                        ? BOOPIE_SLIME_GOLD
+              : w->level >= 12 && roll < 36   ? BOOPIE_SLIME_PINK
+              : w->level >= 6 && roll < 66    ? BOOPIE_SLIME_BLUE
+                                              : BOOPIE_SLIME_GREEN;
+    s->hp = s->hp_max = SLIME_HP[s->kind];
+    s->state = BOOPIE_SLIME_ROAM;
+    s->x = SLIME_HOME[i] + (frand(w) - 0.5f) * SLIME_RANGE;
+    s->y = 84 + frand(w) * 36;
+    s->hop = -1;
+    s->rest = 0.5f + frand(w) * 2;
+}
+
+static void hop_to(boopie_slime_t *s, float x, float y)
+{
+    s->fx = s->x;
+    s->fy = s->y;
+    s->tx = x;
+    s->ty = y;
+    s->hop = 0;
+}
+
+/* Its next hop: about its patch, or round the pet in a fight, kept in view. */
+static void next_hop(boopie_world_t *w, int i)
+{
+    boopie_slime_t *s = &w->slimes[i];
+    float x, y;
+    if (s->state == BOOPIE_SLIME_FIGHT) {
+        float side = frand(w) < 0.5f ? -1 : 1;
+        x = w->x + side * (14 + frand(w) * 26);
+        y = w->y + (frand(w) - 0.5f) * 36;
+        float lo = w->cam + 14, hi = w->cam + BOOPIE_WORLD_W - 14;
+        if (x < lo || x > hi) {
+            x = w->x - side * (14 + frand(w) * 26);
+        }
+        x = x < lo ? lo : x > hi ? hi : x;
+    } else {
+        x = s->x + (frand(w) - 0.5f) * 24;
+        y = s->y + (frand(w) - 0.5f) * 14;
+        float home = SLIME_HOME[i];
+        x = x < home - SLIME_RANGE ? home - SLIME_RANGE : x > home + SLIME_RANGE ? home + SLIME_RANGE : x;
+    }
+    /* Above the buttons along the screen's bottom, in a fight, to be tapped. */
+    float bottom = s->state == BOOPIE_SLIME_FIGHT ? 114 : 124;
+    y = y < 78 ? 78 : y > bottom ? bottom : y;
+    hop_to(s, x, y);
+}
+
+static void slime_tick(boopie_world_t *w, int i, float dt)
+{
+    boopie_slime_t *s = &w->slimes[i];
+    s->t += dt;
+    s->hit += dt;
+    switch (s->state) {
+    case BOOPIE_SLIME_AWAY:
+        if (s->t >= SLIME_BACK_S) {
+            spawn(w, i);
+        }
+        return;
+    case BOOPIE_SLIME_POOF:
+        s->z = 0;
+        if (s->t >= 0.7f) {
+            s->state = BOOPIE_SLIME_AWAY;
+            s->t = 0;
+        }
+        return;
+    default:
+        break;
+    }
+    bool fight = s->state == BOOPIE_SLIME_FIGHT;
+    if (s->hop < 0) {
+        s->z = 0;
+        s->rest -= dt;
+        if (s->rest <= 0) {
+            next_hop(w, i);
+        }
+        return;
+    }
+    float len = fight ? SLIME_HOP_S[s->kind] : 0.6f;
+    s->hop += dt / len;
+    if (s->hop >= 1) {
+        s->x = s->tx;
+        s->y = s->ty;
+        s->z = 0;
+        s->hop = -1;
+        s->rest = fight ? SLIME_WAIT_S[s->kind] : 1.2f + frand(w) * 2.5f;
+        return;
+    }
+    s->x = s->fx + (s->tx - s->fx) * s->hop;
+    s->y = s->fy + (s->ty - s->fy) * s->hop;
+    s->z = sinf(s->hop * 3.14159f) * (fight ? 9 : 5);
+}
+
+/* A tap's on slime i: its body, where it is in its hop, and a little round it. */
+static bool on_slime(const boopie_slime_t *s, float x, float y)
+{
+    if (s->state != BOOPIE_SLIME_ROAM && s->state != BOOPIE_SLIME_FIGHT) {
+        return false;
+    }
+    float top = s->y - s->z - 18, bottom = s->y + 4;
+    return x >= s->x - 12 && x <= s->x + 12 && y >= top && y <= bottom;
+}
+
+static int fight_tap(boopie_world_t *w, float x, float y)
+{
+    boopie_slime_t *s = &w->slimes[w->fight];
+    if (!on_slime(s, x, y) || s->hit < 0.2f) {
+        return -6;
+    }
+    s->hit = 0;
+    if (s->hp > 0) {
+        s->hp--;
+    }
+    w->facing = s->x < w->x ? -1 : 1;
+    if (s->hp == 0) {
+        s->state = BOOPIE_SLIME_POOF;
+        s->t = 0;
+        w->last_slime = s->kind;
+        w->event = BOOPIE_DO_SLIME_WIN;
+        w->fight = -1;
+        w->state = BOOPIE_PET_IDLE;
+        w->state_t = 0;
+        w->idle_for = 2.0f;
+    } else {
+        next_hop(w, (int)(s - w->slimes));   /* off it springs */
+    }
+    return -5;
 }
 
 void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
@@ -227,6 +426,8 @@ void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
                       : from == BOOPIE_DO_DOWNSTAIRS ? BOOPIE_DO_UPSTAIRS
                       : from == BOOPIE_DO_OUTSIDE    ? BOOPIE_DO_INSIDE
                       : from == BOOPIE_DO_INSIDE     ? BOOPIE_DO_OUTSIDE
+                      : from == BOOPIE_DO_WILD       ? BOOPIE_DO_HOME_PATH
+                      : from == BOOPIE_DO_HOME_PATH  ? BOOPIE_DO_WILD
                                                      : from;
     int n;
     const boopie_thing_t *t = boopie_room_things(room, &n);
@@ -240,6 +441,15 @@ void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
     w->tx = w->x;
     w->ty = w->y;
     w->cam = cam_for(w);
+    w->chase = w->fight = -1;
+    w->event = BOOPIE_DO_NOTHING;
+    for (int i = 0; i < BOOPIE_SLIMES; i++) {
+        if (room == BOOPIE_ROOM_WOODS) {
+            spawn(w, i);
+        } else {
+            w->slimes[i].state = BOOPIE_SLIME_AWAY;
+        }
+    }
 }
 
 /* A thing's box on screen: its picture, and its hint over it. */
@@ -255,6 +465,19 @@ int boopie_world_tap(boopie_world_t *w, int level, float x, float y)
 {
     int n;
     const boopie_thing_t *t = boopie_room_things(w->room, &n);
+    if (w->fight >= 0) {
+        return fight_tap(w, x, y);
+    }
+    if (w->state != BOOPIE_PET_SLEEPING) {
+        for (int i = 0; i < BOOPIE_SLIMES; i++) {
+            if (on_slime(&w->slimes[i], x, y)) {
+                walk_to(w, w->slimes[i].x, w->slimes[i].y, -1);
+                w->chase = i;
+                return -4;
+            }
+        }
+    }
+    w->chase = -1;
     int found = -1;
     for (int i = 0; i < n; i++) {
         /* The last drawn wins: floor marks under walls under what stands, front last. */
@@ -314,7 +537,60 @@ void boopie_world_sleep(boopie_world_t *w, int level, bool on)
 
 boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
 {
+    w->level = level;
     w->state_t += dt;
+    for (int i = 0; i < BOOPIE_SLIMES; i++) {
+        slime_tick(w, i, dt);
+    }
+    if (w->event != BOOPIE_DO_NOTHING) {
+        boopie_do_t e = w->event;
+        w->event = BOOPIE_DO_NOTHING;
+        return e;
+    }
+    if (w->fight >= 0) {
+        /* Standing its ground, turned to the slime, till it's won or the time's out. */
+        boopie_slime_t *s = &w->slimes[w->fight];
+        w->facing = s->x < w->x ? -1 : 1;
+        w->cam += (cam_for(w) - w->cam) * (dt * 4 > 1 ? 1 : dt * 4);
+        w->fight_left -= dt;
+        if (w->fight_left <= 0) {
+            s->state = BOOPIE_SLIME_POOF;
+            s->t = 0;
+            w->last_slime = s->kind;
+            w->fight = -1;
+            w->state = BOOPIE_PET_IDLE;
+            w->state_t = 0;
+            w->idle_for = 2.0f;
+            return BOOPIE_DO_SLIME_FLED;
+        }
+        return BOOPIE_DO_NOTHING;
+    }
+    if (w->chase >= 0) {
+        boopie_slime_t *s = &w->slimes[w->chase];
+        if (s->state != BOOPIE_SLIME_ROAM) {
+            w->chase = -1;
+        } else {
+            float dx = s->x - w->x, dy = s->y - w->y;
+            if (dx * dx + dy * dy < 16 * 16 || w->state != BOOPIE_PET_WALKING) {
+                /* Caught up: the fight's on. */
+                w->fight = w->chase;
+                w->chase = -1;
+                w->fight_left = BOOPIE_SLIME_FIGHT_S;
+                w->state = BOOPIE_PET_IDLE;
+                w->state_t = 0;
+                s->state = BOOPIE_SLIME_FIGHT;
+                s->t = 0;
+                s->hit = 1;
+                if (s->hop < 0) {
+                    s->rest = 0.3f;
+                }
+                return BOOPIE_DO_SLIME_FIGHT;
+            }
+            w->tx = s->x;   /* after it as it hops */
+            w->ty = s->y;
+            on_floor(w, &w->tx, &w->ty);
+        }
+    }
     /* The view eases after the pet in a wide room. */
     float want = cam_for(w);
     w->cam += (want - w->cam) * (dt * 4 > 1 ? 1 : dt * 4);
@@ -355,6 +631,10 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
             boopie_world_enter(w, BOOPIE_ROOM_OUTSIDE, act);
         } else if (act == BOOPIE_DO_INSIDE) {
             boopie_world_enter(w, BOOPIE_ROOM_LIVING, act);
+        } else if (act == BOOPIE_DO_WILD) {
+            boopie_world_enter(w, BOOPIE_ROOM_WOODS, act);
+        } else if (act == BOOPIE_DO_HOME_PATH) {
+            boopie_world_enter(w, BOOPIE_ROOM_OUTSIDE, act);
         }
         (void)level;
         return act;

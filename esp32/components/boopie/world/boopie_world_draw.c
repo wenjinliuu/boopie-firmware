@@ -131,6 +131,62 @@ static void pet(const boopie_world_t *w, const boopie_world_look_t *look)
     }
 }
 
+/* A slime: squashed as it lands, takes off or is hit; its hits left and the
+ * time left over it in a fight; a puff as it goes. */
+static void slime(const boopie_world_t *w, int i, const boopie_world_look_t *look)
+{
+    const boopie_slime_t *s = &w->slimes[i];
+    if (s->state == BOOPIE_SLIME_POOF) {
+        int rise = (int)(s->t * 10);
+        blit(BOOPIE_ART_PUFF, (int)s->x, (int)s->y - rise);
+        return;
+    }
+    if (s->state != BOOPIE_SLIME_ROAM && s->state != BOOPIE_SLIME_FIGHT) {
+        return;
+    }
+    bool squash = s->hit < 0.18f || (s->hop >= 0 && (s->hop < 0.12f || s->hop > 0.88f))
+                  || (s->hop < 0 && s->rest < 0.12f);
+    int art = BOOPIE_ART_SLIME_GREEN + s->kind * 2 + (squash ? 1 : 0);
+    shadow(s->x, s->y + 1, 7 - s->z * 0.25f, 2.0f);
+    blit((boopie_art_id_t)art, (int)s->x, (int)(s->y - s->z));
+    if (s->kind == BOOPIE_SLIME_GOLD && ((int)(look->t * 6) & 1)) {
+        put((int)s->x - s_cam + 6, (int)(s->y - s->z) - 10, 0xffffff);   /* a glint */
+    }
+    if (s->state == BOOPIE_SLIME_FIGHT) {
+        /* Its hits left, a red pip each; under them the time, shrinking. */
+        int top = (int)(s->y - s->z) - 16, x0 = (int)s->x - s_cam - (s->hp_max * 3 - 1) / 2;
+        for (int k = 0; k < s->hp_max; k++) {
+            uint32_t c = k < s->hp ? 0xf04858 : 0x707080;
+            put(x0 + k * 3, top, c);
+            put(x0 + k * 3 + 1, top, c);
+            put(x0 + k * 3, top + 1, c);
+            put(x0 + k * 3 + 1, top + 1, c);
+        }
+        int bw = 16, filled = (int)(bw * w->fight_left / BOOPIE_SLIME_FIGHT_S + 0.99f);
+        int bx = (int)s->x - s_cam - bw / 2;
+        for (int k = 0; k < bw; k++) {
+            put(bx + k, top - 3, k < filled ? (w->fight_left < 4 ? 0xf8a040 : 0xf8e070) : 0x404050);
+        }
+    }
+}
+
+/* Fireflies in the woods at night: drifting, blinking. */
+static void fireflies(float t)
+{
+    for (int k = 0; k < 14; k++) {
+        float x = fmodf(k * 37.0f + t * (3 + k % 4) + sinf(t * 0.7f + k) * 10, 520.0f) - s_cam;
+        float y = 62 + fmodf(k * 23.0f, 60.0f) + sinf(t * 1.3f + k * 2) * 6;
+        if (sinf(t * 2.2f + k * 1.7f) < -0.2f) {
+            continue;   /* blinked off */
+        }
+        put((int)x, (int)y, 0xf8ffb0);
+        put((int)x - 1, (int)y, 0xa8c858);
+        put((int)x + 1, (int)y, 0xa8c858);
+        put((int)x, (int)y - 1, 0xa8c858);
+        put((int)x, (int)y + 1, 0xa8c858);
+    }
+}
+
 /* A plot: its soil (dark while damp), what grows in it, by kind and stage. */
 static boopie_art_id_t crop_art(boopie_plant_t plant, boopie_stage_t st)
 {
@@ -188,6 +244,9 @@ static boopie_art_id_t art_of(const boopie_thing_t *t, const boopie_world_look_t
     if (t->art == BOOPIE_ART_BOWL_FULL && look->hungry) {
         return BOOPIE_ART_BOWL_EMPTY;
     }
+    if (t->act == BOOPIE_DO_CHEST && (look->chests_open >> t->arg & 1)) {
+        return BOOPIE_ART_CHEST_OPEN;
+    }
     return (boopie_art_id_t)t->art;
 }
 
@@ -213,6 +272,8 @@ static void night(const boopie_thing_t *t, int n, int level)
         case BOOPIE_ART_AQUARIUM: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 26, 0x90d8ff }; break;
         case BOOPIE_ART_LAMP_POST: lights[nl++] = (light_t){ t[i].x, t[i].y - 27, 40, 0xffe0a0 }; break;
         case BOOPIE_ART_HOUSE_FRONT: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 40, 0xffd090 }; break;
+        case BOOPIE_ART_MUSHROOM_RING: lights[nl++] = (light_t){ t[i].x, t[i].y - 4, 30, 0xc8b0ff }; break;
+        case BOOPIE_ART_TREE_HOUSE: lights[nl++] = (light_t){ t[i].x + 6, t[i].y - 45, 22, 0xffe0a0 }; break;
         default: break;
         }
     }
@@ -281,8 +342,9 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             }
         }
     }
-    /* What stands, back to front, and the pet among it. */
+    /* What stands, back to front, and the pet and the slimes among it. */
     bool pet_drawn = false;
+    bool slime_drawn[BOOPIE_SLIMES] = { false };
     int done[48] = { 0 };
     for (;;) {
         int next = -1;
@@ -292,6 +354,13 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
                 next = i;
             }
         }
+        for (int k = 0; k < BOOPIE_SLIMES; k++) {
+            if (!slime_drawn[k] && (next < 0 || w->slimes[k].y < t[next].y)
+                && (pet_drawn || w->y >= w->slimes[k].y)) {
+                slime(w, k, look);
+                slime_drawn[k] = true;
+            }
+        }
         /* Asleep it lies on the bed, so after it. */
         bool front = w->state == BOOPIE_PET_SLEEPING;
         if (!pet_drawn && (next < 0 || (!front && w->y < t[next].y))) {
@@ -299,6 +368,11 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             pet_drawn = true;
         }
         if (next < 0) {
+            for (int k = 0; k < BOOPIE_SLIMES; k++) {
+                if (!slime_drawn[k]) {
+                    slime(w, k, look);   /* in front of the pet */
+                }
+            }
             break;
         }
         const boopie_art_t *a = &boopie_art[t[next].art];
@@ -312,6 +386,9 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
     }
     if (look->night) {
         night(t, n, look->level);
+        if (w->room == BOOPIE_ROOM_WOODS) {
+            fireflies(look->t);
+        }
     }
     /* The hints last, over everything and never dimmed, bobbing. */
     for (int i = 0; i < n; i++) {
@@ -320,6 +397,9 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             int bob = (int)(sinf(look->t * 3 + i) * 1.2f);
             int top = t[i].y - a->ay;
             int hint = t[i].hint;
+            if (t[i].act == BOOPIE_DO_CHEST && (look->chests_open >> t[i].arg & 1)) {
+                continue;   /* opened today: nothing more in it */
+            }
             if (t[i].art == BOOPIE_ART_DOOR_OUT) {
                 top = t[i].y - 6;
             } else if (t[i].act == BOOPIE_DO_PLOT) {

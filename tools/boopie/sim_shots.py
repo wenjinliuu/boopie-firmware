@@ -221,13 +221,16 @@ LOOK = [("viewer-chat", ["viewer=chat"]), ("viewer-album", ["viewer=album"]), ("
         ("game-hop", ["game=hop", *["tap=233,233"] * 4]),
         ("pet-stroke", ["stroke=4"]), ("pet-hug", ["stroke=0"]),
         ("nest", ["swipe=up", "advance=1500"]), ("nest-shop", ["swipe=up", "advance=1200", "tap=307,418"])]
-# 小窝's yard and farm (BOOPIE_GARDEN=bloom: a sunflower in bud, a dry tulip, a
+# 小窝's yard and farm, and the woods (BOOPIE_GARDEN=bloom: a sunflower in bud, a dry tulip, a
 # strawberry to pick): out of the door, walked over to the plots, and the
 # seeds for an empty one.
 FARM = [("nest-outside", ["swipe=up", "advance=600", "room=outside", "advance=1500"]),
         ("nest-farm", ["swipe=up", "advance=600", "room=outside", "tap=440,300", "advance=6000"]),
         ("nest-seeds", ["swipe=up", "advance=600", "room=outside", "tap=440,300", "advance=6000",
-                        "tap=233,325", "advance=4000"])]
+                        "tap=233,325", "advance=4000"]),
+        # 森林: in by the sign, and a slime fought (its hits and the time over it).
+        ("nest-woods", ["swipe=up", "advance=600", "room=woods", "advance=2500"]),
+        ("nest-slime", ["swipe=up", "advance=600", "room=woods", "advance=2500", "tap=415,300", "advance=3000"])]
 
 
 def user_data(root: Path) -> Path:

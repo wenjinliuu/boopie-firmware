@@ -85,6 +85,13 @@ static bool local_hour(int *hour)
 /* Something to say when nothing's happening: hungry, sleepy, the hour, or just chatter. */
 static void chatter(const boopie_pet_status_t *st, int hour)
 {
+    static const char *const WOODS[] = {
+        "森林里好安静", "那边有史莱姆！点它试试", "宝箱里会有什么呢？", "小心别迷路哦", "听，有鸟在叫",
+    };
+    if (s_world.room == BOOPIE_ROOM_WOODS && !st->hungry && hour >= 6 && hour < 22) {
+        say("%s", WOODS[rand() % (int)(sizeof WOODS / sizeof WOODS[0])]);
+        return;
+    }
     static const char *const IDLE[] = {
         "今天也要开心哦", "摸摸我的头吧～", "陪我玩一会儿嘛", "点冒气泡的东西试试看", "我在家里转转",
         "外面天气怎么样？", "等我长大，家里会变漂亮哦",
@@ -112,7 +119,7 @@ static void close_panel(void)
     if (s_panel) {
         lv_obj_delete_async(s_panel);
         s_panel = NULL;
-        muse_ui_set_swipe_enabled(true);
+        muse_ui_set_swipe_enabled(s_world.fight < 0);   /* a slime fight keeps it off */
     }
     s_row_cb = NULL;
     s_armed = -1;
@@ -402,7 +409,9 @@ static void status_panel(void)
     row(box, -1, "星星", v, false);
     row(box, -1, "心情", st.hungry ? "饿了" : st.mood == BOOPIE_EXPR_SLEEPY ? "困了"
                                                 : st.mood == BOOPIE_EXPR_SAD ? "想你了" : "很好", false);
-    note(box, "升级后家里会添新家具：盆栽、沙发、鱼缸……");
+    snprintf(v, sizeof v, "%u 只", (unsigned)boopie_avatar_slimes_beaten());
+    row(box, -1, "打败史莱姆", v, false);
+    note(box, "升级后家里会添新家具，屋外和森林也会变样。");
 }
 
 /* ---- the mirror: a new name ---- */
@@ -488,6 +497,57 @@ static void use_plot(int plot)
     }
 }
 
+/* ---- 森林: chests and slimes ---- */
+
+static const char *const SLIME_NAMES[BOOPIE_SLIME_KINDS] = { "绿史莱姆", "蓝史莱姆", "粉史莱姆", "金史莱姆" };
+static bool s_woods_told;   /* how the slimes go, said the first time in */
+
+static void open_chest(int chest)
+{
+    int stars, xp;
+    if (boopie_avatar_open_chest(chest, &stars, &xp)) {
+        boopie_sound_play(BOOPIE_SOUND_GOLD);
+        if (stars > 0) {
+            say("宝箱里有 ★ %d！", stars);
+        } else {
+            say("宝箱里空空的…今天的星星拿够啦");
+        }
+    } else if (boopie_avatar_chests_open() >> chest & 1) {
+        say("今天开过啦，明天再来");
+    } else {
+        say("还没对上时间，连上网再来开吧");
+    }
+}
+
+static void fight_over(void)
+{
+    if (!s_panel) {
+        muse_ui_set_swipe_enabled(true);
+    }
+}
+
+static void slime_won(void)
+{
+    boopie_slime_kind_t kind = (boopie_slime_kind_t)s_world.last_slime;
+    int got = 0;
+    boopie_avatar_slime_beaten(boopie_slime_stars(kind), boopie_slime_xp(kind), &got);
+    boopie_sound_play(BOOPIE_SOUND_GOLD);
+    if (got > 0) {
+        say("打败了%s！★ +%d", SLIME_NAMES[kind], got);
+    } else {
+        say("打败了%s！", SLIME_NAMES[kind]);
+    }
+    fight_over();
+}
+
+static void slime_fight(void)
+{
+    const boopie_slime_t *s = &s_world.slimes[s_world.fight];
+    muse_ui_set_swipe_enabled(false);   /* every tap is for the slime */
+    boopie_sound_play(BOOPIE_SOUND_POKE);
+    say("%s！%d 秒内点中它 %d 次", SLIME_NAMES[s->kind], (int)BOOPIE_SLIME_FIGHT_S, s->hp);
+}
+
 /* ---------------------------------------------------------------- doing things */
 
 static void feed(void)
@@ -509,7 +569,22 @@ static void act(boopie_do_t what, int arg)
     switch (what) {
     case BOOPIE_DO_PLOT: use_plot(arg); break;
     case BOOPIE_DO_MAIL: say("没有新的信"); break;
-    case BOOPIE_DO_WILD: say("森林还在准备中，敬请期待！"); break;
+    case BOOPIE_DO_WILD:
+        if (!s_woods_told) {
+            s_woods_told = true;
+            say("进森林咯！点史莱姆就能和它玩");
+        } else {
+            say("进森林咯！");
+        }
+        break;
+    case BOOPIE_DO_HOME_PATH: say("回到家门口啦"); break;
+    case BOOPIE_DO_CHEST: open_chest(arg); break;
+    case BOOPIE_DO_SLIME_FIGHT: slime_fight(); break;
+    case BOOPIE_DO_SLIME_WIN: slime_won(); break;
+    case BOOPIE_DO_SLIME_FLED:
+        say("%s溜走了…下次快一点", SLIME_NAMES[s_world.last_slime]);
+        fight_over();
+        break;
     case BOOPIE_DO_INSIDE: say("回家咯"); break;
     case BOOPIE_DO_GAMES: games_panel(); break;
     case BOOPIE_DO_BOOKS: books_panel(); break;
@@ -551,6 +626,11 @@ static void on_tap(lv_event_t *e)
     int r = boopie_world_tap(&s_world, st.level, x, y);
     if (r == -3) {
         say("嗯…早上了吗？");
+    } else if (r == -5) {
+        boopie_sound_play(BOOPIE_SOUND_SCORE);   /* a hit */
+    } else if (r == -4) {
+        say("冲呀！");
+        muse_state_poke();
     } else if (r >= 0) {
         muse_state_poke();
     }
@@ -580,6 +660,12 @@ static void frame(lv_timer_t *timer)
     float dt = (float)(now - s_last_us) / 1e6f;
     s_last_us = now;
     if (!shown()) {
+        if (s_world.fight >= 0) {
+            /* Away mid-fight (the screen off, another page): it's over, and the swipe back. */
+            s_world.fight_left = 0;
+            boopie_world_tick(&s_world, s_world.level, 0);
+            muse_ui_set_swipe_enabled(true);
+        }
         return;
     }
     dt = dt > 0.2f ? 0.2f : dt;
@@ -608,7 +694,8 @@ static void frame(lv_timer_t *timer)
     int64_t epoch = 0;
     int minute = 0;
     const boopie_garden_t *garden = boopie_avatar_garden(&epoch, &minute);
-    boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_HEAD_H, garden, epoch };
+    boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_HEAD_H, garden, epoch,
+                                 boopie_avatar_chests_open() };
     boopie_world_draw(&s_world, &look, s_rgb);
     boopie_world_scale(s_rgb, s_screen, SIZE);
     const char *clock = boopie_pages_clock();
@@ -624,7 +711,7 @@ static void frame(lv_timer_t *timer)
     if (s_t - s_said_at > SAY_S) {
         lv_obj_add_flag(s_say, LV_OBJ_FLAG_HIDDEN);
     }
-    if (s_t >= s_chat_at && !s_panel) {
+    if (s_t >= s_chat_at && !s_panel && s_world.fight < 0 && s_t - s_said_at > SAY_S + 2) {
         chatter(&st, hour);
         s_chat_at = s_t + CHAT_EVERY_S + (float)(rand() % 6);
     }
@@ -737,8 +824,11 @@ void boopie_world_ui_build(lv_obj_t *tile)
 bool boopie_world_ui_back(void)
 {
     muse_board->display_lock(-1);
-    bool open = s_panel != NULL;
+    bool open = s_panel != NULL || s_world.fight >= 0;
     close_panel();
+    if (s_world.fight >= 0) {
+        s_world.fight_left = 0;   /* given up: the slime's off */
+    }
     muse_board->display_unlock();
     return open;
 }
@@ -746,10 +836,11 @@ bool boopie_world_ui_back(void)
 bool boopie_world_ui_go(const char *room)
 {
     static const char *const NAMES[] = { [BOOPIE_ROOM_LIVING] = "living", [BOOPIE_ROOM_BEDROOM] = "bedroom",
-                                         [BOOPIE_ROOM_OUTSIDE] = "outside" };
+                                         [BOOPIE_ROOM_OUTSIDE] = "outside", [BOOPIE_ROOM_WOODS] = "woods" };
     for (int r = 0; r < (int)(sizeof NAMES / sizeof NAMES[0]); r++) {
         if (NAMES[r] && !strcmp(room, NAMES[r])) {
-            boopie_world_enter(&s_world, (boopie_room_t)r, r == BOOPIE_ROOM_OUTSIDE ? BOOPIE_DO_OUTSIDE
+            boopie_world_enter(&s_world, (boopie_room_t)r, r == BOOPIE_ROOM_WOODS     ? BOOPIE_DO_WILD
+                                                         : r == BOOPIE_ROOM_OUTSIDE ? BOOPIE_DO_OUTSIDE
                                                          : r == BOOPIE_ROOM_BEDROOM ? BOOPIE_DO_UPSTAIRS
                                                                                     : BOOPIE_DO_INSIDE);
             return true;

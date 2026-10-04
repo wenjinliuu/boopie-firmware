@@ -27,6 +27,7 @@ typedef struct {
     int pet_w, pet_h;
     const struct boopie_garden *garden;   /* the farm's plots (NULL: all bare) */
     int64_t now;              /* epoch seconds, for the garden */
+    unsigned chests_open;     /* the woods' chests opened today, bit by bit */
 } boopie_world_look_t;
 
 /* The room into rgb (BOOPIE_WORLD_W squared, 3 bytes a pixel). */

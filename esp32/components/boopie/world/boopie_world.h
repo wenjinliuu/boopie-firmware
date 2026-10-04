@@ -23,6 +23,7 @@ typedef enum {
     BOOPIE_ROOM_LIVING = 0,   /* 一楼客厅 */
     BOOPIE_ROOM_BEDROOM,      /* 二楼卧室 */
     BOOPIE_ROOM_OUTSIDE,      /* 户外: the house front and the farm, wider than the screen */
+    BOOPIE_ROOM_WOODS,        /* 森林: a long walk east, slimes and chests */
     BOOPIE_ROOM_COUNT,
 } boopie_room_t;
 
@@ -44,6 +45,11 @@ typedef enum {
     BOOPIE_DO_INSIDE,         /* the house's door, from outside */
     BOOPIE_DO_MAIL,           /* the mailbox */
     BOOPIE_DO_WILD,           /* the sign to the woods */
+    BOOPIE_DO_HOME_PATH,      /* the woods' sign back to the yard */
+    BOOPIE_DO_CHEST,          /* a chest (arg: which): once a day */
+    BOOPIE_DO_SLIME_FIGHT,    /* the pet's reached a slime: the fight's on */
+    BOOPIE_DO_SLIME_WIN,      /* ... and won (boopie_world_t.last_slime: which kind) */
+    BOOPIE_DO_SLIME_FLED,     /* ... or the time ran out and it got away */
     BOOPIE_DO_COUNT,
 } boopie_do_t;
 
@@ -58,7 +64,7 @@ typedef struct {
     uint8_t act;              /* boopie_do_t */
     uint8_t hint;             /* its hint bubble's art, or 0 for none */
     int8_t use_dx, use_dy;    /* where the pet stands to use it, from (x, y) */
-    uint8_t arg;              /* BOOPIE_DO_PLOT: the plot */
+    uint8_t arg;              /* BOOPIE_DO_PLOT: the plot; BOOPIE_DO_CHEST: the chest */
 } boopie_thing_t;
 
 /* A room's things, and its background at a level. */
@@ -72,6 +78,35 @@ int boopie_room_width(boopie_room_t room);
 
 typedef enum { BOOPIE_PET_IDLE = 0, BOOPIE_PET_WALKING, BOOPIE_PET_USING, BOOPIE_PET_SLEEPING } boopie_pet_state_t;
 
+/*
+ * The woods' slimes: each hops about its own patch. Tap one and the pet goes
+ * to it; there the fight's on: the slime hops round the pet, and each tap on
+ * it is a hit, until it's out of hits (won) or the time is (it gets away).
+ * Beaten or gone, it's back a while later, maybe another colour. Green from
+ * the start, blue from level 6, pink from 12; now and then a quick gold one.
+ */
+#define BOOPIE_SLIMES 3
+#define BOOPIE_SLIME_FIGHT_S 12.0f
+typedef enum { BOOPIE_SLIME_GREEN = 0, BOOPIE_SLIME_BLUE, BOOPIE_SLIME_PINK, BOOPIE_SLIME_GOLD, BOOPIE_SLIME_KINDS } boopie_slime_kind_t;
+typedef enum { BOOPIE_SLIME_AWAY = 0, BOOPIE_SLIME_ROAM, BOOPIE_SLIME_FIGHT, BOOPIE_SLIME_POOF } boopie_slime_state_t;
+
+typedef struct {
+    uint8_t state;            /* boopie_slime_state_t */
+    uint8_t kind;             /* boopie_slime_kind_t */
+    uint8_t hp, hp_max;
+    float x, y;               /* where it is, on the ground */
+    float z;                  /* how high it is in its hop */
+    float fx, fy, tx, ty;     /* a hop: from, to */
+    float hop;                /* how far through it (0 to 1), or < 0 resting */
+    float rest;               /* seconds till the next hop */
+    float t;                  /* seconds in this state */
+    float hit;                /* seconds since it was hit (squashed a moment) */
+} boopie_slime_t;
+
+/* Stars and experience a kind is worth. */
+int boopie_slime_stars(boopie_slime_kind_t kind);
+int boopie_slime_xp(boopie_slime_kind_t kind);
+
 typedef struct {
     uint32_t rng;
     boopie_room_t room;
@@ -84,6 +119,13 @@ typedef struct {
     int pending;              /* the thing it's walking to use, or -1 */
     float walked;             /* distance walked, for the hop */
     float cam;                /* the view's left edge in a wide room */
+    boopie_slime_t slimes[BOOPIE_SLIMES];
+    int chase;                /* the slime it's going for, or -1 */
+    int fight;                /* the slime it's fighting, or -1 */
+    float fight_left;         /* seconds */
+    int last_slime;           /* the kind just beaten or gone */
+    boopie_do_t event;        /* for the next tick to hand on */
+    int level;                /* the last level ticked with */
 } boopie_world_t;
 
 void boopie_world_init(boopie_world_t *w, uint32_t seed);
@@ -94,7 +136,9 @@ void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
 /*
  * A tap at (x, y), in the room (add w->cam to a point on the screen): on a thing that does something, the pet goes to use it
  * (and its index comes back); on the floor, it walks there (-1); elsewhere
- * nothing (-2). Asleep, a tap anywhere but the bed wakes it (-3).
+ * nothing (-2). Asleep, a tap anywhere but the bed wakes it (-3). In the
+ * woods: on a slime, off it goes after it (-4); fighting, a tap is a hit on
+ * the slime (-5) or a miss (-6), and nothing else.
  */
 int boopie_world_tap(boopie_world_t *w, int level, float x, float y);
 

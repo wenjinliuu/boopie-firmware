@@ -25,9 +25,12 @@ HERE = Path(__file__).resolve().parent
 COMPONENT = HERE.parent
 
 (NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS,
- PLOT, INSIDE, MAIL, WILD) = range(16)
+ PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED) = range(21)
 IDLE, WALKING, USING, SLEEPING = range(4)
-LIVING, BEDROOM, YARD = range(3)
+LIVING, BEDROOM, YARD, WOODS = range(4)
+WIDTH = {YARD: 360, WOODS: 520}
+GREEN, BLUE, PINK, GOLD = range(4)
+AWAY, ROAM, FIGHTING, POOF = range(4)
 
 
 class BoopieWorldTest(unittest.TestCase):
@@ -93,14 +96,14 @@ class BoopieWorldTest(unittest.TestCase):
             for t in self.things(level):
                 if not t["shown"]:
                     continue
-                if t["room"] == YARD:
+                if t["room"] in WIDTH:
                     # The view follows the pet across: only up and down must fit.
                     if t["act"]:
                         hint_over = 0 if t["act"] == INSIDE else 16   # the house's hint is over its door
                         self.assertGreaterEqual(t["box"][1] + 16 - hint_over, 6, t)
                         self.assertLessEqual(t["box"][3], 128, t)
                         self.assertLess(0, t["box"][0], t)
-                        self.assertLess(t["box"][2], 360, t)
+                        self.assertLess(t["box"][2], WIDTH[t["room"]], t)
                     continue
                 x0, y0, x1, y1 = t["box"]
                 top = y0 + (16 if t["act"] and t["art"] else 0)   # the picture, under its hint
@@ -143,6 +146,55 @@ class BoopieWorldTest(unittest.TestCase):
         def plots(level: int) -> int:
             return sum(1 for t in self.things(level) if t["act"] == PLOT and t["shown"])
         self.assertEqual([plots(lv) for lv in (1, 5, 10, 15)], [3, 4, 5, 6])
+
+    def test_to_the_woods_and_back(self) -> None:
+        sign = self.thing(1, WILD, YARD)
+        home = self.thing(1, HOME_PATH, WOODS)
+        mat = self.thing(1, OUTSIDE)
+        s = self.run_w(f"tap:{mat['x']}:{mat['y'] - 3}", "tick:3", f"tap:{sign['x']}:{sign['y'] - 8}", "tick:10.5",
+                       f"tap:{home['x']}:{home['y'] - 8}", "tick:1.5")
+        self.assertEqual((s[3]["room"], s[3]["acts"]), (WOODS, [WILD]))
+        self.assertLess(math.hypot(s[3]["x"] - home["use"][0], s[3]["y"] - home["use"][1]), 3)   # in by its sign
+        self.assertEqual((s[5]["room"], s[5]["acts"]), (YARD, [HOME_PATH]))
+        self.assertLess(math.hypot(s[5]["x"] - sign["use"][0], s[5]["y"] - sign["use"][1]), 3)
+
+    def test_the_woods_chests_come_with_the_level(self) -> None:
+        def chests(level: int) -> int:
+            return sum(1 for t in self.things(level) if t["act"] == CHEST and t["shown"])
+        self.assertEqual([chests(lv) for lv in (1, 7, 8)], [1, 1, 2])
+
+    def test_a_slime_is_chased_fought_and_beaten(self) -> None:
+        s = self.run_w("woods", "chase", "hit:6", "tick:1", "slimes", "tick:41", "slimes")
+        chase, hit = s[1], s[2]
+        self.assertEqual((chase["tap"], chase["fight"]), (-4, 1))
+        self.assertLess(chase["secs"], 10)
+        hp = chase["hp"]
+        self.assertEqual(hit["taps"][:hp], [-5] * hp)          # every tap on it a hit ...
+        self.assertEqual(hit["acts"], [SLIME_WIN])             # ... till it's beaten
+        self.assertEqual((hit["fight"], hit["last"]), (-1, chase["kind"]))
+        self.assertLess(hit["moved"], 1)                       # the pet stands its ground
+        self.assertEqual(s[4][chase["slime"]]["state"], AWAY)
+        self.assertEqual(s[6][chase["slime"]]["state"], ROAM)  # back a while later
+
+    def test_it_stays_in_view_and_above_the_buttons_and_can_get_away(self) -> None:
+        s = self.run_w("woods", "chase", "watch:11", "watch:1.5")
+        self.assertEqual(s[1]["fight"], 1)
+        lo, hi = s[2]["view"]
+        self.assertGreaterEqual(lo, 12)                        # round the pet, on screen ...
+        self.assertLessEqual(hi, 144)
+        self.assertLessEqual(s[2]["y"], 114.5)                 # ... and above the buttons
+        self.assertEqual((s[2]["fled"], s[3]["fled"]), (0, 1))  # 12 s, then it's off
+        s = self.run_w("woods", "chase", "tap:5:60", "tick:0.1")
+        self.assertEqual(s[2]["tap"], -6)                      # a miss, and nothing else
+        self.assertEqual(s[3]["state"], IDLE)
+
+    def test_slimes_by_level(self) -> None:
+        low = self.run_w("lv:1", "kinds:300")[1]
+        self.assertEqual((low[BLUE], low[PINK]), (0, 0))
+        self.assertGreater(low[GREEN], 200)
+        self.assertGreater(low[GOLD], 0)                       # now and then a gold one
+        high = self.run_w("lv:12", "kinds:300")[1]
+        self.assertTrue(all(high[k] > 0 for k in range(4)), high)
 
     def test_floor_and_wall(self) -> None:
         s = self.run_w("tap:90:90", "tick:1.5", "tap:78:10")

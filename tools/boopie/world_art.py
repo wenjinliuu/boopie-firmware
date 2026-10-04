@@ -633,6 +633,232 @@ def crop_cactus(L, x, y):
     L.ell(x - 3, y - 16, x + 3, y - 10, (255, 136, 196))
     L.put(x, y - 13, (255, 232, 120))
 
+
+# ---------------------------------------------------------------- the woods
+
+MOSS = (132, 184, 108)
+MOSS_D = (108, 158, 92)
+MOSS_L = (160, 204, 128)
+DIRT = (212, 184, 132)
+DIRT_D = (188, 158, 110)
+CANOPY = (60, 116, 76)
+CANOPY_D = (44, 92, 64)
+CANOPY_L = (88, 148, 92)
+WOODS_W = 520   # the woods: a long walk, three and a third screens
+
+
+def bg_woods():
+    import random
+    r = random.Random(7)
+    im = Image.new("RGB", (WOODS_W, W), MOSS)
+    px = im.load()
+    # Behind, the forest itself: trunks under a dark roof of leaves.
+    edge = [40 + int(5 * math.sin(x * 0.09) + 3 * math.sin(x * 0.23 + 1)) for x in range(WOODS_W)]
+    for x in range(WOODS_W):
+        for y in range(edge[x]):
+            px[x, y] = CANOPY_D if (y < 10 or (x * 3 + y * 5) % 23 == 0) else CANOPY
+    for tx in range(6, WOODS_W, 22):
+        tx += r.randrange(-4, 5)
+        for y in range(18, edge[min(max(tx, 0), WOODS_W - 1)] + 3):
+            for x in range(tx - 3, tx + 4):
+                if 0 <= x < WOODS_W:
+                    px[x, y] = (112, 84, 64) if x < tx + 2 else (88, 64, 50)
+    for _ in range(90):   # leaves in clumps, light from above
+        cx, cy, rr = r.randrange(WOODS_W), r.randrange(0, 30), r.randrange(5, 10)
+        for y in range(cy - rr, cy + rr):
+            for x in range(cx - rr, cx + rr):
+                if 0 <= x < WOODS_W and 0 <= y < W and (x - cx) ** 2 + (y - cy) ** 2 < rr * rr:
+                    top = (x - cx + 2) ** 2 + (y - cy + 3) ** 2 < (rr - 3) ** 2
+                    px[x, y] = CANOPY_L if top else CANOPY
+    for x in range(WOODS_W):   # the roof's dark edge, and its shade on the ground
+        px[x, edge[x]] = CANOPY_D
+        for y in range(edge[x] + 1, edge[x] + 4):
+            if (x + y) % 2:
+                px[x, y] = MOSS_D
+
+    # The path winds east.
+    def path_y(x):
+        return 98 + int(7 * math.sin(x * 0.03))
+    for x in range(WOODS_W):
+        c = path_y(x)
+        for y in range(c - 7, c + 8):
+            e = y in (c - 7, c + 7)
+            if not e or (x + y) % 2:
+                px[x, y] = DIRT
+        for y in (c - 3, c + 4):
+            if (x * 7 + y) % 9 == 0:
+                px[x, y] = DIRT_D
+    for _ in range(260):   # tufts, light flecks, fallen leaves
+        x, y = r.randrange(2, WOODS_W - 3), r.randrange(edge[0] + 6, W - 3)
+        if px[x, y] == MOSS:
+            px[x, y] = MOSS_D; px[x + 2, y] = MOSS_D; px[x + 1, y + 1] = MOSS_D
+    for _ in range(160):
+        x, y = r.randrange(WOODS_W), r.randrange(46, W)
+        if px[x, y] in (MOSS, DIRT):
+            px[x, y] = MOSS_L if px[x, y] == MOSS else (228, 204, 156)
+    for _ in range(40):
+        x, y = r.randrange(WOODS_W), r.randrange(50, W)
+        if px[x, y] == DIRT:
+            px[x, y] = r.choice(((216, 140, 72), (200, 104, 64), (232, 176, 88)))
+    for _ in range(30):   # small flowers in the moss
+        x, y = r.randrange(4, WOODS_W - 4), r.randrange(52, W - 4)
+        if px[x, y] == MOSS:
+            c = r.choice(((255, 255, 255), (200, 168, 248), (255, 216, 96)))
+            for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
+                if px[x + dx, y + dy] == MOSS:
+                    px[x + dx, y + dy] = c
+            px[x, y] = (248, 200, 64)
+    return im
+
+
+def oak(L, x, y):
+    L.rect(x - 3, y - 12, x + 3, y, (128, 92, 64))
+    L.rect(x + 1, y - 12, x + 3, y, (100, 72, 52))
+    L.rect(x - 6, y - 2, x + 6, y, (128, 92, 64))
+    L.ell(x - 16, y - 40, x + 16, y - 10, (72, 140, 84))
+    for k in range(-3, 4):
+        L.ell(x + k * 5 - 5, y - 15, x + k * 5 + 5, y - 7, (56, 120, 72))
+    L.ell(x - 12, y - 38, x + 2, y - 24, (108, 176, 104))
+
+
+def bush(L, x, y):
+    L.ell(x - 10, y - 10, x + 10, y, (80, 152, 88))
+    L.ell(x - 7, y - 10, x + 1, y - 5, (112, 180, 108))
+
+
+def berry_bush(L, x, y):
+    bush(L, x, y)
+    for bx, by in ((-6, -6), (-1, -3), (4, -7), (6, -3), (0, -8)):
+        L.rect(x + bx, y + by, x + bx + 1, y + by + 1, (88, 96, 216))
+        L.put(x + bx, y + by, (168, 176, 248))
+
+
+def fern(L, x, y):
+    for k in range(-2, 3):
+        for t in range(7):
+            L.put(x + k * t // 2, y - t, (88, 160, 88) if t < 5 else (120, 188, 104))
+
+
+def mushroom(L, x, y):
+    L.rect(x - 1, y - 4, x + 1, y, (240, 228, 200))
+    L.ell(x - 4, y - 8, x + 4, y - 3, (224, 72, 72))
+    L.put(x - 2, y - 6, (255, 255, 255)); L.put(x + 1, y - 7, (255, 255, 255))
+
+
+def mushroom_ring(L, x, y):
+    for k in range(7):
+        a = k * 2 * math.pi / 7
+        mx, my = x + int(13 * math.cos(a)), y - 4 + int(5 * math.sin(a))
+        L.rect(mx, my - 2, mx, my, (240, 232, 210))
+        L.ell(mx - 2, my - 4, mx + 2, my - 2, (176, 132, 232) if k % 2 else (120, 200, 232))
+        L.put(mx - 1, my - 3, (232, 240, 255))
+
+
+def log(L, x, y):
+    L.rect(x - 14, y - 7, x + 12, y, (148, 104, 68))
+    L.rect(x - 14, y - 7, x + 12, y - 6, (176, 128, 84))
+    L.ell(x + 9, y - 7, x + 15, y, (216, 176, 120))
+    L.ell(x + 11, y - 5, x + 13, y - 2, (176, 128, 84))
+    L.rect(x - 6, y - 9, x - 4, y - 7, (96, 168, 80))
+
+
+def stump(L, x, y):
+    L.rect(x - 6, y - 7, x + 6, y, (140, 100, 66))
+    L.ell(x - 6, y - 10, x + 6, y - 5, (216, 180, 124))
+    L.ell(x - 3, y - 9, x + 3, y - 6, (188, 148, 100))
+
+
+def chest(L, x, y, open_):
+    L.rect(x - 8, y - 9, x + 8, y, (176, 112, 60))
+    L.rect(x - 8, y - 9, x + 8, y - 8, (204, 140, 80))
+    for bx in (x - 6, x + 5):
+        L.rect(bx, y - 9, bx + 1, y, (232, 192, 80))
+    if open_:
+        L.rect(x - 8, y - 16, x + 8, y - 10, (148, 92, 52))
+        L.rect(x - 7, y - 11, x + 7, y - 9, (60, 40, 32))
+        L.put(x - 3, y - 12, (255, 236, 120)); L.put(x + 2, y - 13, (255, 236, 120))
+    else:
+        L.rect(x - 8, y - 14, x + 8, y - 9, (200, 128, 68))
+        L.rect(x - 8, y - 14, x + 8, y - 13, (224, 156, 92))
+        for bx in (x - 6, x + 5):
+            L.rect(bx, y - 14, bx + 1, y - 9, (232, 192, 80))
+        L.rect(x - 1, y - 11, x + 1, y - 7, (248, 216, 96))
+
+
+def chest_shut(L, x, y):
+    chest(L, x, y, False)
+
+
+def chest_open(L, x, y):
+    chest(L, x, y, True)
+
+
+def pond(L, x, y):
+    """A pond: a floor mark (no outline), its rim drawn in."""
+    L.ell(x - 22, y - 14, x + 22, y, (176, 160, 128))
+    L.ell(x - 20, y - 13, x + 20, y - 1, (96, 160, 216))
+    L.ell(x - 16, y - 12, x + 10, y - 7, (136, 192, 232))
+    for lx, ly in ((-10, -5), (8, -8), (12, -4)):
+        L.ell(x + lx - 3, y + ly - 2, x + lx + 3, y + ly + 1, (96, 172, 88))
+    L.put(x + 8, y - 9, (248, 168, 200))
+
+
+def frog(L, x, y):
+    L.ell(x - 3, y - 5, x + 3, y, (112, 192, 88))
+    L.put(x - 2, y - 6, (112, 192, 88)); L.put(x + 2, y - 6, (112, 192, 88))
+    L.put(x - 2, y - 5, (30, 30, 30)); L.put(x + 2, y - 5, (30, 30, 30))
+
+
+def tree_house(L, x, y):
+    L.rect(x - 4, y - 30, x + 4, y, (128, 92, 64))
+    L.rect(x + 1, y - 30, x + 4, y, (100, 72, 52))
+    L.rect(x - 8, y - 2, x + 8, y, (128, 92, 64))
+    L.ell(x - 22, y - 58, x + 22, y - 22, (72, 140, 84))
+    L.ell(x - 16, y - 58, x, y - 44, (108, 176, 104))
+    L.rect(x - 12, y - 38, x + 12, y - 36, (176, 124, 80))
+    L.rect(x - 9, y - 50, x + 9, y - 38, (224, 172, 112))
+    L.poly([(x - 12, y - 49), (x, y - 58), (x + 12, y - 49)], (200, 88, 72))
+    L.rect(x - 3, y - 46, x + 3, y - 39, (128, 84, 56))
+    L.rect(x + 5, y - 47, x + 8, y - 44, (255, 228, 140))
+    for k in range(5):   # the ladder
+        L.rect(x - 10, y - 34 + k * 7, x - 6, y - 34 + k * 7, (176, 124, 80))
+    L.rect(x - 10, y - 36, x - 10, y, (148, 104, 68)); L.rect(x - 6, y - 36, x - 6, y, (148, 104, 68))
+
+
+def sign_home(L, x, y):
+    L.rect(x - 1, y - 7, x, y, (160, 112, 72))
+    L.rect(x - 8, y - 14, x + 8, y - 6, (224, 184, 128))
+    for k in range(9):
+        L.put(x - 4 + k, y - 10, (120, 80, 48))
+    for k in range(3):
+        L.put(x - 4 + k, y - 10 - k, (120, 80, 48)); L.put(x - 4 + k, y - 10 + k, (120, 80, 48))
+
+
+# Slimes, by colour: standing and squashed (hopping, or hit).
+SLIMES = {"green": (120, 208, 112), "blue": (104, 168, 240), "pink": (244, 140, 196), "gold": (248, 204, 72)}
+
+
+def slime(L, x, y, c, squash):
+    w, h = (9, 5) if squash else (7, 10)
+    L.ell(x - w, y - h, x + w, y, c)
+    L.rect(x - w + 1, y - 2, x + w - 1, y, sh(c, 0.85))
+    L.ell(x - w + 2, y - h + 1, x - w + 5, y - h + 3, (255, 255, 255))
+    ey = y - h + (3 if squash else 4)
+    for ex in (x - 2, x + 2):
+        L.rect(ex, ey, ex, ey + (0 if squash else 1), (40, 40, 56))
+    L.put(x, ey + (2 if not squash else 1), (200, 72, 96))
+
+
+def slime_fn(c, squash):
+    return lambda L, x, y: slime(L, x, y, c, squash)
+
+
+def puff(L, x, y):
+    for px_, py_, r in ((-5, -5, 4), (4, -6, 4), (0, -10, 5), (-1, -3, 3), (5, -2, 3)):
+        L.ell(x + px_ - r, y + py_ - r, x + px_ + r, y + py_ + r, (240, 240, 248))
+    L.ell(x - 2, y - 12, x + 2, y - 8, (255, 255, 255))
+
+
 # ---------------------------------------------------------------- hints
 
 HINT_INK = (88, 104, 168)
@@ -679,6 +905,12 @@ def hint(L, x, y, kind):
     elif kind == "mail":
         L.rect(x - 4, y - 2, x + 4, y + 3, (248, 248, 248)); L.rect(x - 4, y - 2, x + 4, y - 2, c)
         L.put(x - 2, y, c); L.put(x + 2, y, c); L.put(x, y + 1, c)
+    elif kind == "house":
+        L.poly([(x, y - 4), (x - 4, y), (x + 4, y)], (216, 88, 72)); L.rect(x - 3, y, x + 3, y + 3, (248, 236, 208))
+        L.rect(x, y + 1, x, y + 3, (168, 112, 72))
+    elif kind == "key":
+        L.ell(x - 4, y - 3, x - 1, y, (232, 176, 48)); L.rect(x - 1, y - 2, x + 4, y - 1, (232, 176, 48))
+        L.rect(x + 3, y - 1, x + 3, y + 1, (232, 176, 48)); L.rect(x + 1, y - 1, x + 1, y + 1, (232, 176, 48))
     elif kind == "tree":
         L.poly([(x, y - 4), (x - 4, y + 1), (x + 4, y + 1)], (88, 152, 88)); L.rect(x, y + 1, x, y + 3, (140, 96, 60))
 
@@ -763,11 +995,17 @@ SPRITES = [
     ("crop_cactus_m", crop_cactus_m, False), ("crop_cactus_l", crop_cactus_l, False),
     ("crop_sunflower", crop_sunflower, False), ("crop_tulip", crop_tulip, False),
     ("crop_strawberry", crop_strawberry, False), ("crop_cactus", crop_cactus, False),
+    ("oak", oak, False), ("bush", bush, False), ("berry_bush", berry_bush, False), ("fern", fern, False),
+    ("mushroom", mushroom, False), ("mushroom_ring", mushroom_ring, False), ("log", log, False),
+    ("stump", stump, False), ("chest_shut", chest_shut, False), ("chest_open", chest_open, False),
+    ("pond", pond, True), ("frog", frog, False), ("tree_house", tree_house, False), ("sign_home", sign_home, False),
+    *[(f"slime_{k}{'_squash' if q else ''}", slime_fn(c, q), False) for k, c in SLIMES.items() for q in (False, True)],
+    ("puff", puff, False),
 ]
 HINTS = ["zzz", "shirt", "game", "pen", "note", "book", "food", "up", "down", "door", "info", "bang", "water", "plus",
-         "mail", "tree"]
+         "mail", "tree", "house", "key"]
 BACKGROUNDS = [("bg_down", bg_down), ("bg_down_fancy", bg_down_fancy), ("bg_up", bg_up), ("bg_up_stars", bg_up_stars),
-               ("bg_outside", bg_outside)]
+               ("bg_outside", bg_outside), ("bg_woods", bg_woods)]
 
 
 def draw_sprite(fn, flat):
@@ -856,11 +1094,11 @@ def main() -> int:
 
     if args.png:
         args.png.mkdir(parents=True, exist_ok=True)
-        sheet = Image.new("RGBA", (W * 4 + 30 + OUT_W, W + 10 + 70 * 6), (40, 44, 56, 255))
+        sheet = Image.new("RGBA", (W * 4 + 40 + OUT_W + WOODS_W, W + 10 + 70 * 7), (40, 44, 56, 255))
         x = y = 0
         for i, (name, im, *_) in enumerate(images):
             if i < len(BACKGROUNDS):
-                sheet.paste(im, (i * (W + 10), 0))
+                sheet.paste(im, (sum(b.width + 10 for _, b, *_ in images[:i]), 0))
                 continue
             if x + im.width > sheet.width:
                 x, y = 0, y + 52

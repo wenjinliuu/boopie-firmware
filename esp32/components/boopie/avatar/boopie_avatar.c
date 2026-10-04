@@ -103,6 +103,13 @@ static uint8_t s_guided = 1;              /* the simulator: BOOPIE_GUIDE shows i
 /* The pet, ticked from the frames, and what it shows while idle. */
 static boopie_pet_t s_pet_state;
 static boopie_garden_t s_garden;   /* 小花园 */
+/* 森林: the day each chest was last opened, and the slimes beaten. Kept in NVS
+ * as it is: only ever append. */
+#define WOODS_CHESTS 4
+static struct {
+    int32_t chest_day[WOODS_CHESTS];
+    uint32_t slimes;
+} s_woods;
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
 static bool s_pet_resumed, s_pet_dirty;
 static float s_pet_ticked = -100, s_pet_saved = -1;
@@ -316,6 +323,8 @@ static void load(void)
     if (nvs_get_blob(h, "garden", &garden, &gn) == ESP_OK) {
         boopie_garden_load(&s_garden, &garden, gn);
     }
+    size_t wn = sizeof s_woods;
+    nvs_get_blob(h, "woods", &s_woods, &wn);   /* shorter, from an older build: the rest stays 0 */
     n = sizeof key;
     if (nvs_get_str(h, "scene", key, &n) == ESP_OK) {
         int sc = scene_from_key(key);
@@ -356,6 +365,7 @@ static void save(void)
     nvs_set_u8(h, "posture", s_posture);
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_set_blob(h, "garden", &s_garden, sizeof s_garden);
+    nvs_set_blob(h, "woods", &s_woods, sizeof s_woods);
     nvs_commit(h);
     nvs_close(h);
 }
@@ -857,6 +867,68 @@ void boopie_avatar_garden_changed(int xp, int stars)
         show_event(&ev);
     }
     save();
+}
+
+unsigned boopie_avatar_chests_open(void)
+{
+    ensure_loaded();
+    int64_t now;
+    int32_t day;
+    int minute;
+    if (!local_now(&now, &day, &minute)) {
+        return 0;
+    }
+    unsigned open = 0;
+    for (int i = 0; i < WOODS_CHESTS; i++) {
+        if (s_woods.chest_day[i] == day) {
+            open |= 1u << i;
+        }
+    }
+    return open;
+}
+
+bool boopie_avatar_open_chest(int chest, int *stars, int *xp)
+{
+    ensure_loaded();
+    int64_t now;
+    int32_t day;
+    int minute;
+    *stars = *xp = 0;
+    if (chest < 0 || chest >= WOODS_CHESTS || !local_now(&now, &day, &minute) || s_woods.chest_day[chest] == day) {
+        return false;
+    }
+    s_woods.chest_day[chest] = day;
+    /* 2 to 4 stars, the deeper chest 3 to 6, different each day. */
+    uint32_t h = (uint32_t)day * 2654435761u + (uint32_t)chest * 40503u;
+    int want = chest == 0 ? 2 + (int)(h >> 13) % 3 : 3 + (int)(h >> 13) % 4;
+    boopie_pet_event_t ev = { 0 };
+    boopie_pet_game(&s_pet_state, 20, want, &ev);
+    boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
+    show_event(&ev);
+    *stars = ev.stars;
+    *xp = ev.xp;
+    save();
+    return true;
+}
+
+void boopie_avatar_slime_beaten(int stars, int xp, int *got_stars)
+{
+    ensure_loaded();
+    boopie_pet_event_t ev = { 0 };
+    boopie_pet_game(&s_pet_state, xp, stars, &ev);
+    s_woods.slimes++;
+    boopie_avatar_react(BOOPIE_EXPR_HAPPY, 2.0f);
+    show_event(&ev);
+    if (got_stars) {
+        *got_stars = ev.stars;
+    }
+    save();
+}
+
+uint32_t boopie_avatar_slimes_beaten(void)
+{
+    ensure_loaded();
+    return s_woods.slimes;
 }
 
 const char *boopie_avatar_soothed(void)

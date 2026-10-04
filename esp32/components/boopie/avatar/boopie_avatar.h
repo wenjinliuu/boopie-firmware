@@ -136,6 +136,15 @@ void boopie_avatar_stroke(int strokes, bool hug);
 struct boopie_garden;
 struct boopie_garden *boopie_avatar_garden(int64_t *now, int *minute);
 void boopie_avatar_garden_changed(int xp, int stars);
+
+/* 森林 (docs/boopie-world.md): the chests opened today (bit i for chest i), and
+ * opening one, its reward given toward the games' daily caps (false if it
+ * was opened today, or the clock isn't set); a slime beaten, its reward the
+ * same way (*got_stars what was given), and how many so far. LVGL task. */
+unsigned boopie_avatar_chests_open(void);
+bool boopie_avatar_open_chest(int chest, int *stars, int *xp);
+void boopie_avatar_slime_beaten(int stars, int xp, int *got_stars);
+uint32_t boopie_avatar_slimes_beaten(void);
 void boopie_avatar_greet(void);
 void boopie_avatar_upside_down(bool on);
 /* Being stroked or hugged now: "好舒服" / "抱抱" for the face's word, or NULL. */
