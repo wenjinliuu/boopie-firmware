@@ -233,8 +233,8 @@ function sOutroMV(ctx, t) {
     }
   }
   if (gather > 0) {
-    const k = backOut(seg(T, 89.3, 89.8));
-    device(ctx, 960, 430, 180 * k, { screen: screenClip('boopie_confetti', t), sweep: seg(T, 89.4, 90.3) });
+    const k = Math.max(0.001, backOut(seg(T, 89.3, 89.8)));
+    if (k > 0.01) device(ctx, 960, 430, 180 * k, { screen: screenClip('boopie_confetti', t), sweep: seg(T, 89.4, 90.3) });
     dance(ctx, 'boopie', 470, 880, 260 * k, t, { sing: false });
     dance(ctx, 'muse', 1450, 900, 360 * k, t, { offset: 1, sing: false });
     const a = easeOut(seg(T, 89.4, 90.0));
