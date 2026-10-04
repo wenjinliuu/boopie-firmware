@@ -34,6 +34,11 @@ typedef enum {
     BOOPIE_ICON_NOISE,
     BOOPIE_ICON_HOP,
     BOOPIE_ICON_GARDEN,
+    /* The world's buttons, and the way to it from the face. */
+    BOOPIE_ICON_BOLT,
+    BOOPIE_ICON_BAG,
+    BOOPIE_ICON_SHOP,
+    BOOPIE_ICON_HOUSE,
     /* 白噪音's sounds. */
     BOOPIE_ICON_NOISE_WHITE,
     BOOPIE_ICON_NOISE_PINK,

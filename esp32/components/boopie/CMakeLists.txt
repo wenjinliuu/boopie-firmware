@@ -16,6 +16,9 @@ set(srcs
     "game/boopie_catch.c"
     "game/boopie_maze.c"
     "game/boopie_hop.c"
+    "world/boopie_world.c"
+    "world/boopie_world_draw.c"
+    "world/boopie_world_art.c"
     "ime/boopie_pinyin.c"
     "ime/boopie_pinyin_dict.c"
     "store/boopie_assets.c"
@@ -45,7 +48,7 @@ endif()
 idf_component_register(
     SRCS ${srcs}
     EMBED_FILES ${embed}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup" "vpn"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup" "vpn" "world"
     REQUIRES esp_driver_i2c
     PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs mbedtls esp_http_client lwip
 )

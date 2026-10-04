@@ -41,6 +41,9 @@ bool muse_ui_go_home(void);
 
 /* Boopie: slides to settings and opens one of its pages (muse_settings_ui_open). */
 void muse_ui_open_settings(const char *page);
+
+/* Boopie: to 小窝, the pet's home below the face. LVGL task. */
+void muse_ui_open_nest(void);
 /* Settings sub-pages turn off the tile swipe so they can use horizontal gestures. */
 void muse_ui_set_swipe_enabled(bool enabled);
 /* Temporarily applies a brightness while a slider is dragged. */

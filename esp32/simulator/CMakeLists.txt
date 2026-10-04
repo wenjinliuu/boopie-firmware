@@ -175,6 +175,10 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_icons.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_noise_ui.c"
     "${BOOPIE_COMPONENT_DIR}/ui/boopie_garden_ui.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_world_ui.c"
+    "${BOOPIE_COMPONENT_DIR}/world/boopie_world.c"
+    "${BOOPIE_COMPONENT_DIR}/world/boopie_world_draw.c"
+    "${BOOPIE_COMPONENT_DIR}/world/boopie_world_art.c"
     "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin_dict.c"
@@ -212,6 +216,7 @@ target_include_directories(muse_simulator PRIVATE
     "${BOOPIE_COMPONENT_DIR}/sound"
     "${BOOPIE_COMPONENT_DIR}/setup"
     "${BOOPIE_COMPONENT_DIR}/vpn"
+    "${BOOPIE_COMPONENT_DIR}/world"
     "${BOOPIE_COMPONENT_DIR}"
 )
 
@@ -225,7 +230,8 @@ target_link_libraries(muse_simulator PRIVATE m)
 
 # Boopie: strdup for the settings pages, localtime_r for the clock and the chat history.
 set_source_files_properties("${MUSE_COMPONENT_DIR}/muse_settings_ui.c" "${BOOPIE_COMPONENT_DIR}/ui/boopie_pages.c"
-    "${BOOPIE_COMPONENT_DIR}/ui/boopie_viewers.c" "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c" PROPERTIES COMPILE_DEFINITIONS
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_viewers.c" "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c"
+    "${BOOPIE_COMPONENT_DIR}/ui/boopie_world_ui.c" PROPERTIES COMPILE_DEFINITIONS
     "_POSIX_C_SOURCE=200809L")
 
 # Boopie: Muse's renderer under the names the avatar switcher calls.

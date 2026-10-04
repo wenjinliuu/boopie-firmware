@@ -16,6 +16,7 @@
 #include "boopie_icons.h"
 #include "boopie_noise_ui.h"
 #include "boopie_garden_ui.h"
+#include "boopie_world_ui.h"
 #include "boopie_viewers.h"
 #include "boopie_input.h"
 #include "boopie_store.h"
@@ -268,117 +269,6 @@ static void tick_cards(void)
 
 /* ---------------------------------------------------------------- the pet */
 
-static lv_obj_t *s_name, *s_level, *s_bar, *s_xp, *s_stars, *s_mood, *s_pet_head;
-static int s_pet_head_for = -1;
-
-/* To the wardrobe: the companion page in settings. */
-static void on_dress(lv_event_t *e)
-{
-    (void)e;
-    muse_ui_open_settings("avatar");
-}
-
-static void tick_pet(void);
-
-static void named(const char *text, bool done)
-{
-    const char *error = NULL;
-    if (done && !boopie_avatar_set_pet_name(text, &error)) {
-        set_text(s_mood, "这个名字用不了");
-        return;
-    }
-    tick_pet();
-}
-
-/* Tapping the name renames the pet; left empty, it goes back to its character's. */
-static void on_name(lv_event_t *e)
-{
-    (void)e;
-    boopie_input_open("给它起个名字", boopie_avatar_has_own_name() ? boopie_avatar_pet_name() : "",
-                      "留空就叫角色名", BOOPIE_PET_NAME_CHARS, named);
-}
-
-static void build_pet(lv_obj_t *page)
-{
-    title(page, "小窝");
-    /* The pet itself, over its name. */
-    s_pet_head = lv_image_create(page);
-    lv_obj_align(s_pet_head, LV_ALIGN_TOP_MID, 0, 80);
-    s_name = text(page, &lv_font_montserrat_28, COLOR_TEXT, "");
-    lv_obj_align(s_name, LV_ALIGN_TOP_MID, 0, 148);
-    lv_obj_add_flag(s_name, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_ext_click_area(s_name, 20);
-    lv_obj_add_event_cb(s_name, on_name, LV_EVENT_CLICKED, NULL);
-    s_level = text(page, &lv_font_montserrat_20, COLOR_ACCENT, "");
-    lv_obj_align(s_level, LV_ALIGN_TOP_MID, -110, 196);
-    lv_obj_set_width(s_level, 70);
-
-    s_bar = lv_bar_create(page);
-    lv_obj_set_size(s_bar, 180, 12);
-    lv_obj_align(s_bar, LV_ALIGN_TOP_MID, 10, 202);
-    lv_obj_set_style_bg_color(s_bar, lv_color_hex(COLOR_CARD), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s_bar, lv_color_hex(COLOR_ACCENT), LV_PART_INDICATOR);
-    lv_obj_set_style_radius(s_bar, 6, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_bar, 6, LV_PART_INDICATOR);
-    s_xp = text(page, &lv_font_montserrat_16, COLOR_DIM, "");
-    lv_obj_align(s_xp, LV_ALIGN_TOP_MID, 10, 220);
-
-    lv_obj_t *c = card(page, 320, 96);
-    lv_obj_align(c, LV_ALIGN_TOP_MID, 0, 252);
-    s_stars = text(c, &lv_font_montserrat_20, COLOR_GOLD, "");
-    lv_obj_align(s_stars, LV_ALIGN_TOP_MID, 0, 16);
-    s_mood = text(c, &lv_font_montserrat_20, COLOR_TEXT, "");
-    lv_obj_align(s_mood, LV_ALIGN_TOP_MID, 0, 52);
-
-    lv_obj_t *b = card(page, 150, 48);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_align(b, LV_ALIGN_TOP_MID, 0, 362);
-    lv_obj_center(text(b, &lv_font_montserrat_20, COLOR_ACCENT, LV_SYMBOL_IMAGE "  换装"));
-    lv_obj_add_event_cb(b, on_dress, LV_EVENT_CLICKED, NULL);
-}
-
-static const char *mood_name(const boopie_pet_status_t *st)
-{
-    if (st->hungry) {
-        return "饿了，去主屏点食物喂它";
-    }
-    switch (st->mood) {
-    case BOOPIE_EXPR_SLEEPY:
-        return "困了";
-    case BOOPIE_EXPR_SAD:
-        return "有点想你";
-    default:
-        return "心情不错";
-    }
-}
-
-static void tick_pet(void)
-{
-    boopie_pet_status_t st;
-    boopie_avatar_pet_status(&st);
-    char buf[64];
-    snprintf(buf, sizeof buf, "%s  " LV_SYMBOL_EDIT, boopie_avatar_pet_name());   /* tap to rename */
-    set_text(s_name, buf);
-    snprintf(buf, sizeof buf, "Lv %d", st.level);
-    set_text(s_level, buf);
-    int cur = boopie_avatar_current();
-    if (cur != s_pet_head_for) {
-        const lv_image_dsc_t *head = boopie_head(cur, 5);
-        if (head) {
-            lv_image_set_src(s_pet_head, head);
-        }
-        s_pet_head_for = cur;
-    }
-    lv_bar_set_range(s_bar, 0, st.xp_need > 0 ? (int32_t)st.xp_need : 1);
-    lv_bar_set_value(s_bar, (int32_t)st.xp_into, LV_ANIM_OFF);
-    snprintf(buf, sizeof buf, "%u / %u", (unsigned)st.xp_into, (unsigned)st.xp_need);
-    set_text(s_xp, buf);
-    snprintf(buf, sizeof buf, "★ %u", (unsigned)st.stars);
-    set_text(s_stars, buf);
-    set_text(s_mood, mood_name(&st));
-}
-
 /* ---------------------------------------------------------------- */
 
 static lv_obj_t *s_apps, *s_cards, *s_pet;
@@ -390,15 +280,13 @@ void boopie_pages_build(lv_obj_t *apps, lv_obj_t *cards, lv_obj_t *pet)
     s_pet = pet;
     build_apps(apps);
     build_cards(cards);
-    build_pet(pet);
+    boopie_world_ui_build(pet);   /* 小窝: the pet's home */
 }
 
 void boopie_pages_tick(lv_obj_t *shown)
 {
     if (shown && shown == s_cards) {
         tick_cards();
-    } else if (shown && shown == s_pet) {
-        tick_pet();
     } else if (shown && shown == s_apps) {
         tick_apps();
     }
