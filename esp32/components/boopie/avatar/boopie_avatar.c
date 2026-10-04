@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "boopie_pet.h"
+#include "boopie_garden.h"
 #include "muse_pixel.h"
 #include "muse_state.h"
 
@@ -101,6 +102,7 @@ static uint8_t s_guided = 1;              /* the simulator: BOOPIE_GUIDE shows i
 
 /* The pet, ticked from the frames, and what it shows while idle. */
 static boopie_pet_t s_pet_state;
+static boopie_garden_t s_garden;   /* 小花园 */
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
 static bool s_pet_resumed, s_pet_dirty;
 static float s_pet_ticked = -100, s_pet_saved = -1;
@@ -309,6 +311,11 @@ static void load(void)
     if (nvs_get_blob(h, "pet", &saved, &pn) == ESP_OK) {
         boopie_pet_load(&s_pet_state, &saved, pn);   /* an older version is brought up to date */
     }
+    boopie_garden_t garden;
+    size_t gn = sizeof garden;
+    if (nvs_get_blob(h, "garden", &garden, &gn) == ESP_OK) {
+        boopie_garden_load(&s_garden, &garden, gn);
+    }
     n = sizeof key;
     if (nvs_get_str(h, "scene", key, &n) == ESP_OK) {
         int sc = scene_from_key(key);
@@ -348,6 +355,7 @@ static void save(void)
     nvs_set_u8(h, "guided", s_guided);
     nvs_set_u8(h, "posture", s_posture);
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
+    nvs_set_blob(h, "garden", &s_garden, sizeof s_garden);
     nvs_commit(h);
     nvs_close(h);
 }
@@ -395,6 +403,20 @@ static void load(void)
     if (getenv("BOOPIE_GUIDE")) {
         s_guided = 0;
     }
+    const char *garden = getenv("BOOPIE_GARDEN");
+    if (garden) {
+        /* Part grown: a sunflower in bud (damp), a tulip sprout gone dry, and an
+         * empty pot, or with "bloom" a strawberry ready to pick. */
+        int64_t now = (int64_t)time(NULL);
+        boopie_garden_plant(&s_garden, 0, BOOPIE_PLANT_SUNFLOWER, now - 50 * 3600);
+        s_garden.pots[0].damp_until = now + 3600;
+        boopie_garden_plant(&s_garden, 1, BOOPIE_PLANT_TULIP, now - 40 * 3600);
+        if (!strcmp(garden, "bloom")) {
+            boopie_garden_plant(&s_garden, 2, BOOPIE_PLANT_STRAWBERRY, now - 130 * 3600);
+            s_garden.pots[2].damp_until = now;
+        }
+        boopie_garden_update(&s_garden, now);
+    }
     const char *name = getenv("BOOPIE_NAME");
     if (name) {
         snprintf(s_name, sizeof s_name, "%s", name);
@@ -435,6 +457,7 @@ static void ensure_loaded(void)
         s_worn[i] = -1;
     }
     boopie_pet_init(&s_pet_state);
+    boopie_garden_init(&s_garden);
     load();
     apply();
 }
@@ -810,6 +833,30 @@ void boopie_avatar_stroke(int strokes, bool hug)
         show_event(&ev);
     }
     muse_state_poke();
+}
+
+boopie_garden_t *boopie_avatar_garden(int64_t *now, int *minute)
+{
+    ensure_loaded();
+    int32_t day;
+    if (!local_now(now, &day, minute)) {
+        return NULL;   /* no clock yet: nothing grows */
+    }
+    boopie_garden_update(&s_garden, *now);
+    return &s_garden;
+}
+
+void boopie_avatar_garden_changed(int xp, int stars)
+{
+    if (xp || stars) {
+        /* A harvest: counted as a game's reward, toward the same daily caps. */
+        boopie_pet_event_t ev = { 0 };
+        boopie_pet_game(&s_pet_state, xp, stars, &ev);
+        boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
+        flash_overlay(BOOPIE_OVERLAY_CONFETTI, 3.0f);
+        show_event(&ev);
+    }
+    save();
 }
 
 const char *boopie_avatar_soothed(void)

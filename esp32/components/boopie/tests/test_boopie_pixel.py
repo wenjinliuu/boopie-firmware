@@ -51,6 +51,7 @@ class BoopiePixelTest(unittest.TestCase):
         subprocess.run(
             cc + ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
                   "-I", str(COMPONENT), "-I", str(COMPONENT / "avatar"), "-I", str(COMPONENT / "game"),
+                  "-I", str(COMPONENT / "pet"), str(COMPONENT / "pet" / "boopie_garden.c"),
                   str(HERE / "boopie_pixel_harness.c"), str(COMPONENT / "avatar" / "boopie_pixel.c"),
                   str(COMPONENT / "game" / "boopie_whack.c"), str(COMPONENT / "game" / "boopie_catch.c"),
                   str(COMPONENT / "game" / "boopie_maze.c"), str(COMPONENT / "game" / "boopie_hop.c"),

@@ -40,6 +40,7 @@
 #include "boopie_setup.h"
 #include "boopie_viewers.h"
 #include "boopie_noise_ui.h"
+#include "boopie_garden_ui.h"
 #include "boopie_pages.h"
 #include "sim_platform.h"
 #include "sim_services.h"
@@ -400,6 +401,11 @@ static bool apply_setting(const char *key, const char *value, bool real_time)
             boopie_viewer_chat_locked();
         }
         render_for(400, real_time);
+        return true;
+    }
+    if (!strcmp(key, "garden")) {   /* 小花园, as from the apps page (BOOPIE_GARDEN plants it) */
+        boopie_garden_ui_open_locked();
+        render_for(300, real_time);
         return true;
     }
     if (!strcmp(key, "noise")) {   /* 白噪音's screen; "open", or a kind as the AI plays one */

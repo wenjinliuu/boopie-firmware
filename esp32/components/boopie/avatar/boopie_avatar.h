@@ -129,6 +129,13 @@ void boopie_avatar_pet_status(boopie_pet_status_t *out);
  * picked up or turned over. posture_on: the switch, kept in NVS.
  */
 void boopie_avatar_stroke(int strokes, bool hug);
+
+/* 小花园, kept with the pet: up to date at *now (epoch seconds), or NULL
+ * while the clock isn't set. The LVGL task. After a change call
+ * garden_changed, with a harvest's reward (0, 0 for none). */
+struct boopie_garden;
+struct boopie_garden *boopie_avatar_garden(int64_t *now, int *minute);
+void boopie_avatar_garden_changed(int xp, int stars);
 void boopie_avatar_greet(void);
 void boopie_avatar_upside_down(bool on);
 /* Being stroked or hugged now: "好舒服" / "抱抱" for the face's word, or NULL. */

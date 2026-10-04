@@ -1389,6 +1389,11 @@ static char *build_register_json(void) {
                 "user asks for white noise, rain or the sea. It pauses while you talk and fades "
                 "out when its time is up.",
                 nullptr, noise_optional);
+    add_command(commands, "garden.status",
+                "How the pet's little garden (小花园) is doing: what's planted in each of its three "
+                "pots, how far grown, and whether it's thirsty or ready to pick. Planting, watering "
+                "and picking are done by the user on the screen (apps, 小花园).",
+                nullptr, nullptr);
     add_command(commands, "noise.stop",
                 "Stop the white noise, rain or waves playing.",
                 nullptr, nullptr);

@@ -16,6 +16,7 @@
 #include "boopie_catch.h"
 #include "boopie_maze.h"
 #include "boopie_hop.h"
+#include "boopie_garden.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -3382,6 +3383,231 @@ void boopie_pixel_render_hop(const boopie_hop_t *g, int head)
     }
     /* The score on top of it all. */
     draw_number(g->score, 0, 32, 7, 2, (rgb_t){ 242, 239, 255 });
+}
+
+/* ---------------------------------------------------------------- 小花园 */
+
+/* Plants, drawn up from the pot's rim, centred: s stem, l leaf, f bud or flower
+ * (each plant's own colour), y petal, b seed head, r berry, w white, c and d
+ * cactus, p its flower. */
+typedef struct {
+    const char *const *rows;
+    uint8_t h;
+} sprite_t;
+#define SPRITE(...) { (const char *const[]){ __VA_ARGS__ }, sizeof((const char *const[]){ __VA_ARGS__ }) / sizeof(char *) }
+
+static const sprite_t SEEDLING = SPRITE("l...l", ".l.l.", "..s..", "..s..");
+static const sprite_t LEAVES = SPRITE("...l...", "..lll..", "...s...", "ll.s...", ".lls.ll", "...sll.", "...s...");
+static const sprite_t BUD = SPRITE("...f...", "..fff..", "..fff..", "...s...", "ll.s...", ".lls...", "...s.ll",
+                                   "...sll.", "...s...", "...s...");
+static const sprite_t BLOOMS[BOOPIE_PLANT_COUNT] = {
+    [BOOPIE_PLANT_SUNFLOWER] = SPRITE("...y.y.y...", "..yyyyyyy..", ".yyybbbyyy.", "yyybbbbbyyy", ".yybbbbbyy.",
+                                      "yyybbbbbyyy", ".yyybbbyyy.", "..yyyyyyy..", "...y.s.y...", ".....s.....",
+                                      ".lll.s.....", "..llss.....", ".....s.lll.", ".....ssll..", ".....s....."),
+    [BOOPIE_PLANT_TULIP] = SPRITE(".f.f.f.", ".fffff.", "fffffff", "fffffff", ".fffff.", "..fff..", "...s...",
+                                  "l..s...", "ll.s..l", ".lls.ll", "..lsll.", "...s..."),
+    [BOOPIE_PLANT_STRAWBERRY] = SPRITE("....lll....", "..llllllw..", ".llllwlllll", "lllrlllllll", "llrrrllrlll",
+                                       ".lrrrllrrl.", "..rr..rrr..", "......rr...", ".....s....."),
+    [BOOPIE_PLANT_CACTUS] = SPRITE("...p...", "..ppp..", "...c...", "..ccc..", "..cdc..", "c.ccc..", "c.cdc.c",
+                                   "ccccc.c", "..cdccc", "..ccc..", "..cdc..", "..ccc.."),
+};
+static const sprite_t CACTI[3] = {   /* a cactus's own way up: a nub, a column, a column in bud */
+    SPRITE("ccc", "cdc"),
+    SPRITE("ccc", "cdc", "ccc", "cdc"),
+    SPRITE("...p...", "..ccc..", "..cdc..", "c.ccc..", "c.cdc.c", "ccccc.c", "..cdc..", "..ccc.."),
+};
+
+static rgb_t plant_colour(char ch, boopie_plant_t plant, bool dry)
+{
+    switch (ch) {
+    case 's': return dry ? (rgb_t){ 130, 130, 70 } : (rgb_t){ 70, 160, 70 };
+    case 'l': return dry ? (rgb_t){ 150, 150, 80 } : (rgb_t){ 100, 200, 95 };
+    case 'f':
+        return plant == BOOPIE_PLANT_TULIP ? (rgb_t){ 240, 70, 100 } : plant == BOOPIE_PLANT_SUNFLOWER
+                                                                            ? (rgb_t){ 255, 210, 60 }
+                                                                            : (rgb_t){ 250, 250, 250 };
+    case 'y': return (rgb_t){ 255, 210, 60 };
+    case 'b': return (rgb_t){ 120, 72, 30 };
+    case 'r': return (rgb_t){ 235, 50, 70 };
+    case 'w': return (rgb_t){ 250, 250, 250 };
+    case 'c': return dry ? (rgb_t){ 120, 150, 90 } : (rgb_t){ 60, 175, 105 };
+    case 'd': return dry ? (rgb_t){ 90, 115, 70 } : (rgb_t){ 40, 125, 75 };
+    case 'p': return (rgb_t){ 255, 120, 180 };
+    default: return (rgb_t){ 0, 0, 0 };
+    }
+}
+
+static void draw_sprite(const sprite_t *sp, int cx, int bottom, boopie_plant_t plant, bool dry, int lean)
+{
+    int w = (int)strlen(sp->rows[0]);
+    for (int j = 0; j < sp->h; j++) {
+        /* Dry, it droops: the top leans over. */
+        int shift = lean ? (lean * (sp->h - j)) / sp->h : 0;
+        for (int i = 0; i < w; i++) {
+            char ch = sp->rows[j][i];
+            if (ch != '.') {
+                put(cx - w / 2 + i + shift, bottom - sp->h + 1 + j, plant_colour(ch, plant, dry));
+            }
+        }
+    }
+}
+
+void boopie_pixel_garden_pot(int pot, int *cx, int *top)
+{
+    *cx = 14 + pot * 18;
+    *top = 41;
+}
+
+void boopie_pixel_render_garden(const boopie_garden_t *g, int64_t now, int minute, float t, int selected,
+                                int watering, float watered_t, int harvested, float harvested_t)
+{
+    memset(s_img, 0, sizeof(s_img));
+    s_dst = s_img;
+    s_dst_mask = NULL;
+    /* The sky by the time of day: night, dawn, day, dusk. */
+    float h = minute / 60.0f;
+    rgb_t top, low;
+    bool night = h < 5.5f || h >= 19.5f;
+    if (night) {
+        top = (rgb_t){ 8, 10, 34 };
+        low = (rgb_t){ 26, 28, 70 };
+    } else if (h < 7.5f || h >= 17.5f) {
+        top = (rgb_t){ 60, 70, 150 };
+        low = (rgb_t){ 250, 150, 110 };
+    } else {
+        top = (rgb_t){ 80, 150, 230 };
+        low = (rgb_t){ 170, 215, 245 };
+    }
+    for (int y = 0; y < 47; y++) {
+        rgb_t c = mix(top, low, y / 46.0f);
+        for (int x = 0; x < N; x++) {
+            put(x, y, c);
+        }
+    }
+    if (night) {
+        static const uint8_t STARS[][2] = { { 12, 14 }, { 22, 8 }, { 40, 11 }, { 30, 20 }, { 52, 22 }, { 17, 26 } };
+        for (int i = 0; i < 6; i++) {
+            put(STARS[i][0], STARS[i][1], ((int)(t * 2) + i) % 3 ? (rgb_t){ 230, 230, 255 } : (rgb_t){ 120, 120, 170 });
+        }
+        for (int y = -3; y <= 3; y++) {   /* the moon */
+            for (int x = -3; x <= 3; x++) {
+                if (x * x + y * y <= 10 && (x - 2) * (x - 2) + (y + 1) * (y + 1) > 8) {
+                    put(46 + x, 14 + y, (rgb_t){ 250, 240, 190 });
+                }
+            }
+        }
+    } else {
+        for (int y = -3; y <= 3; y++) {   /* the sun */
+            for (int x = -3; x <= 3; x++) {
+                if (x * x + y * y <= 10) {
+                    put(47 + x, 13 + y, (rgb_t){ 255, 220, 90 });
+                }
+            }
+        }
+    }
+    /* The ground. */
+    for (int x = 0; x < N; x++) {
+        put(x, 47, (rgb_t){ 110, 200, 110 });
+        put(x, 48, (rgb_t){ 80, 165, 85 });
+        for (int y = 49; y < N; y++) {
+            put(x, y, ((x * 7 + y * 3) % 11) ? (rgb_t){ 112, 74, 46 } : (rgb_t){ 92, 60, 38 });
+        }
+    }
+    for (int i = 0; i < BOOPIE_GARDEN_POTS; i++) {
+        int cx, top_y;
+        boopie_pixel_garden_pot(i, &cx, &top_y);
+        const boopie_pot_t *pot = &g->pots[i];
+        boopie_plant_t plant = (boopie_plant_t)pot->plant;
+        boopie_stage_t st = boopie_garden_stage(g, i);
+        bool dry = boopie_garden_dry(g, i, now);
+        bool damp = boopie_garden_damp_s(g, i, now) > 0;
+        /* The pot: a rim, and a body narrowing down, lit on the left. */
+        for (int y = 0; y < 7; y++) {
+            int half = y < 2 ? 6 : 5 - (y - 2) / 2;
+            for (int x = -half; x <= half; x++) {
+                rgb_t c = y < 2 ? (rgb_t){ 230, 135, 85 } : x == -half + 1 ? (rgb_t){ 225, 130, 80 }
+                                                         : x == half ? (rgb_t){ 160, 75, 45 } : (rgb_t){ 200, 100, 60 };
+                put(cx + x, top_y + y, c);
+            }
+        }
+        for (int x = -5; x <= 5; x++) {   /* its soil: dark damp, pale dry */
+            put(cx + x, top_y, plant && damp ? (rgb_t){ 70, 45, 30 } : (rgb_t){ 150, 110, 70 });
+        }
+        if (i == selected) {
+            for (int x = -7; x <= 7; x++) {
+                put(cx + x, top_y + 8, (rgb_t){ 255, 230, 120 });
+            }
+        }
+        int bottom = top_y - 1;
+        bool cactus = plant == BOOPIE_PLANT_CACTUS;
+        switch (st) {
+        case BOOPIE_STAGE_EMPTY: {
+            /* A faint +: plant something. */
+            rgb_t c = ((int)(t * 2) & 1) ? (rgb_t){ 255, 255, 255 } : (rgb_t){ 200, 200, 220 };
+            for (int k = -2; k <= 2; k++) {
+                put(cx + k, top_y - 5, c);
+                put(cx, top_y - 5 + k, c);
+            }
+            break;
+        }
+        case BOOPIE_STAGE_SEED:
+            put(cx - 1, bottom, (rgb_t){ 120, 80, 40 });
+            put(cx + 1, bottom, (rgb_t){ 120, 80, 40 });
+            put(cx, bottom, (rgb_t){ 90, 60, 30 });
+            break;
+        case BOOPIE_STAGE_SPROUT:
+            draw_sprite(cactus ? &CACTI[0] : &SEEDLING, cx, bottom, plant, dry, 0);
+            break;
+        case BOOPIE_STAGE_LEAVES:
+            draw_sprite(cactus ? &CACTI[1] : &LEAVES, cx, bottom, plant, dry, dry && !cactus ? 2 : 0);
+            break;
+        case BOOPIE_STAGE_BUD:
+            draw_sprite(cactus ? &CACTI[2] : &BUD, cx, bottom, plant, dry, dry && !cactus ? 3 : 0);
+            break;
+        case BOOPIE_STAGE_BLOOM:
+            draw_sprite(&BLOOMS[plant], cx, bottom, plant, false, 0);
+            /* Ready: sparkles. */
+            if (((int)(t * 3) + i) & 1) {
+                spark(cx - 6, top_y - 12, (rgb_t){ 255, 246, 200 }, 1);
+            } else {
+                spark(cx + 6, top_y - 15, (rgb_t){ 255, 246, 200 }, 1);
+            }
+            break;
+        }
+        /* Thirsty: a drop over it, bobbing. */
+        if (dry && st != BOOPIE_STAGE_EMPTY) {
+            int dy = ((int)(t * 3) & 1);
+            /* Deep blue with a shine, to show on a day sky as well as a night one. */
+            static const char *const DROP[5] = { "..d..", ".ddd.", "dwddd", "ddddd", ".ddd." };
+            for (int j = 0; j < 5; j++) {
+                for (int k = 0; k < 5; k++) {
+                    if (DROP[j][k] != '.') {
+                        put(cx + 5 + k, top_y - 11 + dy + j,
+                            DROP[j][k] == 'w' ? (rgb_t){ 230, 245, 255 } : (rgb_t){ 40, 110, 230 });
+                    }
+                }
+            }
+        }
+        /* Being watered: drops falling from a can's spout. */
+        if (i == watering && watered_t < 1.5f) {
+            for (int k = 0; k < 5; k++) {
+                float ft = fmodf(watered_t * 2 + k * 0.2f, 1.0f);
+                put(cx - 3 + k * 1.5f, top_y - 20 + ft * 19, (rgb_t){ 120, 190, 255 });
+            }
+            for (int x = -4; x <= 1; x++) {   /* the can */
+                put(cx + x, top_y - 23, (rgb_t){ 150, 190, 230 });
+                put(cx + x, top_y - 24, (rgb_t){ 150, 190, 230 });
+            }
+            put(cx + 2, top_y - 22, (rgb_t){ 150, 190, 230 });
+            put(cx + 3, top_y - 21, (rgb_t){ 150, 190, 230 });
+        }
+        /* Just picked: stars rising. */
+        if (i == harvested && harvested_t < 2.0f) {
+            for (int k = 0; k < 4; k++) {
+                spark(cx - 6 + k * 4, top_y - 6 - harvested_t * 12 - (k % 2) * 3, (rgb_t){ 255, 210, 70 }, 1);
+            }
+        }
+    }
 }
 
 void boopie_pixel_head_image(int head, uint16_t *dst, int scale)

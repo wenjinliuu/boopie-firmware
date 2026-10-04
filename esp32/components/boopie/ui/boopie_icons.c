@@ -11,7 +11,7 @@ typedef struct {
     const char *const *rows;
     uint8_t h;
     const char *keys;         /* the characters drawn ... */
-    uint32_t colours[4];      /* ... in these colours */
+    uint32_t colours[5];      /* ... in these colours */
     uint32_t tile;
 } art_t;
 
@@ -87,6 +87,11 @@ static const art_t ART[BOOPIE_ICON_COUNT] = {
                                "...pp.........", "..pppp........", ".pkppkp.......", ".pppppp.......", "..pppp........",
                                ".......GGGGG..", "........ggg...", "........ggg...", "........ggg..."),
                           "gGpk", { 0x5bd18a, 0x9ff0bd, 0xff8fb8, 0x1a1530 }, 0x4aa8ff },
+    /* A sunflower in a pot. */
+    [BOOPIE_ICON_GARDEN] = { ROWS("...yyyyy...", "..yybbbyy..", "..ybbbbby..", "..yybbbyy..", "...yyyyy...",
+                                  ".....s.....", ".ll..s.....", "..llss..ll.", ".....s.ll..", ".ooooooooo.",
+                                  "..ooooooo..", "..ooooooo..", "...ooooo..."),
+                             "ybslo", { 0xffd23c, 0x78481e, 0x46a046, 0x6ed264, 0xdc7846 }, 0x5bb8e8 },
     /* Static. */
     [BOOPIE_ICON_NOISE_WHITE] = { ROWS("#.#..#.##.#.", ".#.##.#..#.#", "#..#.#.##..#", ".##.#..#.#.#", "#.#.##.#..#.",
                                        "..#..#.#.##.", "#.##.#..#.#.", ".#..#.##..##"),

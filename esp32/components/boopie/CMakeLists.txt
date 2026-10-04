@@ -11,6 +11,7 @@ set(srcs
     "device/boopie_shake.c"
     "pet/boopie_pet.c"
     "pet/boopie_posture.c"
+    "pet/boopie_garden.c"
     "game/boopie_whack.c"
     "game/boopie_catch.c"
     "game/boopie_maze.c"

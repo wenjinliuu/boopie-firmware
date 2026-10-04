@@ -52,7 +52,7 @@ class BoopieSoundTest(unittest.TestCase):
     def test_every_sound_plays_without_clipping_or_clicking(self) -> None:
         r = self.run_it()
         for key in ("boot", "off", "listen", "sent", "error", "level_up", "eat", "poke", "score", "gold", "cloud",
-                    "game_over", "notify", "purr", "hello"):
+                    "game_over", "notify", "purr", "hello", "water"):
             frames, peak, last = r[key]
             with self.subTest(sound=key):
                 self.assertGreater(frames, 16000 * 0.05)    # at least 50 ms

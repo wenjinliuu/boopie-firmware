@@ -77,6 +77,7 @@
 #include "boopie_games.h"    /* Boopie: game.start */
 #include "boopie_viewers.h"  /* Boopie: storage.clear */
 #include "boopie_noise_ui.h" /* Boopie: noise.play, noise.stop */
+#include "boopie_garden_ui.h" /* Boopie: garden.status */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -1955,6 +1956,14 @@ static cJSON *on_ws_command(
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
         cJSON_AddStringToObject(result, "status", said);
+        return result;
+    }
+    if (strcmp(command, "garden.status") == 0) {
+        char said[400];
+        boopie_garden_ui_status(said, sizeof said);
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "garden", said);
         return result;
     }
     if (strcmp(command, "noise.stop") == 0) {

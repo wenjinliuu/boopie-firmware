@@ -43,6 +43,7 @@ static const note_t GAME_OVER[] = { { 784, 0, 120, PULSE, 55 }, { 659, 0, 120, P
 static const note_t NOTIFY[] = { { 1319, 0, 80, TRIANGLE, 65 }, { 1047, 0, 160, TRIANGLE, 65 }, END };
 static const note_t PURR[] = { { 150, 175, 140, TRIANGLE, 55 }, { 175, 140, 140, TRIANGLE, 55 },
                                { 150, 180, 140, TRIANGLE, 50 }, { 180, 130, 200, TRIANGLE, 45 }, END };
+static const note_t WATER[] = { { 2600, 1800, 260, NOISE, 35 }, { 2200, 1400, 220, NOISE, 25 }, END };
 static const note_t HELLO[] = { { 784, 0, 70, TRIANGLE, 65 }, { 0, 0, 30, TRIANGLE, 0 }, { 1175, 1319, 150, TRIANGLE, 65 },
                                 END };
 
@@ -57,7 +58,7 @@ static const struct {
     [BOOPIE_SOUND_SCORE] = { "score", SCORE },        [BOOPIE_SOUND_GOLD] = { "gold", GOLD },
     [BOOPIE_SOUND_CLOUD] = { "cloud", CLOUD },        [BOOPIE_SOUND_GAME_OVER] = { "game_over", GAME_OVER },
     [BOOPIE_SOUND_NOTIFY] = { "notify", NOTIFY },     [BOOPIE_SOUND_PURR] = { "purr", PURR },
-    [BOOPIE_SOUND_HELLO] = { "hello", HELLO },
+    [BOOPIE_SOUND_HELLO] = { "hello", HELLO },        [BOOPIE_SOUND_WATER] = { "water", WATER },
 };
 
 const char *boopie_sound_key(boopie_sound_t s)
