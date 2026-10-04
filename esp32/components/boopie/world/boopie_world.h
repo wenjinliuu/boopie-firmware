@@ -62,6 +62,7 @@ typedef enum {
     BOOPIE_DO_FISH_MISSED,    /* not tapped in time */
     BOOPIE_DO_ANTIC,          /* it's begun a little something of its own (boopie_world_t.antic) */
     BOOPIE_DO_DECOR,          /* a festival's or the weather's: arg the festival, or 16 + the weather */
+    BOOPIE_DO_SHELTER,        /* rain: it's off home out of it */
     BOOPIE_DO_COUNT,
 } boopie_do_t;
 

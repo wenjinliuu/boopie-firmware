@@ -39,6 +39,8 @@ static const boopie_thing_t LIVING[] = {
     { A(LAMP), 56, 66, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(TABLE), 78, 98, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(MOONCAKES), 78, 99, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_MOON },
+    { A(ZONGZI), 78, 99, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_DRAGON },
+    { A(CAKE), 78, 99, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_BIRTHDAY },
     { A(RADIO), 20, 98, 1, 0, STAND, BOOPIE_DO_RADIO, A(HINT_NOTE), 8, 4, 0 },
     { A(BOWL_FULL), 32, 116, 1, 0, STAND, BOOPIE_DO_FEED, A(HINT_FOOD), 9, 0, 0 },
     { A(PLANT), 60, 122, 2, 11, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
@@ -110,6 +112,9 @@ static const boopie_thing_t OUTSIDE[] = {
     { A(LANTERN), 96, 66, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_MOON },
     { A(COUPLETS), 70, 65, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_SPRING },
     { A(WREATH), 70, 65, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_XMAS },
+    { A(HEART_WREATH), 70, 65, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_VALENTINE },
+    { A(BALLOONS), 116, 78, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_CHILDREN },
+    { A(BALLOONS), 116, 78, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_BIRTHDAY },
     { A(XMAS_TREE), 156, 114, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_XMAS },
     { A(JACK_O_LANTERN), 52, 78, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_HALLOWEEN },
     { A(SNOWMAN), 90, 112, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, 16 + BOOPIE_WEATHER_SNOW },
@@ -742,6 +747,25 @@ static void antic_tick(boopie_world_t *w, float dt)
     w->antic = BOOPIE_ANTIC_NONE;
 }
 
+/* Rain, and it's out in it: more often than not, home it goes (the house's
+ * door, or the sign back to the yard first). */
+static bool shelter(boopie_world_t *w, int level)
+{
+    if (s_weather != BOOPIE_WEATHER_RAIN || !boopie_world_outdoors(w->room) || frand(w) > 0.6f) {
+        return false;
+    }
+    boopie_do_t way = w->room == BOOPIE_ROOM_OUTSIDE ? BOOPIE_DO_INSIDE : BOOPIE_DO_HOME_PATH;
+    int n;
+    const boopie_thing_t *t = boopie_room_things(w->room, &n);
+    for (int i = 0; i < n; i++) {
+        if (t[i].act == way && boopie_thing_shown(&t[i], level)) {
+            walk_to(w, t[i].x + t[i].use_dx, t[i].y + t[i].use_dy, i);
+            return true;
+        }
+    }
+    return false;
+}
+
 /* Left alone: now and then one of these, if the room has any. */
 static bool maybe_antic(boopie_world_t *w, int level)
 {
@@ -1067,6 +1091,8 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
             boopie_room_floor(w->room, &x0, &y0, &x1, &y1);
             if (w->y < y0) {
                 walk_to(w, w->x, (float)y0 + 2, -1);   /* off the pier first, the way it came */
+            } else if (shelter(w, level)) {
+                return BOOPIE_DO_SHELTER;
             } else if (maybe_antic(w, level)) {
                 /* off to its little something */
             } else {

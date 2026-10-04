@@ -167,6 +167,9 @@ boopie_weather_t boopie_avatar_weather(void);
 bool boopie_avatar_set_weather(boopie_weather_t w);
 boopie_fest_t boopie_avatar_festival(void);
 bool boopie_avatar_mail_waiting(void);
+/* The pet's birthday (false while it isn't set), and setting it (false for no such day). */
+bool boopie_avatar_birthday(int *month, int *mday);
+bool boopie_avatar_set_birthday(int month, int mday);
 int boopie_avatar_open_mail(void);
 
 /* Furniture (boopie_furni_t): what's out (bought and not put away, bit f),

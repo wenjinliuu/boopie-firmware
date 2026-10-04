@@ -121,7 +121,8 @@ static struct {
     int32_t weather_day; /* the day the weather was told (by the AI), and what it is */
     uint8_t weather;
     uint8_t pad[3];
-    int32_t mail_key;    /* the festival whose gift's been opened: year * 8 + festival */
+    int32_t mail_key;    /* the festival whose gift's been opened: year * 16 + festival */
+    uint8_t birth_month, birth_day;   /* the pet's birthday (0: not set) */
 } s_woods;
 static int s_sim_fest = -1;   /* the simulator's BOOPIE_FEST */
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
@@ -852,7 +853,35 @@ boopie_fest_t boopie_avatar_festival(void)
     }
     int year, month, mday;
     int32_t day;
-    return local_date(&year, &month, &mday, &day) ? boopie_fest_on(year, month, mday) : BOOPIE_FEST_NONE;
+    if (!local_date(&year, &month, &mday, &day)) {
+        return BOOPIE_FEST_NONE;
+    }
+    ensure_loaded();
+    if (s_woods.birth_month == month && s_woods.birth_day == mday) {
+        return BOOPIE_FEST_BIRTHDAY;   /* its own day comes first */
+    }
+    return boopie_fest_on(year, month, mday);
+}
+
+bool boopie_avatar_birthday(int *month, int *mday)
+{
+    ensure_loaded();
+    *month = s_woods.birth_month;
+    *mday = s_woods.birth_day;
+    return s_woods.birth_month != 0;
+}
+
+bool boopie_avatar_set_birthday(int month, int mday)
+{
+    static const uint8_t DAYS[12] = { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    ensure_loaded();
+    if (month < 1 || month > 12 || mday < 1 || mday > DAYS[month - 1]) {
+        return false;
+    }
+    s_woods.birth_month = (uint8_t)month;
+    s_woods.birth_day = (uint8_t)mday;
+    save();
+    return true;
 }
 
 /* This festival's gift, this year: its key. */
@@ -865,7 +894,7 @@ static int32_t mail_key(boopie_fest_t f)
     if (f == BOOPIE_FEST_NEW_YEAR && month == 12) {
         year++;
     }
-    return year * 8 + (int32_t)f;
+    return year * 16 + (int32_t)f;
 }
 
 bool boopie_avatar_mail_waiting(void)
@@ -884,7 +913,7 @@ int boopie_avatar_open_mail(void)
     boopie_fest_t f = boopie_avatar_festival();
     s_woods.mail_key = mail_key(f);
     /* A gift, over and above the day's cap for games. */
-    int stars = f == BOOPIE_FEST_SPRING || f == BOOPIE_FEST_XMAS ? 5 : 3;
+    int stars = f == BOOPIE_FEST_BIRTHDAY ? 10 : f == BOOPIE_FEST_SPRING || f == BOOPIE_FEST_XMAS ? 5 : 3;
     s_pet_state.stars += (uint32_t)stars;
     boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
     flash_overlay(BOOPIE_OVERLAY_CONFETTI, 3.0f);

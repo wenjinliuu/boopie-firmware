@@ -35,6 +35,10 @@ typedef enum {
     BOOPIE_FEST_HALLOWEEN,    /* 万圣节: 28 to 31 October */
     BOOPIE_FEST_XMAS,         /* 圣诞: 20 to 26 December */
     BOOPIE_FEST_NEW_YEAR,     /* 元旦: 31 December, 1 January */
+    BOOPIE_FEST_VALENTINE,    /* 情人节: 14 February */
+    BOOPIE_FEST_DRAGON,       /* 端午: the day (2026 to 2035) */
+    BOOPIE_FEST_CHILDREN,     /* 儿童节: 1 June */
+    BOOPIE_FEST_BIRTHDAY,     /* the pet's own: never by the date here, the screen knows it */
     BOOPIE_FEST_COUNT,
 } boopie_fest_t;
 

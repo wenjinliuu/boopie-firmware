@@ -92,7 +92,9 @@ static void chatter(const boopie_pet_status_t *st, int hour)
     boopie_weather_t wx = boopie_avatar_weather();
     if (!st->hungry && rand() % 3 == 0) {
         if (fest != BOOPIE_FEST_NONE) {
-            if (boopie_avatar_mail_waiting()) {
+            if (fest == BOOPIE_FEST_BIRTHDAY) {
+                say(boopie_avatar_mail_waiting() ? "今天是我的生日！信箱里会有礼物吗？" : "今天是我的生日！");
+            } else if (boopie_avatar_mail_waiting()) {
                 say("%s快乐！信箱里好像有东西", boopie_fest_name(fest));
             } else {
                 say("%s快乐！", boopie_fest_name(fest));
@@ -582,9 +584,55 @@ static void shop_panel(void)
 
 /* ---- the desk: the pet's status ---- */
 
+/* ---- its birthday: a month, then a day ---- */
+
+static int s_birth_month;
+static void status_panel(void);
+static void birthday_month_panel(void);
+
+static void on_birth_day(int i)
+{
+    if (boopie_avatar_set_birthday(s_birth_month, i + 1)) {
+        boopie_sound_play(BOOPIE_SOUND_SCORE);
+        say("记住啦！%d月%d日是我的生日", s_birth_month, i + 1);
+    }
+    status_panel();
+}
+
+static void on_birth_month(int i)
+{
+    static const int DAYS[12] = { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    s_birth_month = i + 1;
+    char title[24];
+    snprintf(title, sizeof title, "%d月几日？", s_birth_month);
+    lv_obj_t *box = panel(title, on_birth_day);
+    for (int d = 1; d <= DAYS[i]; d++) {
+        char v[16];
+        snprintf(v, sizeof v, "%d日", d);
+        row(box, d - 1, v, NULL, true);
+    }
+}
+
+static void birthday_month_panel(void)
+{
+    lv_obj_t *box = panel("生日是几月？", on_birth_month);
+    for (int m = 1; m <= 12; m++) {
+        char v[16];
+        snprintf(v, sizeof v, "%d月", m);
+        row(box, m - 1, v, NULL, true);
+    }
+}
+
+static void on_status(int i)
+{
+    if (i == 0) {
+        birthday_month_panel();
+    }
+}
+
 static void status_panel(void)
 {
-    lv_obj_t *box = panel(boopie_avatar_pet_name(), NULL);
+    lv_obj_t *box = panel(boopie_avatar_pet_name(), on_status);
     boopie_pet_status_t st;
     boopie_avatar_pet_status(&st);
     char v[48];
@@ -598,7 +646,14 @@ static void status_panel(void)
                                                 : st.mood == BOOPIE_EXPR_SAD ? "想你了" : "很好", false);
     snprintf(v, sizeof v, "%u 只", (unsigned)boopie_avatar_slimes_beaten());
     row(box, -1, "打败史莱姆", v, false);
-    note(box, "升级后家里会添新家具，屋外和森林也会变样。");
+    int bm, bd;
+    if (boopie_avatar_birthday(&bm, &bd)) {
+        snprintf(v, sizeof v, "%d月%d日", bm, bd);
+    } else {
+        snprintf(v, sizeof v, "点这里设");
+    }
+    row(box, 0, "生日", v, true);
+    note(box, "升级后家里会添新家具，屋外和森林也会变样。生日那天有蛋糕和礼物。");
 }
 
 /* ---- the mirror: a new name ---- */
@@ -887,7 +942,8 @@ static void act(boopie_do_t what, int arg)
     case BOOPIE_DO_MAIL: {
         int stars = boopie_avatar_open_mail();
         if (stars) {
-            static const char *const GIFT[BOOPIE_FEST_COUNT] = { "", "红包", "月饼", "糖果", "圣诞礼物", "新年贺卡" };
+            static const char *const GIFT[BOOPIE_FEST_COUNT] = { "", "红包", "月饼", "糖果", "圣诞礼物", "新年贺卡",
+                                                                 "巧克力", "粽子", "小玩具", "生日礼物" };
             boopie_sound_play(BOOPIE_SOUND_GOLD);
             say("%s快乐！收到%s ★ +%d", boopie_fest_name(boopie_avatar_festival()), GIFT[boopie_avatar_festival()], stars);
         } else {
@@ -899,8 +955,10 @@ static void act(boopie_do_t what, int arg)
         if (arg >= 16) {
             say(arg - 16 == BOOPIE_WEATHER_SNOW ? "我们堆的雪人！" : "踩水坑～啪嗒啪嗒");
         } else {
-            static const char *const HELLO[BOOPIE_FEST_COUNT] = { "", "新年快乐！恭喜发财！", "中秋快乐！月饼真香",
-                                                                  "不给糖就捣蛋！", "圣诞快乐！", "元旦快乐！" };
+            static const char *const HELLO[BOOPIE_FEST_COUNT] = {
+                "", "新年快乐！恭喜发财！", "中秋快乐！月饼真香", "不给糖就捣蛋！", "圣诞快乐！", "元旦快乐！",
+                "情人节快乐！最喜欢你了", "端午安康！粽子好香", "儿童节快乐！", "今天是我的生日！谢谢你～",
+            };
             say("%s", HELLO[arg < BOOPIE_FEST_COUNT ? arg : 0]);
         }
         break;
@@ -917,6 +975,7 @@ static void act(boopie_do_t what, int arg)
     case BOOPIE_DO_CHEST: open_chest(arg); break;
     case BOOPIE_DO_GATHER: gather(arg); break;
     case BOOPIE_DO_ANTIC: antic_said(); break;
+    case BOOPIE_DO_SHELTER: say("下雨啦，回家躲雨～"); break;
     case BOOPIE_DO_BEACH: say("到海边啦！去码头钓鱼吧"); break;
     case BOOPIE_DO_FISH:
         muse_ui_set_swipe_enabled(false);   /* every tap is for the line */

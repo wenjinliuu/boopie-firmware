@@ -26,7 +26,7 @@ COMPONENT = HERE.parent
 
 (NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS,
  PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED, GATHER, FURNI,
- BEACH_SIGN, FISH, FISH_BITE, FISH_CAUGHT, FISH_EARLY, FISH_MISSED, ANTIC, DECOR) = range(31)
+ BEACH_SIGN, FISH, FISH_BITE, FISH_CAUGHT, FISH_EARLY, FISH_MISSED, ANTIC, DECOR, SHELTER) = range(32)
 IDLE, WALKING, USING, SLEEPING, AT_IT = range(5)
 NONE, TV, DANCE, MIRROR, LOVE, SWING, BUTTERFLY, SWIM = range(8)
 LIVING, BEDROOM, YARD, WOODS, BEACH = range(5)
@@ -297,6 +297,17 @@ class BoopieWorldTest(unittest.TestCase):
         self.assertEqual(decor(2, 0), 3)                       # 中秋: lanterns, mooncakes
         self.assertEqual(decor(4, 3), 3)                       # 圣诞 in the snow: wreath, tree, snowman
         self.assertEqual(decor(0, 2), 2)                       # rain: puddles
+        self.assertEqual(decor(6, 0), 1)                       # 情人节: the heart on the door
+        self.assertEqual(decor(7, 0), 1)                       # 端午: zongzi
+        self.assertEqual(decor(8, 0), 1)                       # 儿童节: balloons
+        self.assertEqual(decor(9, 0), 2)                       # its birthday: a cake, balloons
+
+    def test_in_the_rain_it_goes_home(self) -> None:
+        s = self.run_w("season:0:2", "room:3", "tick:120")
+        self.assertIn(SHELTER, s[2]["acts"])
+        self.assertIn(LIVING, [s[2]["room"]])                 # woods, the yard, then indoors
+        s = self.run_w("season:0:0", "room:2", "tick:120")
+        self.assertNotIn(SHELTER, s[2]["acts"])                # not when it's fine
 
     def test_no_butterflies_or_swims_in_the_rain(self) -> None:
         self.assertEqual(self.run_w("season:0:2", "room:2", "antic:6")[2]["ok"], 0)

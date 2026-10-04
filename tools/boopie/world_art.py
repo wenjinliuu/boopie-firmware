@@ -1003,6 +1003,42 @@ def snowman(L, x, y):
         L.put(x, y + k, (56, 56, 72))
 
 
+def cake(L, x, y):
+    """On the living room's table, like the mooncakes."""
+    L.rect(x - 7, y - 18, x + 7, y - 11, (252, 236, 220))
+    L.rect(x - 7, y - 18, x + 7, y - 16, (248, 160, 184))
+    for k in range(-6, 7, 3):
+        L.put(x + k, y - 15, (248, 160, 184))
+    L.rect(x - 8, y - 11, x + 8, y - 10, (240, 240, 248))
+    for k in (-4, 0, 4):
+        L.rect(x + k, y - 22, x + k, y - 19, (120, 176, 248))
+        L.put(x + k, y - 23, (255, 200, 72))
+
+
+def zongzi(L, x, y):
+    L.ell(x - 9, y - 14, x + 9, y - 10, (248, 248, 240))
+    for dx in (-4, 3):
+        L.poly([(x + dx, y - 20), (x + dx - 4, y - 12), (x + dx + 4, y - 12)], (104, 168, 72))
+        L.rect(x + dx - 3, y - 15, x + dx + 3, y - 15, (200, 160, 96))
+
+
+def balloons(L, x, y):
+    for k, (dx, h, c) in enumerate(((-5, 30, (240, 88, 104)), (1, 36, (248, 200, 72)), (6, 28, (104, 168, 240)))):
+        for t in range(h - 6):
+            L.put(x + dx * t // h, y - t, (220, 220, 228))
+        L.ell(x + dx - 4, y - h - 4, x + dx + 4, y - h + 5, c)
+        L.put(x + dx - 2, y - h - 2, (255, 255, 255))
+    L.rect(x - 1, y - 2, x + 1, y, (176, 128, 84))
+
+
+def heart_wreath(L, x, y):
+    for cx in (x - 3, x + 3):
+        L.ell(cx - 4, y - 19, cx + 4, y - 11, (232, 72, 104))
+    L.poly([(x - 7, y - 14), (x + 7, y - 14), (x, y - 6)], (232, 72, 104))
+    L.ell(x - 5, y - 17, x - 3, y - 15, (252, 160, 184))
+
+
+
 def puddle(L, x, y):
     """A floor mark."""
     L.ell(x - 10, y - 5, x + 10, y, (136, 168, 200))
@@ -1407,7 +1443,8 @@ SPRITES = [
     ("crab_a", crab_a, False), ("crab_b", crab_b, False), ("bird_bath", bird_bath, False),
     ("lantern", lantern, False), ("couplets", couplets, False), ("wreath", wreath, False),
     ("xmas_tree", xmas_tree, False), ("mooncakes", mooncakes, False), ("jack_o_lantern", jack_o_lantern, False),
-    ("snowman", snowman, False), ("puddle", puddle, True),
+    ("snowman", snowman, False), ("puddle", puddle, True), ("cake", cake, False), ("zongzi", zongzi, False),
+    ("balloons", balloons, False), ("heart_wreath", heart_wreath, False),
 ]
 HINTS = ["zzz", "shirt", "game", "pen", "note", "book", "food", "up", "down", "door", "info", "bang", "water", "plus",
          "mail", "tree", "house", "key", "heart", "berry", "mushroom", "wave", "fish", "shell"]

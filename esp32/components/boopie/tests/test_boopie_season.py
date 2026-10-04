@@ -21,7 +21,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 COMPONENT = HERE.parent
 
-NONE, SPRING, MOON, HALLOWEEN, XMAS, NEW_YEAR = range(6)
+NONE, SPRING, MOON, HALLOWEEN, XMAS, NEW_YEAR, VALENTINE, DRAGON, CHILDREN, BIRTHDAY = range(10)
 SUNNY, CLOUDY, RAIN, SNOW = range(4)
 
 
@@ -63,6 +63,12 @@ class BoopieSeasonTest(unittest.TestCase):
         self.assertEqual([self.fest(2026, 12, d) for d in (19, 20, 25, 26, 27, 31)],
                          [NONE, XMAS, XMAS, XMAS, NONE, NEW_YEAR])
         self.assertEqual([self.fest(2027, 1, d) for d in (1, 2)], [NEW_YEAR, NONE])
+
+    def test_valentines_dragon_boat_and_childrens_day(self) -> None:
+        self.assertEqual([self.fest(2027, 2, d) for d in (13, 14, 15)], [NONE, VALENTINE, NONE])
+        self.assertEqual([self.fest(2026, 6, d) for d in (1, 18, 19, 20)], [CHILDREN, NONE, DRAGON, NONE])
+        self.assertEqual(self.fest(2033, 6, 1), DRAGON)        # both on one day: 端午's
+        self.assertEqual(self.fest(2036, 6, 1), CHILDREN)
 
     def test_weather_by_the_season(self) -> None:
         july = self.run_s("weather:7")[0]
