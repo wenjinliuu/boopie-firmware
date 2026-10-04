@@ -162,6 +162,10 @@ uint32_t boopie_avatar_slimes_beaten(void);
 unsigned boopie_avatar_gathered(void);
 bool boopie_avatar_gather(int spot, int item);
 int boopie_avatar_items(int item);
+/* Buys one of a shop item (boopie_item_price) into the bag; false with *error (Chinese). */
+bool boopie_avatar_buy_item(int item, const char **error);
+/* Sets off a popper from the bag: confetti and hearts. False if there's none. */
+bool boopie_avatar_pop(void);
 bool boopie_avatar_snack(int item, bool *fed);
 /* Something won out there (a catch): `count` of an item into the bag (item
  * -1 for none), and experience and stars toward the daily caps. */

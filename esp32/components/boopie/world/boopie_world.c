@@ -293,13 +293,23 @@ void boopie_world_set_furniture(uint32_t out)
 
 const char *boopie_item_name(boopie_item_t item)
 {
-    static const char *const NAMES[BOOPIE_ITEM_COUNT] = { "蓝莓", "蘑菇", "贝壳", "小鱼" };
+    static const char *const NAMES[BOOPIE_ITEM_COUNT] = { "蓝莓", "蘑菇", "贝壳", "小鱼", "小饼干", "小蛋糕", "礼炮" };
     return (int)item >= 0 && item < BOOPIE_ITEM_COUNT ? NAMES[item] : "";
 }
 
 bool boopie_item_edible(boopie_item_t item)
 {
-    return item != BOOPIE_ITEM_SHELL;
+    return (int)item >= 0 && item < BOOPIE_ITEM_COUNT && item != BOOPIE_ITEM_SHELL && item != BOOPIE_ITEM_POPPER;
+}
+
+int boopie_item_price(boopie_item_t item)
+{
+    return item == BOOPIE_ITEM_COOKIE ? 5 : item == BOOPIE_ITEM_CAKE ? 15 : item == BOOPIE_ITEM_POPPER ? 8 : 0;
+}
+
+int boopie_item_treat_xp(boopie_item_t item)
+{
+    return item == BOOPIE_ITEM_COOKIE ? 15 : item == BOOPIE_ITEM_CAKE ? 50 : 0;
 }
 
 boopie_item_t boopie_gather_item(int spot)

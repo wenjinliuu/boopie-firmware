@@ -191,6 +191,11 @@ void boopie_pet_game(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev)
     reward(p, BOOPIE_XP_GAME, &p->game_stars_today, BOOPIE_GAME_STARS_CAP, xp, stars, ev);
 }
 
+void boopie_pet_treat(boopie_pet_t *p, int xp, boopie_pet_event_t *ev)
+{
+    add_xp(p, xp, ev);
+}
+
 void boopie_pet_world(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev)
 {
     reward(p, BOOPIE_XP_WORLD, &p->world_stars_today, BOOPIE_WORLD_STARS_CAP, xp, stars, ev);

@@ -23,6 +23,7 @@
 #include "boopie_pet.h"
 #include "boopie_season.h"
 #include "boopie_garden.h"
+#include "boopie_world.h"
 #include "muse_pixel.h"
 #include "muse_state.h"
 
@@ -471,6 +472,8 @@ static void load(void)
         s_woods.items[1] = 2;   /* mushrooms */
         s_woods.items[2] = 4;   /* shells */
         s_woods.items[3] = 1;   /* fish */
+        s_woods.items[4] = 2;   /* cookies */
+        s_woods.items[6] = 1;   /* a popper */
         s_woods.seeds[5] = 2;   /* pumpkin seeds */
     }
     boopie_weather_t wk;
@@ -1245,9 +1248,55 @@ bool boopie_avatar_snack(int item, bool *fed)
     } else {
         boopie_sound_play(BOOPIE_SOUND_EAT);
         boopie_avatar_react(BOOPIE_EXPR_EATING, 2.5f);
-        boopie_pet_earn(&s_pet_state, BOOPIE_XP_POKE, -1, &ev);
+        int treat = boopie_item_treat_xp((boopie_item_t)item);
+        if (treat) {
+            boopie_pet_treat(&s_pet_state, treat, &ev);   /* bought: past the caps */
+            flash_overlay(BOOPIE_OVERLAY_HEARTS, 3.0f);
+        } else {
+            boopie_pet_earn(&s_pet_state, BOOPIE_XP_POKE, -1, &ev);
+        }
+    }
+    if (item == BOOPIE_ITEM_CAKE) {
+        flash_overlay(BOOPIE_OVERLAY_CONFETTI, 3.0f);
     }
     show_event(&ev);
+    save();
+    return true;
+}
+
+bool boopie_avatar_buy_item(int item, const char **error)
+{
+    ensure_loaded();
+    int price = item >= 0 && item < BAG_ITEMS ? boopie_item_price((boopie_item_t)item) : 0;
+    if (price <= 0) {
+        *error = "没有这个";
+        return false;
+    }
+    if (s_woods.items[item] >= 99) {
+        *error = "背包装不下啦";
+        return false;
+    }
+    if (s_pet_state.stars < (uint32_t)price) {
+        *error = "星星不够，再攒攒吧";
+        return false;
+    }
+    s_pet_state.stars -= (uint32_t)price;
+    s_woods.items[item]++;
+    save();
+    return true;
+}
+
+bool boopie_avatar_pop(void)
+{
+    ensure_loaded();
+    if (!s_woods.items[BOOPIE_ITEM_POPPER]) {
+        return false;
+    }
+    s_woods.items[BOOPIE_ITEM_POPPER]--;
+    boopie_sound_play(BOOPIE_SOUND_LEVEL_UP);
+    boopie_avatar_react(BOOPIE_EXPR_HAPPY, 4.0f);
+    flash_overlay(BOOPIE_OVERLAY_CONFETTI, 5.0f);
+    flash_overlay(BOOPIE_OVERLAY_HEARTS, 5.0f);
     save();
     return true;
 }

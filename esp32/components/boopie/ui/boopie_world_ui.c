@@ -323,6 +323,13 @@ static void bag_panel(void);
 
 static void on_bag(int i)
 {
+    if (i == BOOPIE_ITEM_POPPER) {
+        if (boopie_avatar_pop()) {
+            close_panel();
+            muse_ui_show_face();   /* the confetti's on its face */
+        }
+        return;
+    }
     bool fed = false;
     if (!boopie_avatar_snack(i, &fed)) {
         return;
@@ -343,9 +350,9 @@ static void bag_panel(void)
     for (int i = 0; i < BOOPIE_ITEM_COUNT; i++) {
         int n = boopie_avatar_items(i);
         if (n) {
-            bool edible = boopie_item_edible((boopie_item_t)i);
-            snprintf(v, sizeof v, edible ? "× %d 喂它" : "× %d", n);
-            row(box, edible ? i : -1, boopie_item_name((boopie_item_t)i), v, edible);
+            bool edible = boopie_item_edible((boopie_item_t)i), popper = i == BOOPIE_ITEM_POPPER;
+            snprintf(v, sizeof v, edible ? "× %d 喂它" : popper ? "× %d 放一个" : "× %d", n);
+            row(box, edible || popper ? i : -1, boopie_item_name((boopie_item_t)i), v, edible || popper);
             any++;
         }
     }
@@ -365,7 +372,7 @@ static void bag_panel(void)
     }
     snprintf(v, sizeof v, "%d 件", owned);
     row(box, -1, "皮肤", v, false);
-    note(box, any ? "点吃的喂给它：饿了能当一顿饭。森林里摘蓝莓蘑菇，海边捡贝壳、钓鱼。"
+    note(box, any ? "点吃的喂给它：饿了能当一顿饭，商店买的零食还加经验。森林里摘蓝莓蘑菇，海边捡贝壳、钓鱼。"
                   : "森林里每天能摘蓝莓和蘑菇，海边能捡贝壳、钓鱼。");
 }
 
@@ -559,12 +566,58 @@ static void seed_shop_panel(void)
     note(box, "一次买一颗，收获的星星比种子价钱多，经验也多。普通种子不用买。");
 }
 
+/* ---- 商店: treats and poppers, one at a time ---- */
+
+static void treat_panel(void);
+static const boopie_item_t TREATS[] = { BOOPIE_ITEM_COOKIE, BOOPIE_ITEM_CAKE, BOOPIE_ITEM_POPPER };
+
+static void on_treat(int i)
+{
+    if (i < 0 || i >= (int)(sizeof TREATS / sizeof *TREATS)) {
+        return;
+    }
+    if (arm(i)) {
+        return;
+    }
+    const char *error = NULL;
+    if (boopie_avatar_buy_item(TREATS[i], &error)) {
+        boopie_sound_play(BOOPIE_SOUND_GOLD);
+        say("买到%s！放进背包啦", boopie_item_name(TREATS[i]));
+    } else {
+        boopie_sound_play(BOOPIE_SOUND_ERROR);
+        say("%s", error ? error : "买不了");
+    }
+    s_armed = -1;
+    treat_panel();
+}
+
+static void treat_panel(void)
+{
+    int armed = s_armed;
+    lv_obj_t *box = panel("零食", on_treat);
+    s_armed = armed;
+    boopie_pet_status_t st;
+    boopie_avatar_pet_status(&st);
+    char v[48];
+    snprintf(v, sizeof v, "你有 ★ %u", (unsigned)st.stars);
+    note(box, v);
+    for (int i = 0; i < (int)(sizeof TREATS / sizeof *TREATS); i++) {
+        char name[48];
+        snprintf(name, sizeof name, "%s ×%d", boopie_item_name(TREATS[i]), boopie_avatar_items(TREATS[i]));
+        snprintf(v, sizeof v, "★ %d", boopie_item_price(TREATS[i]));
+        row(box, i, name, v, true);
+    }
+    note(box, "饼干和蛋糕在背包里喂它，加经验（不占每天的上限）；礼炮在背包里放，撒花庆祝。");
+}
+
 static void on_shop_menu(int i)
 {
     if (i == 0) {
         furni_panel();
     } else if (i == 1) {
         seed_shop_panel();
+    } else if (i == 3) {
+        treat_panel();
     } else {
         skins_panel();
     }
@@ -580,8 +633,9 @@ static void shop_panel(void)
     note(box, v);
     row(box, 0, "家具", NULL, true);
     row(box, 1, "种子", NULL, true);
+    row(box, 3, "零食", NULL, true);
     row(box, 2, "皮肤", NULL, true);
-    note(box, "家具摆进家里、院子和农场；稀有种子拿去农场种；皮肤给现在的伙伴穿。");
+    note(box, "家具摆进家里、院子和农场；稀有种子拿去农场种；零食喂它、礼炮庆祝；皮肤给现在的伙伴穿。");
 }
 
 /* ---- the desk: the pet's status ---- */

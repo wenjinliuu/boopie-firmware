@@ -102,9 +102,21 @@ void boopie_world_set_season(boopie_fest_t fest, boopie_weather_t weather);
 bool boopie_world_outdoors(boopie_room_t room);
 
 /* What can be picked in the woods: each spot gives one of these, once a day. */
-typedef enum { BOOPIE_ITEM_BERRY = 0, BOOPIE_ITEM_MUSHROOM, BOOPIE_ITEM_SHELL, BOOPIE_ITEM_FISH, BOOPIE_ITEM_COUNT } boopie_item_t;
+/* Found in the woods and on the beach; then from the shop (a price), only ever appended. */
+typedef enum {
+    BOOPIE_ITEM_BERRY = 0,
+    BOOPIE_ITEM_MUSHROOM,
+    BOOPIE_ITEM_SHELL,
+    BOOPIE_ITEM_FISH,
+    BOOPIE_ITEM_COOKIE,   /* 小饼干: a treat */
+    BOOPIE_ITEM_CAKE,     /* 小蛋糕: a bigger one */
+    BOOPIE_ITEM_POPPER,   /* 礼炮: set off for confetti */
+    BOOPIE_ITEM_COUNT
+} boopie_item_t;
 const char *boopie_item_name(boopie_item_t item);
-bool boopie_item_edible(boopie_item_t item);   /* shells are only to keep */
+bool boopie_item_edible(boopie_item_t item);   /* shells are only to keep, a popper to set off */
+int boopie_item_price(boopie_item_t item);     /* stars in the shop; 0: not sold */
+int boopie_item_treat_xp(boopie_item_t item);  /* a treat's experience, over the day's caps; 0 for the rest */
 boopie_item_t boopie_gather_item(int spot);    /* the woods' 0 to 4, the beach's 5 to 7 */
 #define BOOPIE_GATHER_SPOTS 8
 

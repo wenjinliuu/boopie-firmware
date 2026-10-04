@@ -114,6 +114,8 @@ void boopie_pet_talked(boopie_pet_t *p, boopie_pet_event_t *ev);
 
 /* A game round's reward, toward the games' day (BOOPIE_GAME_*_CAP). */
 void boopie_pet_game(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev);
+/* A treat bought with stars: its experience, past every cap (it was paid for). */
+void boopie_pet_treat(boopie_pet_t *p, int xp, boopie_pet_event_t *ev);
 /* A reward in 小窝, toward its own day (BOOPIE_WORLD_*_CAP). */
 void boopie_pet_world(boopie_pet_t *p, int xp, int stars, boopie_pet_event_t *ev);
 
