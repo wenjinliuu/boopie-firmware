@@ -3,7 +3,14 @@
 参考：[78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32)（MIT 许可，2026-10-03 的 `0d576d3`）及其 `docs/websocket_zh.md`、`docs/mcp-protocol_zh.md`、`main/ota.cc`。
 
 ## 现状
-- 板子上的“大脑”可选小智，接入说明页写着“还在开发中”：协议还没实现。
+- **步骤 1（激活和绑定）已做**：`components/boopie/xiaozhi/`（`boopie_xz_proto.c` 协议、`boopie_xiaozhi.c` 板上任务），编进 muse 组件，开机在 `muse_app_run` 里启动。
+  - 选了小智当大脑且 Wi-Fi 连上：向官方接口报到。
+  - 没绑定：屏幕说一次“小智激活码 xxxxxx”，设置 › 大脑 › 小智接入 页大字显示激活码，每 3 秒问一次是否绑好；码过期自动换新码。
+  - 绑好：提示“已连接小智！”，对话地址和令牌存 NVS（命名空间 `xiaozhi`），每 6 小时重新报到一次换新令牌。
+  - 服务器的 `firmware` 只记一笔日志，从不升级；服务器时间在 NTP 对时前先拿来用。
+  - 连不上：10 秒起翻倍重试，最长 5 分钟；设置页有“重新连接”按钮。
+  - 按住说话时，如果还没绑定，屏幕会提示激活码；已绑定会说“对话功能马上就来”（步骤 2）。
+  - 测试：`test_boopie_xiaozhi.py`（报到内容、UUID、各种回复的解析）。模拟器用 `BOOPIE_XZ_CODE=123456` / `BOOPIE_XZ_READY=1` 看设置页。
 - 官方仓库**正式支持我们这块板**（`waveshare/esp32-s3-touch-amoled-1.75`，含 1.75C 变体），也用 ESP-IDF 6.0.1，音频芯片同样是 ES8311（喇叭）+ ES7210（麦克风，带回采），官方配置 24 kHz。
 - 从开发环境能访问官方接口 `api.tenclass.net` 和乐鑫组件库（Opus 编解码组件要从这里下载）。
 

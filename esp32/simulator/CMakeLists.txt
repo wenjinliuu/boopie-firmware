@@ -217,6 +217,7 @@ target_include_directories(muse_simulator PRIVATE
     "${BOOPIE_COMPONENT_DIR}/setup"
     "${BOOPIE_COMPONENT_DIR}/vpn"
     "${BOOPIE_COMPONENT_DIR}/world"
+    "${BOOPIE_COMPONENT_DIR}/xiaozhi"
     "${BOOPIE_COMPONENT_DIR}"
 )
 

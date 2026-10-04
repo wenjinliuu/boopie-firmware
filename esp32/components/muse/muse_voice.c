@@ -36,6 +36,7 @@
 #include "sdkconfig.h"
 
 #include "muse_adpcm.h"
+#include "boopie_xiaozhi.h"
 #include "muse_audio.h"
 #include "muse_board.h"
 #include "muse_chat.h"
@@ -468,7 +469,17 @@ static void go_idle(const char *caption)
 static const char *not_set_up(void)
 {
     if (boopie_avatar_brain() != BOOPIE_BRAIN_MUSE) {
-        return "小智还没接通，设置 › 大脑 里可以改用 Muse";
+        static char said[96];
+        char code[16];
+        switch (boopie_xiaozhi_status(code, sizeof code, NULL, 0)) {
+        case BOOPIE_XZ_CODE:
+            snprintf(said, sizeof said, "先绑定小智：在 xiaozhi.me 添加设备，激活码 %s", code);
+            return said;
+        case BOOPIE_XZ_READY: return "小智已绑定，对话功能马上就来";
+        case BOOPIE_XZ_NO_NET: return "没连上网";
+        case BOOPIE_XZ_ERROR: return "连不上小智服务器，稍后再试";
+        default: return "正在连接小智……";
+        }
     }
     char sdk[BOOPIE_SDK_TOKEN_LEN + 1];
     bool has = boopie_sdk_token(sdk);

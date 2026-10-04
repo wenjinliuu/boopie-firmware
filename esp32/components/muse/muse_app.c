@@ -36,6 +36,7 @@
 #include "muse_ui.h"
 #include "muse_voice.h"
 #include "muse_wifi.h"
+#include "boopie_xiaozhi.h"
 
 static const char *TAG = "muse";
 
@@ -101,6 +102,7 @@ void muse_app_run(const muse_board_t *board)
     }
 
     muse_hatch_start();
+    boopie_xiaozhi_start();   /* Boopie: 小智, when it's the brain: its activation code, then where to talk */
     /* Home Link owns the radios; these just hand it the saved settings. */
     muse_wifi_apply();
     muse_ble_apply();

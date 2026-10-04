@@ -45,6 +45,7 @@
 #include "boopie_heads.h"
 #include "boopie_sdk_token.h"
 #include "boopie_vpn.h"
+#include "boopie_xiaozhi.h"
 #include "boopie_history.h"
 #include "boopie_store.h"
 #include "boopie_viewers.h"
@@ -1573,25 +1574,45 @@ static const page_t AVATAR = { &s_avatar, build_avatar_page };   /* Boopie */
 /* ---------- Brain (Boopie) ---------- */
 
 static lv_obj_t *s_brain, *s_home_brain, *s_brain_checks[BOOPIE_BRAIN_COUNT], *s_xiaozhi;
+static lv_obj_t *s_xz_code, *s_xz_note;
 
 static void on_brain_choice(lv_event_t *e)
 {
     boopie_avatar_set_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));
 }
 
+static void on_xz_recheck(lv_event_t *e)
+{
+    (void)e;
+    boopie_xiaozhi_recheck();
+}
+
 static void build_xiaozhi_page(lv_obj_t *tile)
 {
     lv_obj_t *list;
     s_xiaozhi = page(tile, "小智", true, &list);
+    s_xz_code = note(list, "");
+    lv_obj_set_style_text_font(s_xz_code, boopie_font_with_cjk(&lv_font_montserrat_28), 0);
+    lv_obj_set_style_text_color(s_xz_code, lv_color_hex(COLOR_ACCENT), 0);
+    lv_obj_set_style_text_letter_space(s_xz_code, 6, 0);
+    s_xz_note = note(list, "");
+    button(list, LV_SYMBOL_REFRESH "  重新连接", COLOR_ACCENT, on_xz_recheck, NULL);
     lv_obj_t *n = note(list,
-        "小智接入还在开发中，接通后是这样：\n"
+        "怎么绑定：\n"
         "1. 在 设置 › 大脑 里选\"小智\"，板子联网。\n"
-        "2. 屏幕上会显示一个 6 位激活码。\n"
+        "2. 这里会显示一个 6 位激活码。\n"
         "3. 手机浏览器打开 xiaozhi.me，登录控制台。\n"
         "4. 添加设备，输入激活码。\n"
-        "5. 绑定好就能直接说话，国内网络，不用代理。");
+        "绑定一次就好，国内网络，不用代理。角色、音色在控制台里改。");
     lv_obj_set_style_text_align(n, LV_TEXT_ALIGN_LEFT, 0);
-    note(list, "在那之前，可以先选 Muse。");
+}
+
+static void tick_xiaozhi(void)
+{
+    char code[16], said[96];
+    boopie_xz_state_t st = boopie_xiaozhi_status(code, sizeof code, said, sizeof said);
+    set_text(s_xz_code, st == BOOPIE_XZ_CODE ? code : st == BOOPIE_XZ_READY ? LV_SYMBOL_OK : "");
+    set_text(s_xz_note, st == BOOPIE_XZ_OFF ? "现在的大脑是 Muse。在 设置 › 大脑 里选小智就开始连接。" : said);
 }
 
 static const page_t XIAOZHI = { &s_xiaozhi, build_xiaozhi_page };
@@ -1606,7 +1627,7 @@ static void build_brain_page(lv_obj_t *tile)
         row(list, NULL, NAMES[i], &s_brain_checks[i], on_brain_choice, (void *)(intptr_t)i);
         lv_obj_set_style_text_color(s_brain_checks[i], lv_color_hex(COLOR_ACCENT), 0);
     }
-    note(list, "小智：国内服务器，不用代理。\nMuse：需要 Muse App 配对和海外网络。");
+    note(list, "小智：国内服务器，不用代理，在 xiaozhi.me 绑定一次。\nMuse：需要 Muse App 配对和海外网络。");
     nav_row(list, "小智接入", on_nav, (void *)&XIAOZHI);
     nav_row(list, "Muse 接入与设置", on_nav, (void *)&HATCH);
 }
@@ -1938,6 +1959,8 @@ void muse_settings_ui_tick(bool visible)
         tick_brain();    /* Boopie */
     } else if (s_current == s_vpn) {
         tick_vpn();      /* Boopie */
+    } else if (s_current == s_xiaozhi) {
+        tick_xiaozhi();  /* Boopie */
     } else if (s_current == s_storage) {
         tick_storage();  /* Boopie */
     }

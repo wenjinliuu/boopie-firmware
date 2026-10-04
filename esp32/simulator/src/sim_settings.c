@@ -184,6 +184,30 @@ static int s_sim_node;
 
 void boopie_vpn_init(const char *extra_host) { (void)extra_host; }
 bool boopie_vpn_on(void) { return getenv("BOOPIE_VPN") != NULL; }
+
+/* 小智: BOOPIE_XZ_CODE shows that code waiting to be bound; BOOPIE_XZ_READY, bound. */
+#include "boopie_xiaozhi.h"
+void boopie_xiaozhi_start(void) {}
+void boopie_xiaozhi_recheck(void) {}
+bool boopie_xiaozhi_endpoint(char *url, size_t url_cap, char *token, size_t token_cap)
+{
+    snprintf(url, url_cap, "%s", "");
+    snprintf(token, token_cap, "%s", "");
+    return false;
+}
+boopie_xz_state_t boopie_xiaozhi_status(char *code, size_t code_cap, char *note, size_t note_cap)
+{
+    const char *c = getenv("BOOPIE_XZ_CODE");
+    boopie_xz_state_t st = c ? BOOPIE_XZ_CODE : getenv("BOOPIE_XZ_READY") ? BOOPIE_XZ_READY : BOOPIE_XZ_NO_NET;
+    if (code_cap) {
+        snprintf(code, code_cap, "%s", c ? c : "");
+    }
+    if (note_cap) {
+        snprintf(note, note_cap, "%s", st == BOOPIE_XZ_CODE ? "打开 xiaozhi.me，控制台 › 添加设备，输入激活码"
+                                       : st == BOOPIE_XZ_READY ? "已连接小智" : "等 Wi-Fi 连上");
+    }
+    return st;
+}
 void boopie_vpn_set_on(bool on) { (void)on; }
 int boopie_vpn_count(void) { return getenv("BOOPIE_VPN") ? (int)(sizeof SIM_NODES / sizeof SIM_NODES[0]) : 0; }
 bool boopie_vpn_node(int i, boopie_vpn_node_t *out)
