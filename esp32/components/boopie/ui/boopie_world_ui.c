@@ -88,6 +88,26 @@ static void chatter(const boopie_pet_status_t *st, int hour)
     static const char *const WOODS[] = {
         "森林里好安静", "那边有史莱姆！点它试试", "宝箱里会有什么呢？", "小心别迷路哦", "听，有鸟在叫",
     };
+    boopie_fest_t fest = boopie_avatar_festival();
+    boopie_weather_t wx = boopie_avatar_weather();
+    if (!st->hungry && rand() % 3 == 0) {
+        if (fest != BOOPIE_FEST_NONE) {
+            if (boopie_avatar_mail_waiting()) {
+                say("%s快乐！信箱里好像有东西", boopie_fest_name(fest));
+            } else {
+                say("%s快乐！", boopie_fest_name(fest));
+            }
+            return;
+        }
+        if (wx == BOOPIE_WEATHER_RAIN) {
+            say(boopie_world_outdoors(s_world.room) ? "雨好大，回屋躲躲雨吧" : "外面在下雨，听滴答滴答");
+            return;
+        }
+        if (wx == BOOPIE_WEATHER_SNOW) {
+            say(boopie_world_outdoors(s_world.room) ? "雪花好凉～" : "外面下雪了，出去堆雪人吧");
+            return;
+        }
+    }
     if (s_world.room == BOOPIE_ROOM_WOODS && !st->hungry && hour >= 6 && hour < 22) {
         say("%s", WOODS[rand() % (int)(sizeof WOODS / sizeof WOODS[0])]);
         return;
@@ -864,7 +884,27 @@ static void act(boopie_do_t what, int arg)
     muse_state_poke();
     switch (what) {
     case BOOPIE_DO_PLOT: use_plot(arg); break;
-    case BOOPIE_DO_MAIL: say("没有新的信"); break;
+    case BOOPIE_DO_MAIL: {
+        int stars = boopie_avatar_open_mail();
+        if (stars) {
+            static const char *const GIFT[BOOPIE_FEST_COUNT] = { "", "红包", "月饼", "糖果", "圣诞礼物", "新年贺卡" };
+            boopie_sound_play(BOOPIE_SOUND_GOLD);
+            say("%s快乐！收到%s ★ +%d", boopie_fest_name(boopie_avatar_festival()), GIFT[boopie_avatar_festival()], stars);
+        } else {
+            say("没有新的信");
+        }
+        break;
+    }
+    case BOOPIE_DO_DECOR: {
+        if (arg >= 16) {
+            say(arg - 16 == BOOPIE_WEATHER_SNOW ? "我们堆的雪人！" : "踩水坑～啪嗒啪嗒");
+        } else {
+            static const char *const HELLO[BOOPIE_FEST_COUNT] = { "", "新年快乐！恭喜发财！", "中秋快乐！月饼真香",
+                                                                  "不给糖就捣蛋！", "圣诞快乐！", "元旦快乐！" };
+            say("%s", HELLO[arg < BOOPIE_FEST_COUNT ? arg : 0]);
+        }
+        break;
+    }
     case BOOPIE_DO_WILD:
         if (!s_woods_told) {
             s_woods_told = true;
@@ -909,7 +949,11 @@ static void act(boopie_do_t what, int arg)
     case BOOPIE_DO_FEED: feed(); break;
     case BOOPIE_DO_UPSTAIRS: say("到二楼啦"); break;
     case BOOPIE_DO_DOWNSTAIRS: say("下楼咯"); break;
-    case BOOPIE_DO_OUTSIDE: say("出门啦！"); break;
+    case BOOPIE_DO_OUTSIDE:
+        say(boopie_avatar_weather() == BOOPIE_WEATHER_RAIN   ? "下雨啦，撑把伞～"
+            : boopie_avatar_weather() == BOOPIE_WEATHER_SNOW ? "哇，下雪了！"
+                                                             : "出门啦！");
+        break;
     case BOOPIE_DO_SLEEP:
         if (s_world.state == BOOPIE_PET_SLEEPING) {
             say("晚安～");
@@ -999,6 +1043,9 @@ static void frame(lv_timer_t *timer)
     const boopie_thing_t *thing = boopie_world_thing(&s_world, using);
     int arg = thing ? thing->arg : 0;
     boopie_world_set_furniture(boopie_avatar_furniture());
+    boopie_weather_t wx = boopie_avatar_weather();
+    boopie_fest_t fest = boopie_avatar_festival();
+    boopie_world_set_season(fest, wx);
     boopie_do_t d = boopie_world_tick(&s_world, st.level, dt);
     if (d != BOOPIE_DO_NOTHING) {
         act(d, arg);
@@ -1016,7 +1063,8 @@ static void frame(lv_timer_t *timer)
     int minute = 0;
     const boopie_garden_t *garden = boopie_avatar_garden(&epoch, &minute);
     boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_HEAD_H, garden, epoch,
-                                 boopie_avatar_chests_open(), boopie_avatar_gathered() };
+                                 boopie_avatar_chests_open(), boopie_avatar_gathered(), wx, fest,
+                                 boopie_avatar_mail_waiting() };
     boopie_world_draw(&s_world, &look, s_rgb);
     boopie_world_scale(s_rgb, s_screen, SIZE);
     const char *clock = boopie_pages_clock();
@@ -1203,4 +1251,17 @@ void boopie_world_ui_farm_status(char *out, size_t cap)
         }
     }
     muse_board->display_unlock();
+}
+
+bool boopie_world_ui_set_weather(const char *key, char *said, size_t cap)
+{
+    boopie_weather_t w;
+    if (!boopie_weather_from_key(key, &w)) {
+        return false;
+    }
+    muse_board->display_lock(-1);
+    bool ok = boopie_avatar_set_weather(w);
+    muse_board->display_unlock();
+    snprintf(said, cap, ok ? "the pet's world shows %s today" : "the clock isn't set yet", key);
+    return ok;
 }

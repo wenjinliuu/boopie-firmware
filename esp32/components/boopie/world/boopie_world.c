@@ -38,6 +38,7 @@ static const boopie_thing_t LIVING[] = {
     { A(STAIRS_UP), 134, 68, 1, 0, STAND, BOOPIE_DO_UPSTAIRS, A(HINT_UP), 0, 6, 0 },
     { A(LAMP), 56, 66, 10, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(TABLE), 78, 98, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(MOONCAKES), 78, 99, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_MOON },
     { A(RADIO), 20, 98, 1, 0, STAND, BOOPIE_DO_RADIO, A(HINT_NOTE), 8, 4, 0 },
     { A(BOWL_FULL), 32, 116, 1, 0, STAND, BOOPIE_DO_FEED, A(HINT_FOOD), 9, 0, 0 },
     { A(PLANT), 60, 122, 2, 11, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
@@ -103,6 +104,17 @@ static const boopie_thing_t OUTSIDE[] = {
     { A(BARN), 326, 70, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(SIGN), 344, 114, 1, 0, STAND, BOOPIE_DO_WILD, A(HINT_TREE), -8, 2, 0 },
     { A(SIGN_HOME), 14, 104, 1, 0, STAND, BOOPIE_DO_BEACH, A(HINT_WAVE), 8, 2, 0 },
+    { A(LANTERN), 44, 66, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_SPRING },
+    { A(LANTERN), 96, 66, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_SPRING },
+    { A(LANTERN), 44, 66, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_MOON },
+    { A(LANTERN), 96, 66, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_MOON },
+    { A(COUPLETS), 70, 65, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_SPRING },
+    { A(WREATH), 70, 65, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_XMAS },
+    { A(XMAS_TREE), 156, 114, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_XMAS },
+    { A(JACK_O_LANTERN), 52, 78, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, BOOPIE_FEST_HALLOWEEN },
+    { A(SNOWMAN), 90, 112, 1, 0, STAND, BOOPIE_DO_DECOR, 0, 0, 0, 16 + BOOPIE_WEATHER_SNOW },
+    { A(PUDDLE), 132, 104, 1, 0, FLOOR, BOOPIE_DO_DECOR, 0, 0, 0, 16 + BOOPIE_WEATHER_RAIN },
+    { A(PUDDLE), 300, 102, 1, 0, FLOOR, BOOPIE_DO_DECOR, 0, 0, 0, 16 + BOOPIE_WEATHER_RAIN },
     { A(BIRD_BATH), 66, 122, 7, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(SWING), 122, 108, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), 0, 2, BOOPIE_FURNI_SWING },
     { A(WINDMILL_A), 228, 58, 1, 0, STAND, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_WINDMILL },
@@ -240,6 +252,19 @@ static const struct {
     [BOOPIE_FURNI_SWING] = { "秋千", "院子", 40 },     [BOOPIE_FURNI_WINDMILL] = { "风车", "农场", 60 },
 };
 static uint32_t s_furniture;   /* out now */
+static boopie_fest_t s_fest;
+static boopie_weather_t s_weather;
+
+void boopie_world_set_season(boopie_fest_t fest, boopie_weather_t weather)
+{
+    s_fest = fest;
+    s_weather = weather;
+}
+
+bool boopie_world_outdoors(boopie_room_t room)
+{
+    return room == BOOPIE_ROOM_OUTSIDE || room == BOOPIE_ROOM_WOODS || room == BOOPIE_ROOM_BEACH;
+}
 
 const char *boopie_furni_name(boopie_furni_t f)
 {
@@ -281,6 +306,9 @@ boopie_item_t boopie_gather_item(int spot)
 bool boopie_thing_shown(const boopie_thing_t *t, int level)
 {
     if (t->act == BOOPIE_DO_FURNI && !(s_furniture >> t->arg & 1)) {
+        return false;
+    }
+    if (t->act == BOOPIE_DO_DECOR && (t->arg < 16 ? (int)s_fest != t->arg : (int)s_weather != t->arg - 16)) {
         return false;
     }
     return level >= t->from_level && (!t->to_level || level <= t->to_level);
@@ -584,14 +612,14 @@ static bool antic_spot(boopie_world_t *w, int level, boopie_antic_t a, float *x,
         *y = t->y - 3;
         return true;
     case BOOPIE_ANTIC_BUTTERFLY:
-        if (w->room != BOOPIE_ROOM_OUTSIDE && w->room != BOOPIE_ROOM_WOODS) {
+        if ((w->room != BOOPIE_ROOM_OUTSIDE && w->room != BOOPIE_ROOM_WOODS) || s_weather >= BOOPIE_WEATHER_RAIN) {
             return false;
         }
         *x = w->x;
         *y = w->y;
         return true;
     case BOOPIE_ANTIC_SWIM:
-        if (w->room != BOOPIE_ROOM_BEACH) {
+        if (w->room != BOOPIE_ROOM_BEACH || s_weather >= BOOPIE_WEATHER_RAIN) {
             return false;
         }
         *x = w->x < 70 ? 70 : w->x > 410 ? 410 : w->x;   /* clear of the pier */

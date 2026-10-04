@@ -178,6 +178,7 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/world/boopie_world.c"
     "${BOOPIE_COMPONENT_DIR}/world/boopie_world_draw.c"
     "${BOOPIE_COMPONENT_DIR}/world/boopie_world_art.c"
+    "${BOOPIE_COMPONENT_DIR}/world/boopie_season.c"
     "${BOOPIE_COMPONENT_DIR}/store/boopie_history.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin.c"
     "${BOOPIE_COMPONENT_DIR}/ime/boopie_pinyin_dict.c"

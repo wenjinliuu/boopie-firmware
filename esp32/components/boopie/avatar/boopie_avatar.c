@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "boopie_pet.h"
+#include "boopie_season.h"
 #include "boopie_garden.h"
 #include "muse_pixel.h"
 #include "muse_state.h"
@@ -82,6 +83,7 @@ static bool s_loaded;
 static void ensure_loaded(void);
 static void save(void);
 static void apply(void);
+static bool local_date(int *year, int *month, int *mday, int32_t *day);
 static int s_avatar = BOOPIE_AVATAR_BOOPIE;   /* Boopie, until one's chosen */
 static uint32_t s_colour[BOOPIE_AVATAR_COUNT];
 static boopie_scene_t s_scene = BOOPIE_SCENE_DEFAULT;
@@ -116,7 +118,12 @@ static struct {
     uint16_t items[BAG_ITEMS];
     uint32_t furni_owned, furni_away;
     uint8_t seeds[16];   /* rare seeds bought, by boopie_plant_t */
+    int32_t weather_day; /* the day the weather was told (by the AI), and what it is */
+    uint8_t weather;
+    uint8_t pad[3];
+    int32_t mail_key;    /* the festival whose gift's been opened: year * 8 + festival */
 } s_woods;
+static int s_sim_fest = -1;   /* the simulator's BOOPIE_FEST */
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
 static bool s_pet_resumed, s_pet_dirty;
 static float s_pet_ticked = -100, s_pet_saved = -1;
@@ -443,6 +450,16 @@ static void load(void)
         s_woods.items[2] = 4;   /* shells */
         s_woods.items[3] = 1;   /* fish */
         s_woods.seeds[5] = 2;   /* pumpkin seeds */
+    }
+    boopie_weather_t wk;
+    int year, month, mday;
+    int32_t day;
+    if (boopie_weather_from_key(getenv("BOOPIE_WEATHER"), &wk) && local_date(&year, &month, &mday, &day)) {
+        s_woods.weather_day = day;   /* as if the AI had said it */
+        s_woods.weather = (uint8_t)wk;
+    }
+    if (getenv("BOOPIE_FEST")) {
+        s_sim_fest = atoi(getenv("BOOPIE_FEST"));   /* boopie_fest_t */
     }
     const char *name = getenv("BOOPIE_NAME");
     if (name) {
@@ -772,6 +789,107 @@ static bool local_now(int64_t *now, int32_t *day, int *minute)
     *day = 365 * (y - 1969) + (y / 4 - 1969 / 4) - (y / 100 - 1969 / 100) + (y / 400 - 1969 / 400) + tm.tm_yday;
     *minute = tm.tm_hour * 60 + tm.tm_min;
     return true;
+}
+
+static void flash_overlay(boopie_overlay_t o, float secs);
+
+/* The local date, if known: year, month (1 to 12), day of the month, and days since 1970. */
+static bool local_date(int *year, int *month, int *mday, int32_t *day)
+{
+    int64_t now;
+    int minute;
+    if (!local_now(&now, day, &minute)) {
+        return false;
+    }
+    struct tm tm;
+#ifdef ESP_PLATFORM
+    boopie_clock_local(&tm);
+#else
+    time_t t = time(NULL);
+    localtime_r(&t, &tm);
+#endif
+    *year = tm.tm_year + 1900;
+    *month = tm.tm_mon + 1;
+    *mday = tm.tm_mday;
+    return true;
+}
+
+boopie_weather_t boopie_avatar_weather(void)
+{
+    ensure_loaded();
+    int year, month, mday;
+    int32_t day;
+    if (!local_date(&year, &month, &mday, &day)) {
+        return BOOPIE_WEATHER_SUNNY;
+    }
+    if (s_woods.weather_day == day && s_woods.weather < BOOPIE_WEATHER_COUNT) {
+        return (boopie_weather_t)s_woods.weather;   /* as the AI said */
+    }
+    if (boopie_fest_on(year, month, mday) == BOOPIE_FEST_XMAS && mday >= 24 && mday <= 25) {
+        return BOOPIE_WEATHER_SNOW;   /* a white Christmas, always */
+    }
+    return boopie_weather_on(day, month);
+}
+
+bool boopie_avatar_set_weather(boopie_weather_t w)
+{
+    ensure_loaded();
+    int year, month, mday;
+    int32_t day;
+    if ((int)w < 0 || w >= BOOPIE_WEATHER_COUNT || !local_date(&year, &month, &mday, &day)) {
+        return false;
+    }
+    s_woods.weather_day = day;
+    s_woods.weather = (uint8_t)w;
+    save();
+    return true;
+}
+
+boopie_fest_t boopie_avatar_festival(void)
+{
+    if (s_sim_fest >= 0) {
+        return (boopie_fest_t)s_sim_fest;
+    }
+    int year, month, mday;
+    int32_t day;
+    return local_date(&year, &month, &mday, &day) ? boopie_fest_on(year, month, mday) : BOOPIE_FEST_NONE;
+}
+
+/* This festival's gift, this year: its key. */
+static int32_t mail_key(boopie_fest_t f)
+{
+    int year = 0, month = 0, mday = 0;
+    int32_t day = 0;
+    local_date(&year, &month, &mday, &day);
+    /* 元旦 runs over the year's end: count its 31 December with the new year. */
+    if (f == BOOPIE_FEST_NEW_YEAR && month == 12) {
+        year++;
+    }
+    return year * 8 + (int32_t)f;
+}
+
+bool boopie_avatar_mail_waiting(void)
+{
+    ensure_loaded();
+    boopie_fest_t f = boopie_avatar_festival();
+    return f != BOOPIE_FEST_NONE && s_woods.mail_key != mail_key(f);
+}
+
+int boopie_avatar_open_mail(void)
+{
+    ensure_loaded();
+    if (!boopie_avatar_mail_waiting()) {
+        return 0;
+    }
+    boopie_fest_t f = boopie_avatar_festival();
+    s_woods.mail_key = mail_key(f);
+    /* A gift, over and above the day's cap for games. */
+    int stars = f == BOOPIE_FEST_SPRING || f == BOOPIE_FEST_XMAS ? 5 : 3;
+    s_pet_state.stars += (uint32_t)stars;
+    boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
+    flash_overlay(BOOPIE_OVERLAY_CONFETTI, 3.0f);
+    save();
+    return stars;
 }
 
 static void flash_overlay(boopie_overlay_t o, float secs)

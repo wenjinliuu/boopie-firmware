@@ -930,6 +930,85 @@ def bird_bath(L, x, y):
     L.put(x + 5, y - 18, (30, 30, 30))
 
 
+
+# ---------------------------------------------------------------- weather and festivals
+
+def lantern(L, x, y):
+    """Hanging from the eaves: its string up from (x, y - 28)."""
+    L.rect(x, y - 30, x, y - 26, (120, 84, 56))
+    L.ell(x - 5, y - 26, x + 5, y - 16, (224, 56, 48))
+    L.rect(x - 3, y - 27, x + 3, y - 26, (248, 200, 72)); L.rect(x - 3, y - 16, x + 3, y - 15, (248, 200, 72))
+    L.rect(x - 2, y - 24, x - 1, y - 18, (248, 120, 96))
+    L.rect(x, y - 14, x, y - 11, (248, 200, 72))
+
+
+def couplets(L, x, y):
+    """Red strips either side of the house's door, and one over it."""
+    for cx in (x - 9, x + 8):
+        L.rect(cx, y - 18, cx + 1, y - 2, (216, 48, 40))
+        for k in range(y - 16, y - 3, 4):
+            L.put(cx, k, (248, 208, 96))
+    L.rect(x - 6, y - 21, x + 6, y - 20, (216, 48, 40))
+
+
+def wreath(L, x, y):
+    for a in range(16):
+        ang = a * math.pi / 8
+        L.ell(x + 4 * math.cos(ang) - 1, y - 13 + 4 * math.sin(ang) - 1, x + 4 * math.cos(ang) + 1,
+              y - 13 + 4 * math.sin(ang) + 1, (64, 136, 72))
+    L.rect(x - 1, y - 9, x + 1, y - 8, (216, 48, 48))
+    for dx, dy in ((-3, -15), (3, -12), (0, -17)):
+        L.put(x + dx, y + dy, (232, 72, 72))
+
+
+def xmas_tree(L, x, y):
+    L.rect(x - 2, y - 5, x + 2, y, (140, 96, 60))
+    for k, w in enumerate((12, 9, 6)):
+        top = y - 10 - k * 8
+        L.poly([(x, top - 9), (x - w, top + 5), (x + w, top + 5)], (56, 136, 80))
+        L.poly([(x, top - 9), (x - w, top + 5), (x - 2, top + 5)], (80, 160, 96))
+    for i, (dx, dy) in enumerate(((-6, -8), (5, -10), (-3, -16), (4, -18), (0, -24), (-7, -12), (8, -6))):
+        L.put(x + dx, y + dy, [(248, 80, 80), (248, 216, 88), (120, 176, 248)][i % 3])
+    L.poly([(x, y - 39), (x - 3, y - 34), (x + 3, y - 34)], (255, 216, 72))
+    L.rect(x + 5, y - 4, x + 10, y, (224, 72, 72)); L.rect(x + 7, y - 4, x + 8, y, (248, 216, 96))
+
+
+def mooncakes(L, x, y):
+    """On the living room's table: drawn up off the floor, at its top."""
+    L.ell(x - 8, y - 15, x + 8, y - 11, (248, 248, 240))
+    for dx in (-4, 3):
+        L.ell(x + dx - 3, y - 18, x + dx + 3, y - 13, (216, 160, 80))
+        L.ell(x + dx - 2, y - 17, x + dx + 2, y - 15, (236, 184, 104))
+        L.put(x + dx, y - 16, (176, 120, 56))
+
+
+def jack_o_lantern(L, x, y):
+    L.ell(x - 8, y - 11, x + 8, y, (240, 136, 40))
+    for k in (-4, 0, 4):
+        L.rect(x + k, y - 10, x + k, y - 1, (212, 108, 32))
+    L.rect(x - 1, y - 14, x + 1, y - 11, (96, 128, 56))
+    L.poly([(x - 5, y - 8), (x - 2, y - 8), (x - 3, y - 6)], (255, 232, 96))
+    L.poly([(x + 2, y - 8), (x + 5, y - 8), (x + 4, y - 6)], (255, 232, 96))
+    L.rect(x - 4, y - 4, x + 4, y - 3, (255, 232, 96))
+
+
+def snowman(L, x, y):
+    L.ell(x - 9, y - 14, x + 9, y, (248, 252, 255))
+    L.ell(x - 6, y - 25, x + 6, y - 12, (248, 252, 255))
+    L.put(x - 2, y - 21, (40, 40, 48)); L.put(x + 2, y - 21, (40, 40, 48))
+    L.rect(x, y - 19, x + 3, y - 18, (248, 144, 56))
+    L.rect(x - 6, y - 13, x + 6, y - 12, (216, 72, 72)); L.rect(x + 3, y - 12, x + 4, y - 8, (216, 72, 72))
+    L.rect(x - 5, y - 28, x + 5, y - 25, (56, 56, 72)); L.rect(x - 3, y - 32, x + 3, y - 28, (56, 56, 72))
+    for k in (-8, -5, -2):
+        L.put(x, y + k, (56, 56, 72))
+
+
+def puddle(L, x, y):
+    """A floor mark."""
+    L.ell(x - 10, y - 5, x + 10, y, (136, 168, 200))
+    L.ell(x - 6, y - 4, x, y - 2, (184, 212, 236))
+
+
 # ---------------------------------------------------------------- the woods
 
 MOSS = (132, 184, 108)
@@ -1326,6 +1405,9 @@ SPRITES = [
     ("sandcastle", sandcastle, False), ("lighthouse", lighthouse, False), ("boat", boat, False),
     ("hammock", hammock, False), ("tide_pool", tide_pool, True), ("shell", shell, False), ("starfish", starfish, False),
     ("crab_a", crab_a, False), ("crab_b", crab_b, False), ("bird_bath", bird_bath, False),
+    ("lantern", lantern, False), ("couplets", couplets, False), ("wreath", wreath, False),
+    ("xmas_tree", xmas_tree, False), ("mooncakes", mooncakes, False), ("jack_o_lantern", jack_o_lantern, False),
+    ("snowman", snowman, False), ("puddle", puddle, True),
 ]
 HINTS = ["zzz", "shirt", "game", "pen", "note", "book", "food", "up", "down", "door", "info", "bang", "water", "plus",
          "mail", "tree", "house", "key", "heart", "berry", "mushroom", "wave", "fish", "shell"]

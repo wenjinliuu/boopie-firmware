@@ -270,6 +270,20 @@ FURNITURE = [("nest-furniture", ["swipe=up", "advance=600", "room=bedroom", "adv
              ("nest-bag", ["swipe=up", "advance=600", "tap=233,418", "advance=600"])]
 
 
+# Weather and festivals (BOOPIE_WEATHER, BOOPIE_FEST as boopie_fest_t): rain
+# with its umbrella, snow and its snowman, the Spring Festival's lanterns.
+SEASONS = [("nest-rain", {"BOOPIE_WEATHER": "rain"}), ("nest-snow", {"BOOPIE_WEATHER": "snow"}),
+           ("nest-spring", {"BOOPIE_FEST": "1"}), ("nest-xmas", {"BOOPIE_FEST": "4", "BOOPIE_WEATHER": "snow"})]
+
+
+def render_seasons(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"{name}.png",
+                      ["face=idle", "advance=300", "swipe=up", "advance=600", "room=outside", "advance=2500"],
+                      {"BOOPIE_PET_XP": "900", **env}, 400)
+                for name, env in SEASONS]
+
+
 def render_furniture(binary: Path, out: Path) -> list[Path]:
     with tempfile.TemporaryDirectory() as tmp:
         return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
@@ -340,6 +354,7 @@ def main() -> int:
     pages += render_look(args.binary, args.out)
     pages += render_farm(args.binary, args.out)
     pages += render_furniture(args.binary, args.out)
+    pages += render_seasons(args.binary, args.out)
     settings = render_settings(args.binary, args.out)
     contact_sheet(settings, args.out / "settings.png", cols=len(SETTINGS))
     wears = render_accessories(args.binary, args.out)

@@ -34,5 +34,10 @@ bool boopie_world_ui_go(const char *room);
  * if the room has it. For the simulator; LVGL task. */
 bool boopie_world_ui_antic(const char *name);
 
+/* The AI's world.weather: today's weather in the pet's world ("sunny",
+ * "cloudy", "rain", "snow"), what was done into said. False for a bad key or
+ * no clock. Any task. */
+bool boopie_world_ui_set_weather(const char *key, char *said, size_t cap);
+
 /* The AI's garden.status: each farm plot, in English, into out. Any task. */
 void boopie_world_ui_farm_status(char *out, size_t cap);

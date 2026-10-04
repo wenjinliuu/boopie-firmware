@@ -75,6 +75,8 @@ static void shadow(float cx, float cy, float rx, float ry)
     }
 }
 
+static void umbrella(int px, int top);
+
 static void pet(const boopie_world_t *w, const boopie_world_look_t *look)
 {
     if (!look->pet) {
@@ -131,6 +133,9 @@ static void pet(const boopie_world_t *w, const boopie_world_look_t *look)
                 put(x0 + i, y0 + j, rgb);
             }
         }
+    }
+    if (look->weather == BOOPIE_WEATHER_RAIN && boopie_world_outdoors(w->room) && !wet && !asleep) {
+        umbrella(px, y0 - 2);
     }
     if (wet) {
         /* Rings round it on the water. */
@@ -196,6 +201,94 @@ static void slime(const boopie_world_t *w, int i, const boopie_world_look_t *loo
         int bx = (int)s->x - s_cam - bw / 2;
         for (int k = 0; k < bw; k++) {
             put(bx + k, top - 3, k < filled ? (w->fight_left < 4 ? 0xf8a040 : 0xf8e070) : 0x404050);
+        }
+    }
+}
+
+/* ---- weather and festivals ---- */
+
+/* Rain or snow falling through a box of the screen (all of it outdoors, a window's glass in). */
+static void falling(boopie_weather_t wx, float t, int x0, int y0, int x1, int y1, int count)
+{
+    for (int k = 0; k < count; k++) {
+        float sx = fmodf(k * 37.3f + (wx == BOOPIE_WEATHER_SNOW ? sinf(t + k) * 4 : 0), (float)(x1 - x0));
+        float speed = wx == BOOPIE_WEATHER_SNOW ? 10 + (k % 5) * 2 : 90 + (k % 4) * 15;
+        float sy = fmodf(k * 53.1f + t * speed, (float)(y1 - y0));
+        int x = x0 + (int)sx, y = y0 + (int)sy;
+        if (wx == BOOPIE_WEATHER_SNOW) {
+            put(x, y, 0xffffff);
+            if (k % 3 == 0) {
+                put(x + 1, y, 0xe8f0ff);
+                put(x, y + 1, 0xe8f0ff);
+            }
+        } else {
+            for (int j = 0; j < 3 && y + j < y1; j++) {
+                put(x - j / 2, y + j, j ? 0xb8d0f0 : 0xe0ecff);   /* a slanting streak */
+            }
+        }
+    }
+}
+
+static void weather(const boopie_world_t *w, const boopie_thing_t *t, int n, const boopie_world_look_t *look)
+{
+    if (look->weather != BOOPIE_WEATHER_RAIN && look->weather != BOOPIE_WEATHER_SNOW) {
+        return;
+    }
+    if (boopie_world_outdoors(w->room)) {
+        falling(look->weather, look->t, 0, 0, N, N, look->weather == BOOPIE_WEATHER_SNOW ? 70 : 90);
+        return;
+    }
+    for (int i = 0; i < n; i++) {   /* through the windows */
+        if (t[i].art == BOOPIE_ART_WINDOW_DAY && boopie_thing_shown(&t[i], look->level)) {
+            const boopie_art_t *a = &boopie_art[BOOPIE_ART_WINDOW_DAY];
+            int x0 = t[i].x - a->ax + 2, y0 = t[i].y - a->ay + 2;
+            falling(look->weather, look->t, x0 - s_cam, y0, x0 + a->w - 4 - s_cam, y0 + a->h - 4, 8);
+        }
+    }
+}
+
+/* Its umbrella, out in the rain: a red dome over its head. */
+static void umbrella(int px, int top)
+{
+    for (int i = -6; i <= 6; i++) {
+        int h = 3 - (i * i) / 12;
+        for (int j = 0; j <= h; j++) {
+            put(px + i, top - j, (i + 6) / 3 % 2 ? 0xf06060 : 0xfff4f0);
+        }
+    }
+    for (int j = 1; j <= 4; j++) {
+        put(px + 3, top + j, 0x604838);
+    }
+}
+
+/* Fireworks over the night: bursts of sparks, one after another, never dimmed. */
+static void fireworks(float t)
+{
+    static const uint32_t COLOURS[] = { 0xff7070, 0xffe070, 0x80d0ff, 0xb0ff90, 0xff90e0 };
+    for (int k = 0; k < 3; k++) {
+        float phase = fmodf(t * 0.45f + k * 0.37f, 1.0f);
+        int burst = (int)(t * 0.45f + k * 0.37f);
+        int cx = 24 + (burst * 47 + k * 31) % 108, cy = 20 + (burst * 13 + k * 7) % 22;
+        uint32_t c = COLOURS[(burst + k) % 5];
+        if (phase < 0.25f) {
+            put(cx, cy + (int)((0.25f - phase) * 120), 0xfff0c0);   /* going up */
+            continue;
+        }
+        float r = (phase - 0.25f) * 34;
+        for (int a = 0; a < 16; a++) {
+            float ang = a * 6.2832f / 16;
+            for (int ring = 0; ring < 2; ring++) {   /* two rings, the inner one paler */
+                float rr = ring ? r * 0.55f : r;
+                int x = cx + (int)(cosf(ang) * rr), y = cy + (int)(sinf(ang) * rr + (phase - 0.25f) * 8);
+                uint32_t col = ring ? 0xfff4e0 : c;
+                if (phase < 0.85f || (a & 1)) {
+                    put(x, y, col);
+                    if (!ring) {
+                        put(x + 1, y, col);
+                        put(x, y + 1, col);
+                    }
+                }
+            }
         }
     }
 }
@@ -458,9 +551,9 @@ typedef struct {
 /* Night: everything dimmed and blue, and near a lamp the true colours back, warmed. */
 static void night(const boopie_thing_t *t, int n, int level)
 {
-    light_t lights[8];
+    light_t lights[12];
     int nl = 0;
-    for (int i = 0; i < n && nl < 8; i++) {
+    for (int i = 0; i < n && nl < 12; i++) {
         if (!boopie_thing_shown(&t[i], level)) {
             continue;
         }
@@ -474,6 +567,9 @@ static void night(const boopie_thing_t *t, int n, int level)
         case BOOPIE_ART_HOUSE_FRONT: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 40, 0xffd090 }; break;
         case BOOPIE_ART_MUSHROOM_RING: lights[nl++] = (light_t){ t[i].x, t[i].y - 4, 30, 0xc8b0ff }; break;
         case BOOPIE_ART_FAIRY_LIGHTS: lights[nl++] = (light_t){ t[i].x, t[i].y - 2, 44, 0xffe0b0 }; break;
+        case BOOPIE_ART_LANTERN: lights[nl++] = (light_t){ t[i].x, t[i].y - 21, 22, 0xff9070 }; break;
+        case BOOPIE_ART_JACK_O_LANTERN: lights[nl++] = (light_t){ t[i].x, t[i].y - 6, 26, 0xffb050 }; break;
+        case BOOPIE_ART_XMAS_TREE: lights[nl++] = (light_t){ t[i].x, t[i].y - 20, 30, 0xfff0b0 }; break;
         case BOOPIE_ART_LIGHTHOUSE: lights[nl++] = (light_t){ t[i].x, t[i].y - 50, 60, 0xfff0b0 }; break;
         case BOOPIE_ART_TREE_HOUSE: lights[nl++] = (light_t){ t[i].x + 6, t[i].y - 45, 22, 0xffe0a0 }; break;
         default: break;
@@ -521,14 +617,33 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
     s_cam = (int)(w->cam + 0.5f);
     const boopie_art_t *bg = &boopie_art[boopie_room_background(w->room, look->level)];
     int cam = s_cam + N > bg->w ? bg->w - N : s_cam;
+    /* Outdoors, the weather on the ground: white with snow, grey and wet in rain, dull when cloudy. */
+    bool out = boopie_world_outdoors(w->room);
+    int wx = out ? look->weather : BOOPIE_WEATHER_SUNNY;
     for (int y = 0; y < N; y++) {
         const uint8_t *src = bg->px + y * bg->w + cam;
         uint8_t *dst = rgb + y * N * 3;
         for (int x = 0; x < N; x++) {
             uint32_t c = boopie_art_palette[src[x]];
-            dst[x * 3] = (uint8_t)(c >> 16);
-            dst[x * 3 + 1] = (uint8_t)(c >> 8);
-            dst[x * 3 + 2] = (uint8_t)c;
+            int r = (int)(c >> 16), g = (int)(c >> 8 & 255), b = (int)(c & 255);
+            if (wx == BOOPIE_WEATHER_SNOW) {
+                int k = ((x + y) & 1) ? 55 : 45;   /* dithered, patchy */
+                r += (240 - r) * k / 100;
+                g += (246 - g) * k / 100;
+                b += (252 - b) * k / 100;
+            } else if (wx == BOOPIE_WEATHER_RAIN) {
+                r = r * 78 / 100;
+                g = g * 82 / 100;
+                b = b * 88 / 100 + 10;
+            } else if (wx == BOOPIE_WEATHER_CLOUDY) {
+                int grey = (r + g + b) / 3;
+                r = (r * 3 + grey) / 4 * 92 / 100;
+                g = (g * 3 + grey) / 4 * 92 / 100;
+                b = (b * 3 + grey) / 4 * 95 / 100;
+            }
+            dst[x * 3] = (uint8_t)r;
+            dst[x * 3 + 1] = (uint8_t)g;
+            dst[x * 3 + 2] = (uint8_t)(b > 255 ? 255 : b);
         }
     }
     if (w->room == BOOPIE_ROOM_BEACH) {
@@ -596,10 +711,14 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
     }
     fishing(w, look);
     tv_on(w, t, n, look);
+    weather(w, t, n, look);
     if (look->night) {
         night(t, n, look->level);
-        if (w->room == BOOPIE_ROOM_WOODS) {
+        if (w->room == BOOPIE_ROOM_WOODS && look->weather < BOOPIE_WEATHER_RAIN) {
             fireflies(look->t);
+        }
+        if (boopie_world_outdoors(w->room) && (look->fest == BOOPIE_FEST_NEW_YEAR || look->fest == BOOPIE_FEST_SPRING)) {
+            fireworks(look->t);
         }
     }
     antic_over(w, look);
@@ -610,7 +729,8 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             int bob = (int)(sinf(look->t * 3 + i) * 1.2f);
             int top = t[i].y - a->ay;
             int hint = t[i].hint;
-            if ((t[i].act == BOOPIE_DO_CHEST && (look->chests_open >> t[i].arg & 1))
+            if ((t[i].act == BOOPIE_DO_MAIL && !look->mail_waiting)
+                || (t[i].act == BOOPIE_DO_CHEST && (look->chests_open >> t[i].arg & 1))
                 || (t[i].act == BOOPIE_DO_GATHER && (look->gathered >> t[i].arg & 1))) {
                 continue;   /* opened or picked today: nothing more till tomorrow */
             }

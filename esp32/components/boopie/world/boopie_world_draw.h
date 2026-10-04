@@ -29,6 +29,9 @@ typedef struct {
     int64_t now;              /* epoch seconds, for the garden */
     unsigned chests_open;     /* the woods' chests opened today, bit by bit */
     unsigned gathered;        /* the woods' spots picked today, bit by bit */
+    boopie_weather_t weather;
+    boopie_fest_t fest;
+    bool mail_waiting;        /* a festival's gift in the mailbox */
 } boopie_world_look_t;
 
 /* The room into rgb (BOOPIE_WORLD_W squared, 3 bytes a pixel). */

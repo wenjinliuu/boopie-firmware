@@ -77,7 +77,7 @@
 #include "boopie_games.h"    /* Boopie: game.start */
 #include "boopie_viewers.h"  /* Boopie: storage.clear */
 #include "boopie_noise_ui.h" /* Boopie: noise.play, noise.stop */
-#include "boopie_world_ui.h" /* Boopie: garden.status */
+#include "boopie_world_ui.h" /* Boopie: garden.status, world.weather */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -1953,6 +1953,17 @@ static cJSON *on_ws_command(
         bool ok = minutes <= 600 && boopie_noise_ui_play(kind, minutes, said, sizeof said);
         free(kind);
         if (!ok) return command_error("bad_param", "kind: white, pink, rain or waves; minutes: 0 to 600");
+        cJSON *result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "ok", true);
+        cJSON_AddStringToObject(result, "status", said);
+        return result;
+    }
+    if (strcmp(command, "world.weather") == 0) {
+        char *kind = json_strdup_string(params, "kind");
+        char said[64];
+        bool ok = boopie_world_ui_set_weather(kind, said, sizeof said);
+        free(kind);
+        if (!ok) return command_error("bad_param", "kind: sunny, cloudy, rain or snow (and the clock set)");
         cJSON *result = cJSON_CreateObject();
         cJSON_AddBoolToObject(result, "ok", true);
         cJSON_AddStringToObject(result, "status", said);

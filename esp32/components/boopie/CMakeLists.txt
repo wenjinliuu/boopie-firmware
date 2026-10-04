@@ -19,6 +19,7 @@ set(srcs
     "world/boopie_world.c"
     "world/boopie_world_draw.c"
     "world/boopie_world_art.c"
+    "world/boopie_season.c"
     "ime/boopie_pinyin.c"
     "ime/boopie_pinyin_dict.c"
     "store/boopie_assets.c"

@@ -26,7 +26,7 @@ COMPONENT = HERE.parent
 
 (NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS,
  PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED, GATHER, FURNI,
- BEACH_SIGN, FISH, FISH_BITE, FISH_CAUGHT, FISH_EARLY, FISH_MISSED, ANTIC) = range(30)
+ BEACH_SIGN, FISH, FISH_BITE, FISH_CAUGHT, FISH_EARLY, FISH_MISSED, ANTIC, DECOR) = range(31)
 IDLE, WALKING, USING, SLEEPING, AT_IT = range(5)
 NONE, TV, DANCE, MIRROR, LOVE, SWING, BUTTERFLY, SWIM = range(8)
 LIVING, BEDROOM, YARD, WOODS, BEACH = range(5)
@@ -43,7 +43,8 @@ class BoopieWorldTest(unittest.TestCase):
         cc = shlex.split(os.environ.get("CC", "cc"))
         subprocess.run(cc + ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-I", str(COMPONENT / "world"),
                              str(HERE / "boopie_world_harness.c"), str(COMPONENT / "world" / "boopie_world.c"),
-                             str(COMPONENT / "world" / "boopie_world_art.c"), "-lm", "-o", str(cls.exe)], check=True)
+                             str(COMPONENT / "world" / "boopie_world_art.c"),
+                             str(COMPONENT / "world" / "boopie_season.c"), "-lm", "-o", str(cls.exe)], check=True)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -286,6 +287,21 @@ class BoopieWorldTest(unittest.TestCase):
     def test_left_alone_it_gets_up_to_things(self) -> None:
         s = self.run_w("furni:63", "lv:10", "tick:240")
         self.assertIn(ANTIC, s[2]["acts"])
+
+    def test_festivals_and_the_weather_put_things_out(self) -> None:
+        def decor(fest: int, weather: int) -> int:
+            s = self.run_w(f"season:{fest}:{weather}", "lv:1", "things")
+            return sum(1 for t in s[2] if t["act"] == DECOR and t["shown"])
+        self.assertEqual(decor(0, 0), 0)
+        self.assertEqual(decor(1, 0), 3)                       # 春节: two lanterns and the couplets
+        self.assertEqual(decor(2, 0), 3)                       # 中秋: lanterns, mooncakes
+        self.assertEqual(decor(4, 3), 3)                       # 圣诞 in the snow: wreath, tree, snowman
+        self.assertEqual(decor(0, 2), 2)                       # rain: puddles
+
+    def test_no_butterflies_or_swims_in_the_rain(self) -> None:
+        self.assertEqual(self.run_w("season:0:2", "room:2", "antic:6")[2]["ok"], 0)
+        self.assertEqual(self.run_w("season:0:3", "room:4", "antic:7")[2]["ok"], 0)
+        self.assertEqual(self.run_w("season:0:1", "room:4", "antic:7")[2]["ok"], 1)   # cloudy's fine
 
     def test_floor_and_wall(self) -> None:
         s = self.run_w("tap:90:90", "tick:1.5", "tap:78:10")

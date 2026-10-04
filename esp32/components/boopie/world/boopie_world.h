@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "boopie_season.h"
 #include "boopie_world_art.h"
 
 /*
@@ -60,6 +61,7 @@ typedef enum {
     BOOPIE_DO_FISH_EARLY,     /* tapped before a bite: it swam off */
     BOOPIE_DO_FISH_MISSED,    /* not tapped in time */
     BOOPIE_DO_ANTIC,          /* it's begun a little something of its own (boopie_world_t.antic) */
+    BOOPIE_DO_DECOR,          /* a festival's or the weather's: arg the festival, or 16 + the weather */
     BOOPIE_DO_COUNT,
 } boopie_do_t;
 
@@ -94,6 +96,9 @@ const char *boopie_furni_name(boopie_furni_t f);
 int boopie_furni_price(boopie_furni_t f);
 const char *boopie_furni_where(boopie_furni_t f);   /* "客厅" ... */
 void boopie_world_set_furniture(uint32_t out);      /* bit f: furniture f is out */
+/* Today's festival and weather, for what's put out for them. */
+void boopie_world_set_season(boopie_fest_t fest, boopie_weather_t weather);
+bool boopie_world_outdoors(boopie_room_t room);
 
 /* What can be picked in the woods: each spot gives one of these, once a day. */
 typedef enum { BOOPIE_ITEM_BERRY = 0, BOOPIE_ITEM_MUSHROOM, BOOPIE_ITEM_SHELL, BOOPIE_ITEM_FISH, BOOPIE_ITEM_COUNT } boopie_item_t;

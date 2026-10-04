@@ -11,6 +11,7 @@
 #include "boopie_expr.h"
 #include "boopie_pet.h"
 #include "boopie_pixel.h"
+#include "boopie_season.h"
 
 /*
  * Which character is on screen. boopie_avatar.c stands in for Muse's
@@ -157,6 +158,16 @@ bool boopie_avatar_snack(int item, bool *fed);
 /* Something won out there (a catch): `count` of an item into the bag (item
  * -1 for none), and experience and stars toward the daily caps. */
 void boopie_avatar_world_reward(int item, int count, int xp, int stars, int *got_stars);
+
+/* The day's weather (as the AI told it today, else by the season) and
+ * festival, while the clock's set (else sunny, none); the AI telling it
+ * (false without a clock). A festival's gift in the mailbox, once a year:
+ * waiting, and opened (the stars it gave, 0 if none waiting). LVGL task. */
+boopie_weather_t boopie_avatar_weather(void);
+bool boopie_avatar_set_weather(boopie_weather_t w);
+boopie_fest_t boopie_avatar_festival(void);
+bool boopie_avatar_mail_waiting(void);
+int boopie_avatar_open_mail(void);
 
 /* Furniture (boopie_furni_t): what's out (bought and not put away, bit f),
  * whether one's bought, buying one for `price` stars (then it's out; false

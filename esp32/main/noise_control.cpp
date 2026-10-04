@@ -1390,10 +1390,17 @@ static char *build_register_json(void) {
                 "out when its time is up.",
                 nullptr, noise_optional);
     add_command(commands, "garden.status",
-                "How the pet's little garden (小花园) is doing: what's planted in each of its three "
-                "pots, how far grown, and whether it's thirsty or ready to pick. Planting, watering "
-                "and picking are done by the user on the screen (apps, 小花园).",
+                "How the pet's farm (农场, outside its home 小窝) is doing: what's planted in each "
+                "plot, how far grown, and whether it's thirsty or ready to pick. Planting, watering "
+                "and picking are done by the user on the screen.",
                 nullptr, nullptr);
+    cJSON *weather_required = cJSON_CreateObject();
+    cJSON_AddItemToObject(weather_required, "kind", string_param(
+        "sunny, cloudy, rain or snow: today's weather where the user is."));
+    add_command(commands, "world.weather",
+                "Whenever you tell the user today's weather, also set it here, so it rains or "
+                "snows in the pet's little world on the screen too. It lasts the day.",
+                weather_required, nullptr);
     add_command(commands, "noise.stop",
                 "Stop the white noise, rain or waves playing.",
                 nullptr, nullptr);
