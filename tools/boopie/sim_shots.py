@@ -260,6 +260,20 @@ def render_look(binary: Path, out: Path) -> list[Path]:
                 for name, steps in LOOK]
 
 
+# Furniture from the shop, all of it out (BOOPIE_FURNI), the shop's furniture
+# page, and the bag with what the woods gave (BOOPIE_BAG).
+FURNITURE = [("nest-furniture", ["swipe=up", "advance=600", "room=bedroom", "advance=300"]),
+             ("nest-shop-furniture", ["swipe=up", "advance=600", "tap=307,418", "advance=600", "tap=233,165"]),
+             ("nest-bag", ["swipe=up", "advance=600", "tap=233,418", "advance=600"])]
+
+
+def render_furniture(binary: Path, out: Path) -> list[Path]:
+    with tempfile.TemporaryDirectory() as tmp:
+        return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
+                      {"BOOPIE_FURNI": "5", "BOOPIE_BAG": "1", "BOOPIE_PET_XP": "900"}, 400)
+                for name, steps in FURNITURE]
+
+
 def render_farm(binary: Path, out: Path) -> list[Path]:
     with tempfile.TemporaryDirectory() as tmp:
         return [shoot(binary, Path(tmp), out / f"{name}.png", ["face=idle", "advance=300", *steps],
@@ -322,6 +336,7 @@ def main() -> int:
     pages += render_phone(args.binary, args.out)
     pages += render_look(args.binary, args.out)
     pages += render_farm(args.binary, args.out)
+    pages += render_furniture(args.binary, args.out)
     settings = render_settings(args.binary, args.out)
     contact_sheet(settings, args.out / "settings.png", cols=len(SETTINGS))
     wears = render_accessories(args.binary, args.out)

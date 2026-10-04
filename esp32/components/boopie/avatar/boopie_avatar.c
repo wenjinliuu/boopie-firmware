@@ -103,12 +103,18 @@ static uint8_t s_guided = 1;              /* the simulator: BOOPIE_GUIDE shows i
 /* The pet, ticked from the frames, and what it shows while idle. */
 static boopie_pet_t s_pet_state;
 static boopie_garden_t s_garden;   /* 小花园 */
-/* 森林: the day each chest was last opened, and the slimes beaten. Kept in NVS
- * as it is: only ever append. */
+/* 小窝's world: the day each chest was last opened, the slimes beaten, the day
+ * each spot was picked, what's in the bag, the furniture bought and the
+ * furniture put away. Kept in NVS as it is: only ever append. */
 #define WOODS_CHESTS 4
+#define WOODS_SPOTS 8
+#define BAG_ITEMS 4
 static struct {
     int32_t chest_day[WOODS_CHESTS];
     uint32_t slimes;
+    int32_t spot_day[WOODS_SPOTS];
+    uint16_t items[BAG_ITEMS];
+    uint32_t furni_owned, furni_away;
 } s_woods;
 static boopie_expr_t s_pet_mood = BOOPIE_EXPR_IDLE;
 static bool s_pet_resumed, s_pet_dirty;
@@ -324,7 +330,7 @@ static void load(void)
         boopie_garden_load(&s_garden, &garden, gn);
     }
     size_t wn = sizeof s_woods;
-    nvs_get_blob(h, "woods", &s_woods, &wn);   /* shorter, from an older build: the rest stays 0 */
+    nvs_get_blob(h, "world", &s_woods, &wn);   /* shorter, from an older build: the rest stays 0 */
     n = sizeof key;
     if (nvs_get_str(h, "scene", key, &n) == ESP_OK) {
         int sc = scene_from_key(key);
@@ -365,7 +371,7 @@ static void save(void)
     nvs_set_u8(h, "posture", s_posture);
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
     nvs_set_blob(h, "garden", &s_garden, sizeof s_garden);
-    nvs_set_blob(h, "woods", &s_woods, sizeof s_woods);
+    nvs_set_blob(h, "world", &s_woods, sizeof s_woods);
     nvs_commit(h);
     nvs_close(h);
 }
@@ -426,6 +432,13 @@ static void load(void)
             s_garden.pots[2].damp_until = now;
         }
         boopie_garden_update(&s_garden, now);
+    }
+    if (getenv("BOOPIE_FURNI")) {
+        s_woods.furni_owned = (uint32_t)strtoul(getenv("BOOPIE_FURNI"), NULL, 0);   /* bought, and out */
+    }
+    if (getenv("BOOPIE_BAG")) {
+        s_woods.items[0] = 3;   /* berries */
+        s_woods.items[1] = 2;   /* mushrooms */
     }
     const char *name = getenv("BOOPIE_NAME");
     if (name) {
@@ -921,6 +934,122 @@ void boopie_avatar_slime_beaten(int stars, int xp, int *got_stars)
     show_event(&ev);
     if (got_stars) {
         *got_stars = ev.stars;
+    }
+    save();
+}
+
+unsigned boopie_avatar_gathered(void)
+{
+    ensure_loaded();
+    int64_t now;
+    int32_t day;
+    int minute;
+    unsigned got = 0;
+    for (int i = 0; local_now(&now, &day, &minute) && i < WOODS_SPOTS; i++) {
+        if (s_woods.spot_day[i] == day) {
+            got |= 1u << i;
+        }
+    }
+    return got;
+}
+
+bool boopie_avatar_gather(int spot, int item)
+{
+    ensure_loaded();
+    int64_t now;
+    int32_t day;
+    int minute;
+    if (spot < 0 || spot >= WOODS_SPOTS || item < 0 || item >= BAG_ITEMS || !local_now(&now, &day, &minute)
+        || s_woods.spot_day[spot] == day) {
+        return false;
+    }
+    s_woods.spot_day[spot] = day;
+    if (s_woods.items[item] < 999) {
+        s_woods.items[item]++;
+    }
+    save();
+    return true;
+}
+
+int boopie_avatar_items(int item)
+{
+    ensure_loaded();
+    return item >= 0 && item < BAG_ITEMS ? s_woods.items[item] : 0;
+}
+
+bool boopie_avatar_snack(int item, bool *fed)
+{
+    ensure_loaded();
+    *fed = false;
+    if (item < 0 || item >= BAG_ITEMS || !s_woods.items[item]) {
+        return false;
+    }
+    s_woods.items[item]--;
+    boopie_pet_event_t ev = { 0 };
+    if (s_pet_state.hungry) {
+        /* As good as the bowl. */
+        int64_t now;
+        int32_t day;
+        int minute;
+        if (!local_now(&now, &day, &minute)) {
+            now = (int64_t)time(NULL);
+        }
+        *fed = boopie_pet_tap(&s_pet_state, now, &ev);
+        if (*fed) {
+            s_pet_mood = BOOPIE_EXPR_IDLE;
+        }
+    } else {
+        boopie_sound_play(BOOPIE_SOUND_EAT);
+        boopie_avatar_react(BOOPIE_EXPR_EATING, 2.5f);
+        boopie_pet_earn(&s_pet_state, BOOPIE_XP_POKE, -1, &ev);
+    }
+    show_event(&ev);
+    save();
+    return true;
+}
+
+uint32_t boopie_avatar_furniture(void)
+{
+    ensure_loaded();
+    return s_woods.furni_owned & ~s_woods.furni_away;
+}
+
+bool boopie_avatar_furni_owned(int f)
+{
+    ensure_loaded();
+    return f >= 0 && f < 32 && (s_woods.furni_owned >> f & 1);
+}
+
+bool boopie_avatar_buy_furni(int f, int price, const char **error)
+{
+    ensure_loaded();
+    if (f < 0 || f >= 32) {
+        *error = "没有这件家具";
+        return false;
+    }
+    if (!(s_woods.furni_owned >> f & 1)) {
+        if (s_pet_state.stars < (uint32_t)price) {
+            *error = "星星不够";
+            return false;
+        }
+        s_pet_state.stars -= (uint32_t)price;
+        s_woods.furni_owned |= 1u << f;
+    }
+    s_woods.furni_away &= ~(1u << f);
+    save();
+    return true;
+}
+
+void boopie_avatar_put_out(int f, bool out)
+{
+    ensure_loaded();
+    if (f < 0 || f >= 32) {
+        return;
+    }
+    if (out) {
+        s_woods.furni_away &= ~(1u << f);
+    } else {
+        s_woods.furni_away |= 1u << f;
     }
     save();
 }

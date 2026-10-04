@@ -27,7 +27,10 @@ int main(int argc, char **argv)
         char op[16] = "";
         float a = 0, b = 0;
         sscanf(argv[i], "%15[^:]:%f:%f", op, &a, &b);
-        if (!strcmp(op, "lv")) {
+        if (!strcmp(op, "furni")) {   /* the furniture out, a mask */
+            boopie_world_set_furniture((uint32_t)a);
+            printf("{}\n");
+        } else if (!strcmp(op, "lv")) {
             level = (int)a;
             printf("{}\n");
         } else if (!strcmp(op, "tap")) {

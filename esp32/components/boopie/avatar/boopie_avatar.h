@@ -145,6 +145,23 @@ unsigned boopie_avatar_chests_open(void);
 bool boopie_avatar_open_chest(int chest, int *stars, int *xp);
 void boopie_avatar_slime_beaten(int stars, int xp, int *got_stars);
 uint32_t boopie_avatar_slimes_beaten(void);
+
+/* What the woods give (boopie_item_t): the spots picked today (bit i for spot
+ * i), and picking one into the bag (false if picked today, or no clock);
+ * how many of an item are in the bag, and giving one to the pet: fed if it's
+ * hungry (*fed), else just a snack. */
+unsigned boopie_avatar_gathered(void);
+bool boopie_avatar_gather(int spot, int item);
+int boopie_avatar_items(int item);
+bool boopie_avatar_snack(int item, bool *fed);
+
+/* Furniture (boopie_furni_t): what's out (bought and not put away, bit f),
+ * whether one's bought, buying one for `price` stars (then it's out; false
+ * with *error, in Chinese, when it can't), and putting one away or out. */
+uint32_t boopie_avatar_furniture(void);
+bool boopie_avatar_furni_owned(int f);
+bool boopie_avatar_buy_furni(int f, int price, const char **error);
+void boopie_avatar_put_out(int f, bool out);
 void boopie_avatar_greet(void);
 void boopie_avatar_upside_down(bool on);
 /* Being stroked or hugged now: "好舒服" / "抱抱" for the face's word, or NULL. */

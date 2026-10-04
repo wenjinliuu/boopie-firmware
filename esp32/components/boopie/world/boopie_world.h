@@ -50,6 +50,8 @@ typedef enum {
     BOOPIE_DO_SLIME_FIGHT,    /* the pet's reached a slime: the fight's on */
     BOOPIE_DO_SLIME_WIN,      /* ... and won (boopie_world_t.last_slime: which kind) */
     BOOPIE_DO_SLIME_FLED,     /* ... or the time ran out and it got away */
+    BOOPIE_DO_GATHER,         /* berries or a mushroom to pick (arg: the spot), once a day */
+    BOOPIE_DO_FURNI,          /* furniture from the shop (arg: which); shown once bought and put out */
     BOOPIE_DO_COUNT,
 } boopie_do_t;
 
@@ -64,8 +66,32 @@ typedef struct {
     uint8_t act;              /* boopie_do_t */
     uint8_t hint;             /* its hint bubble's art, or 0 for none */
     int8_t use_dx, use_dy;    /* where the pet stands to use it, from (x, y) */
-    uint8_t arg;              /* BOOPIE_DO_PLOT: the plot; BOOPIE_DO_CHEST: the chest */
+    uint8_t arg;              /* the plot, the chest, the spot, the furniture */
 } boopie_thing_t;
+
+/*
+ * Furniture from the shop (docs/boopie-world.md), each with its own place in
+ * a room. Which are out (bought and not put away) is the screen's to say.
+ */
+typedef enum {
+    BOOPIE_FURNI_CLOCK = 0,   /* 挂钟: tells the time */
+    BOOPIE_FURNI_RECORD,      /* 唱片机 */
+    BOOPIE_FURNI_LIGHTS,      /* 星星串灯, lit at night */
+    BOOPIE_FURNI_TEDDY,       /* 小熊玩偶 */
+    BOOPIE_FURNI_SWING,       /* 秋千 */
+    BOOPIE_FURNI_WINDMILL,    /* 风车, turning */
+    BOOPIE_FURNI_COUNT,
+} boopie_furni_t;
+const char *boopie_furni_name(boopie_furni_t f);
+int boopie_furni_price(boopie_furni_t f);
+const char *boopie_furni_where(boopie_furni_t f);   /* "客厅" ... */
+void boopie_world_set_furniture(uint32_t out);      /* bit f: furniture f is out */
+
+/* What can be picked in the woods: each spot gives one of these, once a day. */
+typedef enum { BOOPIE_ITEM_BERRY = 0, BOOPIE_ITEM_MUSHROOM, BOOPIE_ITEM_COUNT } boopie_item_t;
+const char *boopie_item_name(boopie_item_t item);
+boopie_item_t boopie_gather_item(int spot);
+#define BOOPIE_GATHER_SPOTS 5
 
 /* A room's things, and its background at a level. */
 const boopie_thing_t *boopie_room_things(boopie_room_t room, int *count);

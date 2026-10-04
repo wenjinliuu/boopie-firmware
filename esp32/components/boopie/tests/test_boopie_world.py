@@ -25,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 COMPONENT = HERE.parent
 
 (NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS,
- PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED) = range(21)
+ PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED, GATHER, FURNI) = range(23)
 IDLE, WALKING, USING, SLEEPING = range(4)
 LIVING, BEDROOM, YARD, WOODS = range(4)
 WIDTH = {YARD: 360, WOODS: 520}
@@ -52,8 +52,8 @@ class BoopieWorldTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return [json.loads(line) for line in r.stdout.splitlines()]
 
-    def things(self, level: int) -> list[dict]:
-        return self.run_w(f"lv:{level}", "things")[1]
+    def things(self, level: int, furniture: int = 63) -> list[dict]:
+        return self.run_w(f"furni:{furniture}", f"lv:{level}", "things")[2]
 
     def thing(self, level: int, act: int, room: int = LIVING) -> dict:
         return next(t for t in self.things(level) if t["act"] == act and t["room"] == room and t["shown"])
@@ -195,6 +195,19 @@ class BoopieWorldTest(unittest.TestCase):
         self.assertGreater(low[GOLD], 0)                       # now and then a gold one
         high = self.run_w("lv:12", "kinds:300")[1]
         self.assertTrue(all(high[k] > 0 for k in range(4)), high)
+
+    def test_furniture_shows_once_its_out(self) -> None:
+        def out(mask: int) -> list[int]:
+            return sorted(t["art"] for t in self.things(1, mask) if t["act"] == FURNI and t["shown"])
+        self.assertEqual(out(0), [])
+        self.assertEqual(len(out(63)), 6)
+        self.assertEqual(len(out(1 | 4)), 2)
+
+    def test_the_woods_have_things_to_pick(self) -> None:
+        def spots(level: int) -> list[int]:
+            return sorted(t["x"] for t in self.things(level) if t["act"] == GATHER and t["shown"])
+        self.assertEqual(len(spots(1)), 3)                     # mushrooms ...
+        self.assertEqual(len(spots(4)), 5)                     # ... and berry bushes from 4
 
     def test_floor_and_wall(self) -> None:
         s = self.run_w("tap:90:90", "tick:1.5", "tap:78:10")

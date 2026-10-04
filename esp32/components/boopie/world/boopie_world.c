@@ -44,6 +44,8 @@ static const boopie_thing_t LIVING[] = {
     { A(AQUARIUM), 60, 122, 12, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(SOFA), 126, 98, 6, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(TROPHY), 14, 80, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(WALL_CLOCK), 118, 46, 1, 0, WALL, BOOPIE_DO_FURNI, 0, 0, 32, BOOPIE_FURNI_CLOCK },
+    { A(RECORD_PLAYER), 50, 104, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), 0, 6, BOOPIE_FURNI_RECORD },
 };
 
 static const boopie_thing_t BEDROOM[] = {
@@ -60,6 +62,8 @@ static const boopie_thing_t BEDROOM[] = {
     { A(STAR_LAMP), 66, 122, 7, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(BEANBAG), 104, 120, 11, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(STAIRS_DOWN), 42, 124, 1, 0, STAND, BOOPIE_DO_DOWNSTAIRS, A(HINT_DOWN), 6, -4, 0 },
+    { A(FAIRY_LIGHTS), 78, 27, 1, 0, WALL, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_LIGHTS },
+    { A(TEDDY), 142, 90, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), -10, 2, BOOPIE_FURNI_TEDDY },
 };
 
 /*
@@ -98,6 +102,8 @@ static const boopie_thing_t OUTSIDE[] = {
     { A(BEEHIVE), 316, 130, 15, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(BARN), 326, 70, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(SIGN), 344, 114, 1, 0, STAND, BOOPIE_DO_WILD, A(HINT_TREE), -8, 2, 0 },
+    { A(SWING), 122, 108, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), 0, 2, BOOPIE_FURNI_SWING },
+    { A(WINDMILL_A), 228, 58, 1, 0, STAND, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_WINDMILL },
 };
 
 /*
@@ -122,14 +128,14 @@ static const boopie_thing_t WOODS[] = {
     { A(FERN), 228, 80, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(FERN), 300, 132, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(FERN), 462, 82, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
-    { A(MUSHROOM), 88, 122, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
-    { A(MUSHROOM), 190, 80, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
-    { A(MUSHROOM), 372, 84, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(MUSHROOM), 88, 122, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_MUSHROOM), 8, 0, 0 },
+    { A(MUSHROOM), 190, 80, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_MUSHROOM), 8, 2, 1 },
+    { A(MUSHROOM), 372, 84, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_MUSHROOM), 8, 2, 2 },
     { A(BUSH), 66, 134, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(BUSH), 206, 136, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(BUSH), 404, 136, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
-    { A(BERRY_BUSH), 124, 132, 4, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
-    { A(BERRY_BUSH), 352, 134, 4, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BERRY_BUSH), 124, 126, 4, 0, STAND, BOOPIE_DO_GATHER, A(HINT_BERRY), 0, -6, 3 },
+    { A(BERRY_BUSH), 352, 126, 4, 0, STAND, BOOPIE_DO_GATHER, A(HINT_BERRY), 0, -6, 4 },
     { A(LOG), 166, 126, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(STUMP), 280, 126, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(FROG), 444, 120, 14, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
@@ -190,8 +196,53 @@ boopie_art_id_t boopie_room_background(boopie_room_t room, int level)
     return level >= 10 ? BOOPIE_ART_BG_DOWN_FANCY : BOOPIE_ART_BG_DOWN;
 }
 
+/* ---- furniture and the woods' pickings ---- */
+
+static const struct {
+    const char *name, *where;
+    int price;
+} FURNI[BOOPIE_FURNI_COUNT] = {
+    [BOOPIE_FURNI_CLOCK] = { "挂钟", "客厅", 15 },     [BOOPIE_FURNI_RECORD] = { "唱片机", "客厅", 25 },
+    [BOOPIE_FURNI_LIGHTS] = { "星星串灯", "卧室", 20 }, [BOOPIE_FURNI_TEDDY] = { "小熊玩偶", "卧室", 15 },
+    [BOOPIE_FURNI_SWING] = { "秋千", "院子", 40 },     [BOOPIE_FURNI_WINDMILL] = { "风车", "农场", 60 },
+};
+static uint32_t s_furniture;   /* out now */
+
+const char *boopie_furni_name(boopie_furni_t f)
+{
+    return (int)f >= 0 && f < BOOPIE_FURNI_COUNT ? FURNI[f].name : "";
+}
+
+int boopie_furni_price(boopie_furni_t f)
+{
+    return (int)f >= 0 && f < BOOPIE_FURNI_COUNT ? FURNI[f].price : 0;
+}
+
+const char *boopie_furni_where(boopie_furni_t f)
+{
+    return (int)f >= 0 && f < BOOPIE_FURNI_COUNT ? FURNI[f].where : "";
+}
+
+void boopie_world_set_furniture(uint32_t out)
+{
+    s_furniture = out;
+}
+
+const char *boopie_item_name(boopie_item_t item)
+{
+    return item == BOOPIE_ITEM_BERRY ? "蓝莓" : item == BOOPIE_ITEM_MUSHROOM ? "蘑菇" : "";
+}
+
+boopie_item_t boopie_gather_item(int spot)
+{
+    return spot >= 3 ? BOOPIE_ITEM_BERRY : BOOPIE_ITEM_MUSHROOM;   /* the woods' table: mushrooms, then bushes */
+}
+
 bool boopie_thing_shown(const boopie_thing_t *t, int level)
 {
+    if (t->act == BOOPIE_DO_FURNI && !(s_furniture >> t->arg & 1)) {
+        return false;
+    }
     return level >= t->from_level && (!t->to_level || level <= t->to_level);
 }
 

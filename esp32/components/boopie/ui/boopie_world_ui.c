@@ -291,21 +291,41 @@ static void function_panel(void)
 
 /* ---- 背包 ---- */
 
+static void bag_panel(void);
+
+static void on_bag(int i)
+{
+    bool fed = false;
+    if (!boopie_avatar_snack(i, &fed)) {
+        return;
+    }
+    say(fed ? "好吃！吃饱啦" : "%s真好吃～", boopie_item_name((boopie_item_t)i));
+    bag_panel();
+}
+
 static void bag_panel(void)
 {
-    lv_obj_t *box = panel("背包", NULL);
+    lv_obj_t *box = panel("背包", on_bag);
     boopie_pet_status_t st;
     boopie_avatar_pet_status(&st);
     char v[32];
     snprintf(v, sizeof v, "%u", (unsigned)st.stars);
     row(box, -1, "星星", v, false);
+    int any = 0;
+    for (int i = 0; i < BOOPIE_ITEM_COUNT; i++) {
+        int n = boopie_avatar_items(i);
+        if (n) {
+            snprintf(v, sizeof v, "× %d 喂它", n);
+            row(box, i, boopie_item_name((boopie_item_t)i), v, true);
+            any++;
+        }
+    }
     int64_t now;
     int minute;
     boopie_garden_t *g = boopie_avatar_garden(&now, &minute);
-    int any = 0;
     for (int p = 1; g && p < BOOPIE_PLANT_COUNT; p++) {
         if (g->harvested[p]) {
-            snprintf(v, sizeof v, "× %u", (unsigned)g->harvested[p]);
+            snprintf(v, sizeof v, "收获 %u", (unsigned)g->harvested[p]);
             row(box, -1, boopie_plant_name((boopie_plant_t)p), v, false);
             any++;
         }
@@ -316,14 +336,32 @@ static void bag_panel(void)
     }
     snprintf(v, sizeof v, "%d 件", owned);
     row(box, -1, "皮肤", v, false);
-    note(box, any ? "农场收获的都在这里。更多道具即将到来。" : "农场收获的东西会放在这里。");
+    note(box, any ? "点吃的喂给它：饿了能当一顿饭。森林里每天能摘蓝莓和蘑菇。"
+                  : "森林里每天能摘蓝莓和蘑菇，农场收获也记在这里。");
 }
 
 /* ---- 商店: the current character's skins, for stars ---- */
 
 static int s_shop_skins[12];
 static int s_shop_count;
-static void shop_panel(void);
+static void skins_panel(void);
+
+/* Tapped once: the row lit and asking for a second tap, which buys (false). */
+static bool arm(int i)
+{
+    if (s_armed == i) {
+        return false;
+    }
+    s_armed = i;
+    lv_obj_t *r = i >= 0 && i < 12 ? s_rows[i] : NULL;
+    if (r) {
+        lv_obj_set_style_bg_color(r, lv_color_hex(0xfff0b8), 0);
+        lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
+        lv_obj_t *v = lv_obj_get_child(r, lv_obj_get_child_count(r) - 1);
+        lv_label_set_text(v, "再点一次买");
+    }
+    return true;
+}
 
 static void on_shop(int i)
 {
@@ -337,19 +375,10 @@ static void on_shop(int i)
         if (boopie_avatar_wear(wearing ? -1 : skin, &error)) {
             say(wearing ? "换回原来的样子啦" : "好看吗？");
         }
-        shop_panel();
+        skins_panel();
         return;
     }
-    if (s_armed != i) {
-        /* Tapped once: say the price; a second tap buys. */
-        s_armed = i;
-        lv_obj_t *r = s_rows[i];
-        if (r) {
-            lv_obj_set_style_bg_color(r, lv_color_hex(0xfff0b8), 0);
-            lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
-            lv_obj_t *v = lv_obj_get_child(r, lv_obj_get_child_count(r) - 1);
-            lv_label_set_text(v, "再点一次买");
-        }
+    if (arm(i)) {
         return;
     }
     if (boopie_avatar_buy(skin, &error)) {
@@ -359,13 +388,13 @@ static void on_shop(int i)
         boopie_sound_play(BOOPIE_SOUND_ERROR);
         say("%s", error ? error : "买不了");
     }
-    shop_panel();
+    skins_panel();
 }
 
-static void shop_panel(void)
+static void skins_panel(void)
 {
     int armed = s_armed;
-    lv_obj_t *box = panel("商店", on_shop);
+    lv_obj_t *box = panel("皮肤", on_shop);
     s_armed = armed;
     boopie_pet_status_t st;
     boopie_avatar_pet_status(&st);
@@ -389,8 +418,85 @@ static void shop_panel(void)
     if (!s_shop_count) {
         note(box, "这个角色还没有皮肤卖。换个伙伴看看？");
     } else {
-        note(box, "点一下看价格，再点一次买；已有的点一下穿上。家具和种子即将上架。");
+        note(box, "点一下看价格，再点一次买；已有的点一下穿上。");
     }
+}
+
+/* ---- 商店: furniture, each to its own place ---- */
+
+static void furni_panel(void);
+
+static void on_furni(int i)
+{
+    if (i < 0 || i >= BOOPIE_FURNI_COUNT) {
+        return;
+    }
+    boopie_furni_t f = (boopie_furni_t)i;
+    if (boopie_avatar_furni_owned(f)) {
+        bool out = boopie_avatar_furniture() >> f & 1;
+        boopie_avatar_put_out(f, !out);
+        say(out ? "%s收起来了" : "%s摆在%s啦", boopie_furni_name(f), boopie_furni_where(f));
+        furni_panel();
+        return;
+    }
+    if (arm(i)) {
+        return;
+    }
+    const char *error = NULL;
+    if (boopie_avatar_buy_furni(f, boopie_furni_price(f), &error)) {
+        boopie_sound_play(BOOPIE_SOUND_GOLD);
+        say("买到%s！摆在%s了", boopie_furni_name(f), boopie_furni_where(f));
+    } else {
+        boopie_sound_play(BOOPIE_SOUND_ERROR);
+        say("%s", error ? error : "买不了");
+    }
+    furni_panel();
+}
+
+static void furni_panel(void)
+{
+    int armed = s_armed;
+    lv_obj_t *box = panel("家具", on_furni);
+    s_armed = armed;
+    boopie_pet_status_t st;
+    boopie_avatar_pet_status(&st);
+    char v[48];
+    snprintf(v, sizeof v, "你有 ★ %u", (unsigned)st.stars);
+    note(box, v);
+    uint32_t out = boopie_avatar_furniture();
+    for (int f = 0; f < BOOPIE_FURNI_COUNT; f++) {
+        char name[48];
+        snprintf(name, sizeof name, "%s·%s", boopie_furni_name((boopie_furni_t)f), boopie_furni_where((boopie_furni_t)f));
+        if (boopie_avatar_furni_owned(f)) {
+            snprintf(v, sizeof v, "%s", out >> f & 1 ? "摆着" : "收着");
+        } else {
+            snprintf(v, sizeof v, "★ %d", boopie_furni_price((boopie_furni_t)f));
+        }
+        row(box, f, name, v, true);
+    }
+    note(box, "点一下看价格，再点一次买，买了就摆好；已有的点一下收起或摆出来。");
+}
+
+static void on_shop_menu(int i)
+{
+    if (i == 0) {
+        furni_panel();
+    } else {
+        skins_panel();
+    }
+}
+
+static void shop_panel(void)
+{
+    lv_obj_t *box = panel("商店", on_shop_menu);
+    boopie_pet_status_t st;
+    boopie_avatar_pet_status(&st);
+    char v[48];
+    snprintf(v, sizeof v, "你有 ★ %u", (unsigned)st.stars);
+    note(box, v);
+    row(box, 0, "家具", NULL, true);
+    row(box, 1, "皮肤", NULL, true);
+    note(box, "家具摆进家里、院子和农场；皮肤给现在的伙伴穿。");
 }
 
 /* ---- the desk: the pet's status ---- */
@@ -519,6 +625,49 @@ static void open_chest(int chest)
     }
 }
 
+static void gather(int spot)
+{
+    boopie_item_t item = boopie_gather_item(spot);
+    if (boopie_avatar_gather(spot, item)) {
+        boopie_sound_play(BOOPIE_SOUND_SCORE);
+        say("摘到%s！放进背包啦", boopie_item_name(item));
+    } else if (boopie_avatar_gathered() >> spot & 1) {
+        say("今天摘过啦，明天再长出来");
+    } else {
+        say("还没对上时间，连上网再来摘吧");
+    }
+}
+
+static void use_furni(int f)
+{
+    switch (f) {
+    case BOOPIE_FURNI_CLOCK: {
+        const char *clock = boopie_pages_clock();
+        if (clock && *clock) {
+            say("现在是 %s", clock);
+        } else {
+            say("钟还没对时");
+        }
+        break;
+    }
+    case BOOPIE_FURNI_RECORD:
+        boopie_sound_play(BOOPIE_SOUND_NOTIFY);
+        boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
+        say("♪ 啦啦啦～ 一起跳舞吧");
+        break;
+    case BOOPIE_FURNI_TEDDY:
+        boopie_avatar_stroke(0, true);
+        say("抱抱小熊～");
+        break;
+    case BOOPIE_FURNI_SWING:
+        boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
+        say("荡秋千～ 好高呀！");
+        break;
+    case BOOPIE_FURNI_WINDMILL: say("风车呼呼地转"); break;
+    default: say("好漂亮"); break;
+    }
+}
+
 static void fight_over(void)
 {
     if (!s_panel) {
@@ -579,6 +728,8 @@ static void act(boopie_do_t what, int arg)
         break;
     case BOOPIE_DO_HOME_PATH: say("回到家门口啦"); break;
     case BOOPIE_DO_CHEST: open_chest(arg); break;
+    case BOOPIE_DO_GATHER: gather(arg); break;
+    case BOOPIE_DO_FURNI: use_furni(arg); break;
     case BOOPIE_DO_SLIME_FIGHT: slime_fight(); break;
     case BOOPIE_DO_SLIME_WIN: slime_won(); break;
     case BOOPIE_DO_SLIME_FLED:
@@ -678,6 +829,7 @@ static void frame(lv_timer_t *timer)
     int using = s_world.pending;
     const boopie_thing_t *thing = boopie_world_thing(&s_world, using);
     int arg = thing ? thing->arg : 0;
+    boopie_world_set_furniture(boopie_avatar_furniture());
     boopie_do_t d = boopie_world_tick(&s_world, st.level, dt);
     if (d != BOOPIE_DO_NOTHING) {
         act(d, arg);
@@ -695,7 +847,7 @@ static void frame(lv_timer_t *timer)
     int minute = 0;
     const boopie_garden_t *garden = boopie_avatar_garden(&epoch, &minute);
     boopie_world_look_t look = { st.level, night, st.hungry, s_t, s_pet, BOOPIE_HEAD_W, BOOPIE_HEAD_H, garden, epoch,
-                                 boopie_avatar_chests_open() };
+                                 boopie_avatar_chests_open(), boopie_avatar_gathered() };
     boopie_world_draw(&s_world, &look, s_rgb);
     boopie_world_scale(s_rgb, s_screen, SIZE);
     const char *clock = boopie_pages_clock();

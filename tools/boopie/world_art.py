@@ -634,6 +634,80 @@ def crop_cactus(L, x, y):
     L.put(x, y - 13, (255, 232, 120))
 
 
+
+# ---------------------------------------------------------------- furniture from the shop
+
+def wall_clock(L, x, y):
+    L.ell(x - 6, y - 13, x + 6, y - 1, (176, 120, 80))
+    L.ell(x - 5, y - 12, x + 5, y - 2, (252, 248, 236))
+    L.rect(x, y - 10, x, y - 7, (60, 60, 72)); L.rect(x, y - 7, x + 3, y - 7, (60, 60, 72))
+    for dx, dy in ((0, -11), (4, -7), (0, -3), (-4, -7)):
+        L.put(x + dx, y + dy, (176, 120, 80))
+
+
+def record_player(L, x, y):
+    L.rect(x - 8, y - 9, x + 8, y, (168, 112, 72))
+    L.rect(x - 8, y - 9, x + 8, y - 8, (196, 140, 92))
+    L.ell(x - 7, y - 13, x + 3, y - 8, (48, 48, 60))
+    L.ell(x - 4, y - 12, x, y - 9, (232, 96, 96))
+    L.rect(x + 5, y - 14, x + 5, y - 9, (200, 200, 216)); L.rect(x + 2, y - 14, x + 5, y - 14, (200, 200, 216))
+    L.rect(x - 2, y - 26, x + 2, y - 15, (232, 200, 96))
+    L.poly([(x - 2, y - 26), (x - 9, y - 31), (x - 9, y - 20)], (248, 216, 96))
+
+
+def fairy_lights(L, x, y):
+    for k in range(-36, 37):
+        sag = int(4 * math.sin((k + 36) / 18 * math.pi) ** 2)
+        L.put(x + k, y - 6 + sag, (96, 120, 88))
+        if (k + 36) % 9 == 4:
+            c = [(255, 216, 96), (248, 140, 180), (140, 200, 248), (160, 232, 140)][((k + 36) // 9) % 4]
+            L.rect(x + k - 1, y - 5 + sag, x + k + 1, y - 3 + sag, c)
+
+
+def teddy(L, x, y):
+    c, d = (200, 148, 100), (232, 196, 148)
+    L.ell(x - 7, y - 11, x + 7, y, c)
+    L.ell(x - 6, y - 20, x + 6, y - 9, c)
+    L.ell(x - 7, y - 22, x - 3, y - 17, c); L.ell(x + 3, y - 22, x + 7, y - 17, c)
+    L.ell(x - 3, y - 14, x + 3, y - 10, d)
+    L.put(x - 2, y - 16, (40, 32, 32)); L.put(x + 2, y - 16, (40, 32, 32)); L.put(x, y - 13, (40, 32, 32))
+    L.ell(x - 4, y - 8, x + 4, y - 2, d)
+    L.rect(x - 2, y - 9, x + 2, y - 9, (232, 96, 120))
+
+
+def swing(L, x, y):
+    wood = (176, 124, 80)
+    L.rect(x - 13, y - 28, x - 11, y, wood); L.rect(x + 11, y - 28, x + 13, y, wood)
+    L.rect(x - 14, y - 30, x + 14, y - 28, (148, 100, 64))
+    L.rect(x - 6, y - 27, x - 6, y - 8, (200, 200, 200)); L.rect(x + 6, y - 27, x + 6, y - 8, (200, 200, 200))
+    L.rect(x - 8, y - 8, x + 8, y - 6, (232, 96, 96))
+
+
+def windmill(L, x, y, turn):
+    L.poly([(x - 9, y), (x - 5, y - 34), (x + 5, y - 34), (x + 9, y)], (240, 232, 216))
+    L.rect(x - 3, y - 9, x + 3, y, (168, 112, 72))
+    L.rect(x - 2, y - 24, x + 2, y - 19, (120, 176, 232))
+    L.poly([(x - 7, y - 33), (x, y - 41), (x + 7, y - 33)], (216, 88, 72))
+    cx, cy = x, y - 34
+    for k in range(4):
+        a = turn + k * math.pi / 2
+        for t in range(3, 18):
+            px_, py_ = cx + t * math.cos(a), cy + t * math.sin(a)
+            L.put(px_, py_, (184, 136, 92))
+            if t > 5:
+                for w in (1, 2, 3):
+                    L.put(px_ + w * math.cos(a + math.pi / 2), py_ + w * math.sin(a + math.pi / 2), (248, 244, 232))
+    L.ell(cx - 2, cy - 2, cx + 2, cy + 2, (120, 84, 56))
+
+
+def windmill_a(L, x, y):
+    windmill(L, x, y, 0.3)
+
+
+def windmill_b(L, x, y):
+    windmill(L, x, y, 0.3 + math.pi / 4)
+
+
 # ---------------------------------------------------------------- the woods
 
 MOSS = (132, 184, 108)
@@ -911,6 +985,16 @@ def hint(L, x, y, kind):
     elif kind == "key":
         L.ell(x - 4, y - 3, x - 1, y, (232, 176, 48)); L.rect(x - 1, y - 2, x + 4, y - 1, (232, 176, 48))
         L.rect(x + 3, y - 1, x + 3, y + 1, (232, 176, 48)); L.rect(x + 1, y - 1, x + 1, y + 1, (232, 176, 48))
+    elif kind == "heart":
+        L.ell(x - 4, y - 3, x, y + 1, (232, 88, 120)); L.ell(x, y - 3, x + 4, y + 1, (232, 88, 120))
+        L.poly([(x - 4, y), (x + 4, y), (x, y + 4)], (232, 88, 120))
+    elif kind == "berry":
+        for bx, by in ((-2, 0), (2, 0), (0, -2)):
+            L.ell(x + bx - 2, y + by - 1, x + bx + 1, y + by + 2, (88, 96, 216))
+        L.put(x, y - 4, (96, 168, 72))
+    elif kind == "mushroom":
+        L.ell(x - 4, y - 4, x + 4, y + 1, (224, 72, 72)); L.rect(x - 1, y + 1, x + 1, y + 3, (240, 228, 200))
+        L.put(x - 2, y - 2, (255, 255, 255)); L.put(x + 1, y - 3, (255, 255, 255))
     elif kind == "tree":
         L.poly([(x, y - 4), (x - 4, y + 1), (x + 4, y + 1)], (88, 152, 88)); L.rect(x, y + 1, x, y + 3, (140, 96, 60))
 
@@ -1001,9 +1085,12 @@ SPRITES = [
     ("pond", pond, True), ("frog", frog, False), ("tree_house", tree_house, False), ("sign_home", sign_home, False),
     *[(f"slime_{k}{'_squash' if q else ''}", slime_fn(c, q), False) for k, c in SLIMES.items() for q in (False, True)],
     ("puff", puff, False),
+    ("wall_clock", wall_clock, False), ("record_player", record_player, False),
+    ("fairy_lights", fairy_lights, True), ("teddy", teddy, False), ("swing", swing, False),
+    ("windmill_a", windmill_a, False), ("windmill_b", windmill_b, False),
 ]
 HINTS = ["zzz", "shirt", "game", "pen", "note", "book", "food", "up", "down", "door", "info", "bang", "water", "plus",
-         "mail", "tree", "house", "key"]
+         "mail", "tree", "house", "key", "heart", "berry", "mushroom"]
 BACKGROUNDS = [("bg_down", bg_down), ("bg_down_fancy", bg_down_fancy), ("bg_up", bg_up), ("bg_up_stars", bg_up_stars),
                ("bg_outside", bg_outside), ("bg_woods", bg_woods)]
 

@@ -247,7 +247,19 @@ static boopie_art_id_t art_of(const boopie_thing_t *t, const boopie_world_look_t
     if (t->act == BOOPIE_DO_CHEST && (look->chests_open >> t->arg & 1)) {
         return BOOPIE_ART_CHEST_OPEN;
     }
+    if (t->art == BOOPIE_ART_BERRY_BUSH && (look->gathered >> t->arg & 1)) {
+        return BOOPIE_ART_BUSH;   /* picked today */
+    }
+    if (t->art == BOOPIE_ART_WINDMILL_A && ((int)(look->t * 3) & 1)) {
+        return BOOPIE_ART_WINDMILL_B;   /* turning */
+    }
     return (boopie_art_id_t)t->art;
+}
+
+/* A mushroom picked today is gone till tomorrow. */
+static bool gone(const boopie_thing_t *t, const boopie_world_look_t *look)
+{
+    return t->art == BOOPIE_ART_MUSHROOM && t->act == BOOPIE_DO_GATHER && (look->gathered >> t->arg & 1);
 }
 
 typedef struct {
@@ -273,6 +285,7 @@ static void night(const boopie_thing_t *t, int n, int level)
         case BOOPIE_ART_LAMP_POST: lights[nl++] = (light_t){ t[i].x, t[i].y - 27, 40, 0xffe0a0 }; break;
         case BOOPIE_ART_HOUSE_FRONT: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 40, 0xffd090 }; break;
         case BOOPIE_ART_MUSHROOM_RING: lights[nl++] = (light_t){ t[i].x, t[i].y - 4, 30, 0xc8b0ff }; break;
+        case BOOPIE_ART_FAIRY_LIGHTS: lights[nl++] = (light_t){ t[i].x, t[i].y - 2, 44, 0xffe0b0 }; break;
         case BOOPIE_ART_TREE_HOUSE: lights[nl++] = (light_t){ t[i].x + 6, t[i].y - 45, 22, 0xffe0a0 }; break;
         default: break;
         }
@@ -380,8 +393,10 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
         if (t[next].art == BOOPIE_ART_CHICKEN) {
             x += (int)(sinf(look->t * 0.8f + next) * 4);   /* pecking about */
         }
-        shadow(x + 2, t[next].y + 1, a->w / 2.0f, 2.0f);
-        blit(art_of(&t[next], look), x, t[next].y);
+        if (!gone(&t[next], look)) {
+            shadow(x + 2, t[next].y + 1, a->w / 2.0f, 2.0f);
+            blit(art_of(&t[next], look), x, t[next].y);
+        }
         done[next] = 1;
     }
     if (look->night) {
@@ -397,8 +412,9 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             int bob = (int)(sinf(look->t * 3 + i) * 1.2f);
             int top = t[i].y - a->ay;
             int hint = t[i].hint;
-            if (t[i].act == BOOPIE_DO_CHEST && (look->chests_open >> t[i].arg & 1)) {
-                continue;   /* opened today: nothing more in it */
+            if ((t[i].act == BOOPIE_DO_CHEST && (look->chests_open >> t[i].arg & 1))
+                || (t[i].act == BOOPIE_DO_GATHER && (look->gathered >> t[i].arg & 1))) {
+                continue;   /* opened or picked today: nothing more till tomorrow */
             }
             if (t[i].art == BOOPIE_ART_DOOR_OUT) {
                 top = t[i].y - 6;
