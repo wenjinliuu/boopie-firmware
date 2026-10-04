@@ -25,72 +25,70 @@ from avatar_proto import (BAYER, N, XS, YS, Boopie, Codex, Doubao, Klaude, Rig, 
 INK = (18, 18, 24)
 
 
-# ---------------------------------------------------------------- GPT, the rosette
+# ---------------------------------------------------------------- GPT, the knot as its head
+KG = np.array([[1.0 if ch == "#" else 0.0 for ch in row] for row in ap.KNOT])
+KIN = np.array([[1.0 if ch != " " else 0.0 for ch in row] for row in ap.KNOT])
+
+
+def bilinear(grid, gx, gy):
+    n = grid.shape[0]
+    x = np.clip(gx - 0.5, 0, n - 1.001)
+    y = np.clip(gy - 0.5, 0, n - 1.001)
+    x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
+    fx, fy = x - x0, y - y0
+    x1, y1 = np.minimum(x0 + 1, n - 1), np.minimum(y0 + 1, n - 1)
+    v = (grid[y0, x0] * (1 - fx) * (1 - fy) + grid[y0, x1] * fx * (1 - fy) + grid[y1, x0] * (1 - fx) * fy
+         + grid[y1, x1] * fx * fy)
+    return np.where((gx >= 0) & (gx < n) & (gy >= 0) & (gy < n), v, 0)
+
+
 class Rosette(Rig):
-    """GPT: its logo's rosette as a big round head, six bands twisting round a
-    middle where its little face is; tiny hands and feet."""
-    key, name, colour = "gpt", "GPT", "ececec"
+    """GPT: its logo's knot, scaled up smooth, as a big head; a round little
+    face in the middle; stubby hands and feet."""
+    key, name, colour = "gpt", "GPT", "f2f2f2"
     size, squash_k, jump_k = 1.0, 0.6, 0.6
-    line = INK                 # the lines between the bands
-    face_colour = "fff4e6"
-    hex_face = False           # the face's window: round, or a hexagon like the logo's middle
+    line = INK                 # outlines
+    holes = (64, 64, 74)       # between the bands
+    face_colour = (255, 244, 230)
+    scale = 2.45
 
     def __init__(self, colour=None, skin=None, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
         super().__init__(colour, skin)
-        self.fp = ramp(self.face_colour)
 
     def draw(self, c, p):
-        cx, cy, R, r_in = 32, 32, 20.0, 8.5
-        f = self.frame(p, cx, 56)
-        dx, dy = f.rx - cx, f.ry - cy
-        r = np.hypot(dx, dy)
-        th = np.arctan2(dy, dx)
-        rim = R * (1 - 0.05 * (1 - np.cos(6 * th)) / 2)        # a little hexagonal, as the logo is
-        if self.hex_face:
-            k = np.cos((np.mod(th + math.pi / 6, math.pi / 3)) - math.pi / 6)
-            inner = r * k <= r_in
-        else:
-            inner = r <= r_in
-        head = r <= rim
-        bands = head & ~inner
+        cx, cy = 32, 30
+        f = self.frame(p, cx, 54)
+        gx, gy = (f.rx - cx) / self.scale + 8, (f.ry - cy) / self.scale + 8
+        band = bilinear(KG, gx, gy) > 0.5
+        head = bilinear(KIN, gx, gy) > 0.5
+        face = f.ellipse(cx, cy, 7.5, 7.5)
         limbs = np.zeros_like(head)
         if p.feet and p.scale > 0.6:
-            limbs |= f.ellipse(cx - 7, 53.5, 3.6, 2.6) | f.ellipse(cx + 7, 53.5, 3.6, 2.6)
+            limbs |= f.ellipse(cx - 7, 50.5, 3.8, 2.8) | f.ellipse(cx + 7, 50.5, 3.8, 2.8)
         for h in p.hands:
             if h[0] != "front":
-                limbs |= f.ellipse(cx + h[0] * (R + 1.5), cy + 7 + h[1], 3, 2.6)
-        c.shaded(limbs & ~head, self.rp)
-        c.shaded(bands, self.rp)
-        # The lines: six from the middle twisting out to the rim, and beside
-        # each a shorter one, so the bands look woven over and under.
-        t = np.clip((r - r_in) / (R - r_in), 0, 1)
-        lines = np.zeros_like(head)
-        for k in range(6):
-            a0 = math.radians(30 + 60 * k)
-            for off, reach in ((0.0, 1.0), (math.radians(26), 0.55)):
-                ang = a0 + off + math.radians(58) * t
-                d = np.abs(np.angle(np.exp(1j * (th - ang)))) * r
-                lines |= bands & (d < 0.65) & (t <= reach)
-        c.flat(lines, self.line)
-        face = head & inner
-        c.flat(face, self.fp["light"])
-        c.flat(face & (f.ry > cy + 3) & (BAYER[np.arange(N)[:, None] % 4, np.arange(N)[None, :] % 4] < 0.4),
-               self.fp["mid"])
+                limbs |= f.ellipse(cx + h[0] * 19.5, cy + 7 + h[1], 3.2, 2.8)
+        limbs &= ~head
+        c.shaded(limbs, self.rp)
+        c.outline(limbs, self.line)
+        c.flat(head & ~band & ~face, self.holes)
+        c.shaded(band & ~face, self.rp)
+        c.outline(band & ~face, self.line)
+        c.flat(face, self.face_colour)
         c.outline(face, self.line)
-        c.outline(head | limbs, self.line)
-        c.body |= face
-        light = f.pt(cx, cy - R - 1)
-        return {"slots": {"hat": f.pt(cx, cy - R + 2), "eyes": (*f.pt(cx, cy - 1), 4 * f.sx),
-                          "neck": (*f.pt(cx, cy + R - 2), 16 * f.sx)},
-                "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": light, "show_face": p.scale > 0.6}
+        c.body |= head
+        return {"slots": {"hat": f.pt(cx, cy - 18), "eyes": (*f.pt(cx, cy - 1), 4 * f.sx),
+                          "neck": (*f.pt(cx, cy + 17), 16 * f.sx)},
+                "face": f.pt(cx, cy - 1), "body": f.pt(cx, cy), "light": f.pt(cx + 14, cy - 15),
+                "show_face": p.scale > 0.6}
 
     def face(self, c, fx, fy, p):
         for side in (-1, 1):
-            eye(c, fx + side * 4, fy - 1, p, side)
-        blush(c, fx, fy - 1, p, 6, self.cheek)
-        mouth(c, fx + p.look[0] // 2, fy + 3, p)
+            eye(c, fx + side * 3, fy, p, side)
+        blush(c, fx, fy - 1, p, 5, self.cheek)
+        mouth(c, fx + p.look[0] // 2, fy + 4, p)
 
 
 # ---------------------------------------------------------------- 海绵宝宝 friends
@@ -100,144 +98,32 @@ def hashed(i, k):
 
 
 class Sponge(Klaude):
-    """小克 as 海绵宝宝: a yellow sponge, holes and all, white shirt, red tie,
-    brown shorts, thin legs in striped socks, big blue eyes and two buck teeth."""
+    """小克 as 海绵宝宝, lightly: yellow, full of holes, little brown shorts;
+    everything else 小克's own."""
     def __init__(self):
         super().__init__("f7e14d")
-
-    def draw(self, c, p):
-        f = self.frame(p, 32, 53)
-        body = f.rect(17, 18, 47, 44)
-        for h in p.hands:
-            if h[0] != "front":
-                up = min(0, h[1]) * 1.6
-                x0 = 12 if h[0] < 0 else 47
-                body |= f.rect(x0, 33 + up, x0 + 5, 35 + up)
-        legs = np.zeros_like(body)
-        if p.feet and p.scale > 0.6:
-            legs = f.rect(24, 44, 26, 51) | f.rect(38, 44, 40, 51)
-        c.shaded(body | legs, self.rp)
-        for i in range(9):                                   # the holes
-            hx, hy = 19 + hashed(i, 1) * 26, 20 + hashed(i, 2) * 14
-            hole = f.ellipse(hx, hy, 1.4 + hashed(i, 3), 1.2 + hashed(i, 4) * 0.8)
-            c.flat(hole & body, (190, 168, 40))
-        c.flat(body & (f.ry >= 37) & (f.ry < 40) & (f.rx >= 17) & (f.rx < 47), (250, 250, 250))
-        shorts = body & (f.ry >= 40) & (f.rx >= 17) & (f.rx < 47)
-        c.flat(shorts, (140, 90, 40))
-        for x in range(19, 46, 4):                           # the belt
-            c.put(*f.pt(x, 41), (40, 26, 14))
-        tie = f.rect(31, 37, 33, 42) | f.rect(30, 39, 34, 41)
-        c.flat(tie & body, (220, 40, 40))
-        if legs.any():
-            socks = legs & (f.ry >= 48)
-            c.flat(socks, (250, 250, 250))
-            c.flat(legs & ((np.round(f.ry) == 48) | (np.round(f.ry) == 49.5)), (60, 110, 220))
-            shoes = f.ellipse(25, 52, 3, 1.6) | f.ellipse(39, 52, 3, 1.6)
-            c.flat(shoes, (20, 20, 24))
-        c.outline(body | legs, (120, 100, 20))
-        return {"slots": {"hat": f.pt(32, 19), "eyes": (*f.pt(32, 27), 7 * f.sx), "neck": (*f.pt(32, 37), 30 * f.sx)},
-                "face": f.pt(32, 27), "body": f.pt(32, 32), "light": f.pt(44, 14), "show_face": p.scale > 0.6}
+        self.skin = None
 
     def face(self, c, fx, fy, p):
-        big = p.eyes in ("open", "look", "wide", "worried")
-        lx, ly = p.look if p.eyes == "look" else (0, 0)
+        c.eye, c.shine = (70, 46, 20), None                  # 小克's square eyes, dark to show on yellow
         for side in (-1, 1):
-            ex = fx + side * 6
-            if big:
-                for dy in range(-4, 5):
-                    for dx in range(-4, 5):
-                        if dx * dx + dy * dy <= 16:
-                            c.put(ex + dx, fy + dy, (255, 255, 255))
-                for dy in range(-2, 3):
-                    for dx in range(-2, 3):
-                        if dx * dx + dy * dy <= 4:
-                            c.put(ex + dx + lx, fy + dy + ly, (70, 140, 230))
-                c.put(ex + lx, fy + ly, (20, 20, 24))
-                c.put(ex + lx - 1, fy + ly - 1, (255, 255, 255))
-                for k in (-2, 0, 2):                         # lashes
-                    c.put(ex + k, fy - 5, (20, 20, 24))
-                    c.put(ex + k + (k // 2), fy - 6, (20, 20, 24))
-            else:
-                c.eye = (20, 20, 24)
-                eye(c, ex, fy, p, side)
-        for dx in (-9, -8, 8, 9):                            # freckles
-            c.put(fx + dx, fy + 5 + (dx % 2), (220, 120, 90))
-        my = fy + 7
-        if p.mouth in ("talk", "o", "chomp"):
-            mouth(c, fx, my - 1, p, colour=(110, 40, 30), inside=(200, 70, 70))
-        else:
-            for dx in range(-6, 7):
-                c.put(fx + dx, my + (1 if abs(dx) < 5 else 0), (110, 40, 30))
-        for dx in (-1, 1):                                   # buck teeth
-            c.put(fx + dx, my + 2, (255, 255, 255))
-            c.put(fx + dx, my + 3, (255, 255, 255))
-
-
-class Star(Boopie):
-    """布比 as 派大星: a pink star of a fellow, pointy head, green shorts with
-    purple flowers, thick brows."""
-    def __init__(self):
-        super().__init__("f6a3b8")
-
-    def draw(self, c, p):
-        cx, cy, rx, ry = 32, 40, 15, 14
-        f = self.frame(p, cx, cy + ry)
-        body = f.ellipse(cx, cy, rx, ry)
-        tip = (f.ry > 14) & (f.ry < cy) & (np.abs(f.rx - cx) < (f.ry - 14) * 0.62)
-        body |= tip
-        if p.feet and p.scale > 0.6:
-            body |= f.ellipse(cx - 7, cy + ry - 1, 4, 2.5) | f.ellipse(cx + 7, cy + ry - 1, 4, 2.5)
-        for h in p.hands:
-            if h[0] != "front":
-                body |= f.rot_ellipse(cx + h[0] * (rx + 1), cy + 1 + h[1], 5, 2.4, h[0] * 0.5)
-        c.shaded(body, self.rp)
-        shorts = body & (f.ry >= cy + 5) & (f.ry < cy + ry - 1)
-        c.flat(shorts, (130, 200, 80))
-        for i in range(5):
-            x, y = f.pt(cx - 10 + i * 5, cy + 8 + (i % 2) * 2)
-            c.put(x, y, (170, 90, 210))
-            c.put(x + 1, y, (170, 90, 210))
-        c.outline(body, (170, 70, 100))
-        light = f.pt(cx, 13)
-        return {"slots": {"hat": f.pt(cx, 18), "eyes": (*f.pt(cx, cy - 4), 6 * f.sx), "neck": (*f.pt(cx, cy + 5), 26 * f.sx)},
-                "face": f.pt(cx, cy - 4), "body": f.pt(cx, cy), "light": light, "show_face": p.scale > 0.6}
-
-    def face(self, c, fx, fy, p):
-        c.eye = (20, 20, 24)
-        for side in (-1, 1):
-            eye(c, fx + side * 4, fy, p, side)
-            for dx in range(-1, 3):                          # brows
-                c.put(fx + side * (3 + dx), fy - 4 - (dx == 2), (20, 20, 24))
-        mouth(c, fx, fy + 5, p, colour=(120, 30, 50), inside=(200, 70, 90))
-
-
-class Squirrel(Doubao):
-    """豆包 as 珊迪: a squirrel in a white suit inside a glass helmet with a flower on top."""
-    hair = "b8743e"
-    top = "f2f2f2"
-
-    def __init__(self):
-        super().__init__("e6b07c")
+            eye(c, fx + side * 7, fy, p, side, square=True)
+        blush(c, fx, fy, p, 11, (255, 150, 110))
+        if p.mouth in ("talk", "o", "chomp", "wavy", "frown"):
+            mouth(c, fx, fy + 6, p, colour=(92, 34, 22), inside=(170, 60, 50))
 
     def draw(self, c, p):
         anchors = super().draw(c, p)
-        f = self.frame(p, 32, 57)
-        for sx in (-1, 1):                                   # ears
-            ear = (f.ry > 8) & (f.ry < 14) & (np.abs(f.rx - (32 + sx * 11)) < (f.ry - 8) * 0.55)
-            c.shaded(ear, self.hp)
-        mz = f.ellipse(32, 35, 6, 3.5)                       # the white muzzle
-        c.flat(mz, (250, 244, 236))
-        helmet = f.ellipse(32, 28, 21, 21)
-        ring = helmet & ~f.ellipse(32, 28, 20, 20)
-        c.flat(ring & (f.ry < 45), (190, 230, 255))
-        for a in range(200, 250, 6):                         # a glint
-            x, y = f.pt(32 + 17 * math.cos(math.radians(a)), 28 + 17 * math.sin(math.radians(a)))
-            c.put(x, y, (255, 255, 255))
-        fx, fy = f.pt(32, 6)                                 # the flower
-        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, 1), (-1, 1), (1, -1)):
-            c.put(fx + dx, fy + dy, (190, 110, 220))
-        c.put(fx, fy, (255, 220, 80))
-        anchors["light"] = (fx, fy)
+        f = self.frame(p, 32, 51)
+        body = f.rect(17, 22, 47, 44)
+        for i in range(10):                                  # the holes
+            hx, hy = 19 + hashed(i, 1) * 26, 23 + hashed(i, 2) * 13
+            if abs(hx - 32) < 11 and 26 < hy < 34:
+                continue                                     # not over the face
+            hole = f.ellipse(hx, hy, 1.3 + hashed(i, 3) * 0.9, 1.1 + hashed(i, 4) * 0.7)
+            c.flat(hole & body, (196, 172, 44))
+        c.flat(body & (f.ry >= 40), (150, 96, 44))           # the shorts
+        c.flat(body & (f.ry >= 40) & (f.ry < 41), (90, 56, 24))
         return anchors
 
 
@@ -272,9 +158,17 @@ class Rem(Doubao):
         super().face(c, fx, fy, p)
         if p.eyes in ("open", "look", "wide", "worried"):
             lx, ly = p.look if p.eyes == "look" else (0, 0)
-            for side in (-1, 1):
-                c.put(fx + side * 6 + lx, fy + ly, (70, 120, 220))
-                c.put(fx + side * 6 + lx, fy + 1 + ly, (70, 120, 220))
+            c.put(fx + 6 + lx, fy + ly, (70, 120, 220))
+            c.put(fx + 6 + lx, fy + 1 + ly, (70, 120, 220))
+        # Her fringe falls over one eye, swept down from the parting.
+        for y in range(-8, 4):
+            edge = -1 - (y + 8) * 0.35
+            for x in range(-11, int(round(edge)) + 1):
+                strand = (x - y) % 4 == 0
+                c.put(fx + x, fy + y, self.hp["dark"] if strand else self.hp["mid"])
+            c.put(fx + round(edge) + 1, fy + y, self.hp["out"])
+        for x in range(-11, -5):                              # its tip
+            c.put(fx + x, fy + 4, self.hp["out"])
 
 
 class Pearl(Whale):
@@ -318,15 +212,11 @@ class Karen(Codex):
 
 # ---------------------------------------------------------------- the sheet
 DRAFTS = [
-    ("GPT 新造型 · 圆脸", lambda: Rosette()),
-    ("GPT 新造型 · 六边形脸", lambda: Rosette(hex_face=True)),
-    ("GPT · 经典绿", lambda: Rosette("10a37f", line=(8, 50, 40), face_colour="fff4e6")),
-    ("GPT · 夜黑", lambda: Rosette("2c2c34", line=(200, 200, 214), face_colour="fff4e6")),
-    ("GPT · 流金（典藏）", lambda: Rosette("f2c14e", line=(110, 70, 10))),
-    ("GPT · 青花", lambda: Rosette("f4f6fa", line=(50, 80, 180), face_colour="ffffff")),
+    ("GPT A · 白结", lambda: Rosette()),
+    ("GPT B · 黑结", lambda: Rosette("26262e", line=(150, 150, 165), holes=(250, 250, 250))),
+    ("GPT C · 白结白底", lambda: Rosette(holes=(255, 255, 255))),
+    ("GPT D · 经典绿", lambda: Rosette("10a37f", line=(6, 40, 30), holes=(230, 255, 245))),
     ("小克 · 海绵宝宝", Sponge),
-    ("布比 · 派大星", Star),
-    ("豆包 · 珊迪", Squirrel),
     ("豆包 · 蕾姆", Rem),
     ("小鲸鱼 · 珍珍", Pearl),
     ("Codex · 凯伦", Karen),
