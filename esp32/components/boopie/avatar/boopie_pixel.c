@@ -1020,9 +1020,306 @@ static void petal(int i, double t, bool front)
     putd(x + 1, y + a, front ? (rgb_t){ 230, 130, 170 } : (rgb_t){ 120, 70, 100 });
 }
 
+/* ---------------------------------------------------------------- ambient */
+
+static boopie_ambient_t s_amb;
+
+void boopie_pixel_set_ambient(const boopie_ambient_t *a)
+{
+    s_amb = a ? *a : (boopie_ambient_t){ 0 };
+}
+
+static void disc(double cx, double cy, double r, rgb_t c)
+{
+    for (int dy = -(int)r - 1; dy <= (int)r + 1; dy++) {
+        for (int dx = -(int)r - 1; dx <= (int)r + 1; dx++) {
+            if (dx * dx + dy * dy <= r * r + 0.5) {
+                putd(cx + dx, cy + dy, c);
+            }
+        }
+    }
+}
+
+static void cloud(double x, double y, rgb_t c, rgb_t lit)
+{
+    static const char *const SHAPE[] = { "  ####  ", " ###### ", "########" };
+    for (int r = 0; r < 3; r++) {
+        for (int k = 0; SHAPE[r][k]; k++) {
+            if (SHAPE[r][k] == '#') {
+                putd(x + k, y + r, r == 0 ? lit : c);
+            }
+        }
+    }
+}
+
+static void sun(double cx, double cy, double r, double t)
+{
+    disc(cx, cy, r, (rgb_t){ 255, 214, 90 });
+    putd(cx - 1, cy - 1, (rgb_t){ 255, 246, 190 });
+    for (int k = 0; k < 8; k++) {   /* rays, turning slowly, every other one longer */
+        double a = k * 0.7853981633974483 + t * 0.15;
+        double len = r + 2 + (k % 2) * (1 + 0.6 * sin(t * 2 + k));
+        putd(cx + cos(a) * len, cy + sin(a) * len, (rgb_t){ 200, 150, 40 });
+    }
+}
+
+static void night_stars(double t, int n)
+{
+    for (int i = 0; i < n; i++) {
+        int x = (int)(h01(2, i, 11, 0) * 64), y = (int)(h01(2, i, 12, 0) * 26);
+        if (abs(x - 32) < 12 && y > 6) {
+            continue;   /* not over its head */
+        }
+        double tw = 0.5 + 0.5 * sin(t * (0.8 + h01(2, i, 13, 0)) + i);
+        if (tw > 0.3) {
+            putd(x, y, mix((rgb_t){ 30, 30, 60 }, (rgb_t){ 190, 190, 235 }, tw));
+        }
+    }
+}
+
+static void moon(double cx, double cy, double r, bool full)
+{
+    disc(cx, cy, r, (rgb_t){ 250, 236, 170 });
+    if (full) {
+        putd(cx - 1, cy, (rgb_t){ 220, 200, 130 });
+        putd(cx + 1, cy + 1, (rgb_t){ 220, 200, 130 });
+        return;
+    }
+    disc(cx + r * 0.6, cy - r * 0.4, r, (rgb_t){ 0, 0, 0 });   /* the crescent's shadow: the sky is black */
+}
+
+static void raindrop(int i, double t, bool front)
+{
+    double sp = 34 + h01(2, i, 21, 0) * 14;
+    double y = pymodd(h01(2, i, 22, 0) * 70 + t * sp, 72) - 4;
+    double x = pymodd(h01(2, i, 23, 0) * 70 - y * 0.25, 70) - 3;
+    rgb_t c = front ? (rgb_t){ 170, 200, 245 } : (rgb_t){ 95, 120, 175 };
+    putd(x, y, c);
+    putd(x - 0.25, y - 1, c);
+    if (front) {
+        putd(x - 0.5, y - 2, (rgb_t){ 90, 110, 160 });
+    }
+}
+
+static void lantern(double x, double t, int i)
+{
+    double sw = sin(t * 1.4 + i * 2) * 1.2;
+    for (int y = 0; y < 5; y++) {
+        putd(x + sw * y / 9, y, (rgb_t){ 160, 120, 60 });   /* the cord */
+    }
+    double cx = x + sw * 0.6;
+    putd(cx - 1, 5, (rgb_t){ 230, 180, 60 });
+    putd(cx, 5, (rgb_t){ 230, 180, 60 });
+    putd(cx + 1, 5, (rgb_t){ 230, 180, 60 });
+    for (int y = 6; y < 10; y++) {
+        for (int dx = -2; dx <= 2; dx++) {
+            bool edge = (y == 6 || y == 9) && (dx == -2 || dx == 2);
+            if (!edge) {
+                putd(cx + dx, y, dx == -1 ? (rgb_t){ 255, 120, 90 } : (rgb_t){ 210, 30, 40 });
+            }
+        }
+    }
+    putd(cx, 10, (rgb_t){ 230, 180, 60 });
+    putd(cx, 11, (rgb_t){ 230, 180, 60 });
+}
+
+static void firework(double t, int i)
+{
+    double period = 3.2;
+    int burst = (int)((t + i * 1.6) / period);
+    double k = pymodd(t + i * 1.6, period) / 1.1;   /* the burst's first 1.1 s */
+    if (k > 1) {
+        return;
+    }
+    double cx = 10 + h01(3, burst, i, 31) * 44, cy = 6 + h01(3, burst, i, 32) * 12;
+    static const rgb_t COLS[] = { { 255, 90, 90 }, { 255, 220, 90 }, { 120, 220, 255 }, { 255, 140, 230 } };
+    rgb_t c = COLS[(burst + i) % 4];
+    for (int a = 0; a < 10; a++) {
+        double ang = a * 0.6283185307179586;
+        double rr = 1 + k * 6;
+        putd(cx + cos(ang) * rr, cy + sin(ang) * rr + k * k * 2, mix(c, (rgb_t){ 20, 10, 20 }, k));
+    }
+}
+
+static void bat(double t, int i)
+{
+    double x = pymodd(t * (6 + i * 2) + i * 30, 80) - 8;
+    double y = 6 + i * 6 + sin(t * 2 + i) * 2;
+    int up = pymod((int)(t * 6 + i), 2);
+    rgb_t c = { 150, 110, 190 };
+    putd(x, y, c);
+    putd(x, y + 1, c);
+    putd(x - 1, y - up, c);
+    putd(x + 1, y - up, c);
+    putd(x - 2, y + up - 1, c);
+    putd(x + 2, y + up - 1, c);
+    putd(x - 3, y + up * 2 - 1, c);
+    putd(x + 3, y + up * 2 - 1, c);
+    putd(x - 1, y, (rgb_t){ 255, 220, 90 });   /* its eyes */
+    putd(x + 1, y, (rgb_t){ 255, 220, 90 });
+}
+
+static void heart(double x, double y, rgb_t c)
+{
+    putd(x - 1, y, c);
+    putd(x + 1, y, c);
+    putd(x - 1, y + 1, c);
+    putd(x, y + 1, c);
+    putd(x + 1, y + 1, c);
+    putd(x, y + 2, c);
+}
+
+static void balloon(int i, double t)
+{
+    static const rgb_t COLS[] = { { 255, 100, 120 }, { 110, 200, 255 }, { 255, 210, 80 }, { 160, 230, 130 } };
+    double sp = 3 + h01(2, i, 41, 0) * 2;
+    double y = 66 - pymodd(h01(2, i, 42, 0) * 80 + t * sp, 84);
+    double x = (i % 2 ? 52 : 7) + h01(2, i, 43, 0) * 5 + sin(t + i) * 1.2;
+    rgb_t c = COLS[i % 4];
+    disc(x, y, 1.6, c);
+    putd(x - 1, y - 1, mix(c, WHITE, 0.6));
+    for (int k = 2; k < 6; k++) {
+        putd(x + sin(t * 2 + k) * 0.4, y + k, (rgb_t){ 120, 120, 140 });
+    }
+}
+
+static void xmas_lights(double t)
+{
+    static const rgb_t COLS[] = { { 255, 70, 70 }, { 90, 230, 110 }, { 255, 210, 70 }, { 100, 170, 255 } };
+    for (int x = 4; x <= 60; x++) {
+        double y = 3 + (x - 32) * (x - 32) / 110.0;
+        putd(x, y, (rgb_t){ 40, 70, 40 });
+        if (x % 5 == 2) {
+            int k = x / 5;
+            bool lit = pymod((int)(t * 2) + k, 3) != 0;
+            putd(x, y + 1, lit ? COLS[k % 4] : mix(COLS[k % 4], (rgb_t){ 0, 0, 0 }, 0.7));
+        }
+    }
+}
+
+static void ambient_back(double t)
+{
+    if (!s_amb.on) {
+        return;
+    }
+    bool night = s_amb.sky == BOOPIE_SKY_NIGHT;
+    bool wet = s_amb.weather == BOOPIE_AMB_RAIN;
+    /* The sky. */
+    if (night && !wet && s_amb.weather != BOOPIE_AMB_CLOUDY) {
+        night_stars(t, 18);
+    }
+    if (s_amb.sky == BOOPIE_SKY_DUSK) {
+        for (int x = 0; x < 64; x++) {   /* the evening glow, low down, fading to the sides */
+            for (int y = 48; y < 64; y++) {
+                double d = hypot((x - 32) / 34.0, (64 - y) / 16.0);
+                if (d < 1 && BAYER[y % 4][x % 4] < (1 - d) * 0.55) {
+                    putd(x, y, mix((rgb_t){ 70, 30, 50 }, (rgb_t){ 150, 70, 40 }, 1 - d));
+                }
+            }
+        }
+    }
+    if (s_amb.fest == BOOPIE_AMB_FEST_MOON) {
+        moon(9, 9, 4.5, true);
+    } else if (night && !wet) {
+        moon(9, 8, 3.5, false);
+    } else if (!night && s_amb.weather == BOOPIE_AMB_SUNNY) {
+        if (s_amb.sky == BOOPIE_SKY_DUSK) {
+            disc(52, 46, 3, (rgb_t){ 255, 140, 70 });   /* setting */
+            putd(51, 45, (rgb_t){ 255, 200, 140 });
+        } else {
+            sun(50, s_amb.sky == BOOPIE_SKY_MORNING ? 12 : 8, 3, t);
+        }
+    }
+    if (s_amb.weather == BOOPIE_AMB_CLOUDY || wet) {
+        rgb_t c = wet ? (rgb_t){ 95, 100, 120 } : night ? (rgb_t){ 75, 80, 100 } : (rgb_t){ 150, 158, 175 };
+        rgb_t lit = wet ? (rgb_t){ 130, 136, 155 } : night ? (rgb_t){ 105, 110, 130 } : (rgb_t){ 210, 215, 225 };
+        cloud(pymodd(t * 1.2 + 14, 84) - 12, 5, c, lit);
+        cloud(pymodd(t * 0.8 + 56, 84) - 12, 13, c, lit);
+    }
+    if (wet) {
+        for (int i = 0; i < 16; i++) {
+            raindrop(i, t, false);
+        }
+    }
+    if (s_amb.weather == BOOPIE_AMB_SNOW || (s_amb.fest == BOOPIE_AMB_FEST_XMAS && !wet)) {
+        for (int i = 0; i < 16; i++) {
+            snowflake(i, t, false);
+        }
+    }
+    /* The festival. */
+    switch (s_amb.fest) {
+    case BOOPIE_AMB_FEST_LANTERNS:
+        lantern(6, t, 0);
+        lantern(58, t, 1);
+        if (night) {
+            firework(t, 0);
+            firework(t, 1);
+        }
+        break;
+    case BOOPIE_AMB_FEST_HALLOWEEN:
+        bat(t, 0);
+        bat(t, 1);
+        for (int dy = -2; dy <= 2; dy++) {   /* a pumpkin by its feet, glowing */
+            for (int dx = -3; dx <= 3; dx++) {
+                if (dx * dx / 9.0 + dy * dy / 4.0 <= 1.1) {
+                    putd(7 + dx, 58 + dy, dx == 0 ? (rgb_t){ 200, 90, 20 } : (rgb_t){ 240, 130, 30 });
+                }
+            }
+        }
+        putd(7, 55, (rgb_t){ 90, 140, 50 });
+        putd(6, 57, (rgb_t){ 255, 230, 120 });
+        putd(8, 57, (rgb_t){ 255, 230, 120 });
+        break;
+    case BOOPIE_AMB_FEST_XMAS:
+        xmas_lights(t);
+        break;
+    case BOOPIE_AMB_FEST_HEARTS:
+        for (int i = 0; i < 6; i++) {
+            double y = 64 - pymodd(h01(2, i, 51, 0) * 70 + t * (4 + i % 3), 70);
+            double x = (i % 2 ? 54 : 6) + h01(2, i, 52, 0) * 6 + sin(t * 1.5 + i) * 1.5;
+            heart(x, y, i % 3 ? (rgb_t){ 230, 80, 120 } : (rgb_t){ 255, 150, 180 });
+        }
+        break;
+    case BOOPIE_AMB_FEST_LEAVES:
+        for (int i = 0; i < 8; i++) {
+            double y = pymodd(h01(2, i, 61, 0) * 64 + t * 5, 68) - 2;
+            double x = pymodd(h01(2, i, 62, 0) * 70 + sin(t + i) * 4, 70) - 3;
+            putd(x, y, (rgb_t){ 90, 170, 80 });
+            putd(x + 1, y + 1, (rgb_t){ 60, 130, 60 });
+        }
+        break;
+    case BOOPIE_AMB_FEST_BALLOONS:
+        for (int i = 0; i < 4; i++) {
+            balloon(i, t);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void ambient_front(double t)
+{
+    if (!s_amb.on) {
+        return;
+    }
+    if (s_amb.weather == BOOPIE_AMB_RAIN) {
+        for (int i = 16; i < 22; i++) {
+            raindrop(i, t, true);
+        }
+    } else if (s_amb.weather == BOOPIE_AMB_SNOW || s_amb.fest == BOOPIE_AMB_FEST_XMAS) {
+        for (int i = 22; i < 28; i++) {
+            snowflake(i, t, true);
+        }
+    }
+}
+
 static void scene_back(boopie_scene_t scene, double t)
 {
     switch (scene) {
+    case BOOPIE_SCENE_DEFAULT:
+        ambient_back(t);
+        break;
     case BOOPIE_SCENE_STARS: {
         for (int i = 0; i < 34; i++) {
             int x = (int)(h01(2, i, 1, 0) * 64), y = (int)(h01(2, i, 2, 0) * 50);
@@ -1125,7 +1422,9 @@ static void scene_back(boopie_scene_t scene, double t)
 
 static void scene_front(boopie_scene_t scene, double t)
 {
-    if (scene == BOOPIE_SCENE_FIREFLIES) {
+    if (scene == BOOPIE_SCENE_DEFAULT) {
+        ambient_front(t);
+    } else if (scene == BOOPIE_SCENE_FIREFLIES) {
         for (int i = 0; i < 9; i += 3) {
             firefly(i, t);
         }

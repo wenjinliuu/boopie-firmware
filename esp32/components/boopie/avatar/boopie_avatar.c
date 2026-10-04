@@ -941,6 +941,47 @@ static void flash_overlay(boopie_overlay_t o, float secs)
 /* Show what a pet call earned: eating, a level-up. */
 static int s_tired;
 
+/*
+ * The default background's life: the time of day, today's weather and a
+ * festival (boopie_pixel_set_ambient). Worked out once a minute.
+ */
+static void set_ambient(bool on)
+{
+    static int64_t s_at = -1;
+    static bool s_on;
+    int64_t now;
+    int32_t day;
+    int minute;
+    bool known = local_now(&now, &day, &minute);
+    if (on == s_on && known && now / 60 == s_at) {
+        return;
+    }
+    s_on = on;
+    s_at = known ? now / 60 : -1;
+    if (!on || !known) {
+        boopie_pixel_set_ambient(NULL);   /* no clock: nothing to tell */
+        return;
+    }
+    static const boopie_amb_fest_t FESTS[BOOPIE_FEST_COUNT] = {
+        [BOOPIE_FEST_SPRING] = BOOPIE_AMB_FEST_LANTERNS,   [BOOPIE_FEST_NEW_YEAR] = BOOPIE_AMB_FEST_LANTERNS,
+        [BOOPIE_FEST_MOON] = BOOPIE_AMB_FEST_MOON,         [BOOPIE_FEST_HALLOWEEN] = BOOPIE_AMB_FEST_HALLOWEEN,
+        [BOOPIE_FEST_XMAS] = BOOPIE_AMB_FEST_XMAS,         [BOOPIE_FEST_VALENTINE] = BOOPIE_AMB_FEST_HEARTS,
+        [BOOPIE_FEST_DRAGON] = BOOPIE_AMB_FEST_LEAVES,     [BOOPIE_FEST_CHILDREN] = BOOPIE_AMB_FEST_BALLOONS,
+        [BOOPIE_FEST_BIRTHDAY] = BOOPIE_AMB_FEST_BALLOONS,
+    };
+    boopie_fest_t f = boopie_avatar_festival();
+    boopie_ambient_t a = {
+        .on = true,
+        .sky = minute < 6 * 60 || minute >= 19 * 60 ? BOOPIE_SKY_NIGHT
+               : minute < 9 * 60                    ? BOOPIE_SKY_MORNING
+               : minute >= 17 * 60                  ? BOOPIE_SKY_DUSK
+                                                    : BOOPIE_SKY_DAY,
+        .weather = (boopie_amb_weather_t)boopie_avatar_weather(),
+        .fest = (int)f >= 0 && f < BOOPIE_FEST_COUNT ? FESTS[f] : BOOPIE_AMB_FEST_NONE,
+    };
+    boopie_pixel_set_ambient(&a);
+}
+
 int boopie_avatar_tired(void)
 {
     return s_tired;
@@ -1555,6 +1596,7 @@ void muse_pixel_render(const muse_pose_t *p)
     s_shown_overlays = on;
     bp.overlays = on;
     bp.scene = p->mode == MUSE_MODE_OFF ? BOOPIE_SCENE_DEFAULT : shown_scene();
+    set_ambient(bp.scene == BOOPIE_SCENE_DEFAULT && p->mode != MUSE_MODE_OFF);
     bp.scene_t = p->t;
     if (s_avatar == BOOPIE_AVATAR_MUSE) {
         /* Muse's own renderer draws the expression, a pet one included, and

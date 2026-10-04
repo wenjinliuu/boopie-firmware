@@ -64,6 +64,31 @@ typedef enum {
     BOOPIE_SCENE_COUNT,
 } boopie_scene_t;
 
+/*
+ * The default background's own life (C only: the prototype has none): the
+ * time of day, today's weather and a festival, drawn behind the character
+ * when the scene is BOOPIE_SCENE_DEFAULT. Off until set; on = false turns it off.
+ */
+typedef enum { BOOPIE_SKY_DAY = 0, BOOPIE_SKY_MORNING, BOOPIE_SKY_DUSK, BOOPIE_SKY_NIGHT } boopie_sky_t;
+typedef enum { BOOPIE_AMB_SUNNY = 0, BOOPIE_AMB_CLOUDY, BOOPIE_AMB_RAIN, BOOPIE_AMB_SNOW } boopie_amb_weather_t;
+typedef enum {
+    BOOPIE_AMB_FEST_NONE = 0,
+    BOOPIE_AMB_FEST_LANTERNS,    /* 春节, 元旦: lanterns, fireworks at night */
+    BOOPIE_AMB_FEST_MOON,        /* 中秋: a full moon */
+    BOOPIE_AMB_FEST_HALLOWEEN,   /* bats */
+    BOOPIE_AMB_FEST_XMAS,        /* lights and snow */
+    BOOPIE_AMB_FEST_HEARTS,      /* 情人节 */
+    BOOPIE_AMB_FEST_LEAVES,      /* 端午: bamboo leaves */
+    BOOPIE_AMB_FEST_BALLOONS,    /* 儿童节, the pet's birthday */
+} boopie_amb_fest_t;
+typedef struct {
+    bool on;
+    boopie_sky_t sky;
+    boopie_amb_weather_t weather;
+    boopie_amb_fest_t fest;
+} boopie_ambient_t;
+void boopie_pixel_set_ambient(const boopie_ambient_t *a);
+
 /* Its id ("stars") and display name ("星空"); NULL out of range. */
 const char *boopie_scene_key(boopie_scene_t s);
 const char *boopie_scene_name(boopie_scene_t s);

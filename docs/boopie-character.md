@@ -115,7 +115,7 @@ python3 tools/boopie/avatar_proto.py --out previews/ --character boopie --color 
 | 10 | 配饰·小皇冠 | 20 | 背景·像素故障 |
 | 11 | 背景·飘雪 | | |
 
-设置页"Avatar"顶部显示等级、经验和星星；没解锁的颜色和背景显示需要的等级，点了不生效。命令 `pet.status` 报告这些数值（不提供语音喂食）。测试：`tests/test_boopie_pet.py` 模拟整天、整月。
+设置页"Avatar"顶部显示等级、经验和星星；没解锁的颜色和背景显示需要的等级，点了不生效。命令 `pet.status` 报告这些数值（语音喂食用 `pet.feed`）。测试：`tests/test_boopie_pet.py` 模拟整天、整月。
 
 ## 皮肤（14 套，已定稿）
 
@@ -143,6 +143,16 @@ python3 tools/boopie/avatar_proto.py --out previews/ --character boopie --color 
 - 原型 `tools/boopie/avatar_proto.py` 的 `SKINS` 是设计稿，固件 `boopie_pixel.c` 的 `SKINS` 照着写，测试逐像素比对 12 套（Muse 的两套由官方渲染器画，看模拟器截图 `skins.png`）；表格只追加，序号就是存档里的拥有记录
 - Muse 的皮肤只换官方渲染器的调色板（`jolly_pixel_set_colours`）：毛色四档、描边，宇航员再换脸部面板和五官颜色
 - 皮肤动画用背景的时钟，换表情时花纹不会跳
+
+## 默认背景会变（`boopie_pixel_set_ambient`）
+
+选"默认"背景、也没穿自带背景的皮肤时，宠物身后的天空跟着现实走（一分钟算一次，没对上时间就不画）：
+- **时间**：早上 6–9 点太阳低一点；白天太阳在右上角慢慢转；傍晚 17–19 点脚下一圈暖色晚霞、夕阳；晚上 19–6 点左上角弯月加零星星星。
+- **天气**（和小窝同一个，AI 的 `world.weather` 也会改）：多云飘两朵云；下雨有乌云和雨丝（前后两层）；下雪有雪花，晚上照样有月亮。
+- **节日**：春节、元旦挂两盏灯笼，晚上放烟花；中秋左上角大圆月；万圣节蝙蝠和南瓜灯；圣诞头顶一串彩灯加下雪；情人节飘爱心；端午飘竹叶；儿童节和宠物生日飘气球。
+- 宠物自己的状态仍由表情和小图标表现（饿了冒想吃的泡泡、旁边放空碗，困了 Zzz，升级撒花），背景不重复表现。
+- 选了别的背景（星空、飘雪……）时以选的为准，这一层不画。只在 C 渲染器里有，原型 `avatar_proto.py` 没有，所以像素对照测试不涉及它。
+- 模拟器：`TZ` 调时间，`BOOPIE_WEATHER=rain`、`BOOPIE_FEST=1`（`boopie_fest_t`）调天气和节日。
 
 ## 配饰
 
