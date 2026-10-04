@@ -24,6 +24,7 @@ typedef enum {
     BOOPIE_ROOM_BEDROOM,      /* 二楼卧室 */
     BOOPIE_ROOM_OUTSIDE,      /* 户外: the house front and the farm, wider than the screen */
     BOOPIE_ROOM_WOODS,        /* 森林: a long walk east, slimes and chests */
+    BOOPIE_ROOM_BEACH,        /* 海边: west of the yard, fishing and shells */
     BOOPIE_ROOM_COUNT,
 } boopie_room_t;
 
@@ -52,6 +53,12 @@ typedef enum {
     BOOPIE_DO_SLIME_FLED,     /* ... or the time ran out and it got away */
     BOOPIE_DO_GATHER,         /* berries or a mushroom to pick (arg: the spot), once a day */
     BOOPIE_DO_FURNI,          /* furniture from the shop (arg: which); shown once bought and put out */
+    BOOPIE_DO_BEACH,          /* the yard's sign to the beach */
+    BOOPIE_DO_FISH,           /* the pier's end: the line's out */
+    BOOPIE_DO_FISH_BITE,      /* a fish on it: tap now! */
+    BOOPIE_DO_FISH_CAUGHT,    /* ... caught (boopie_world_t.last_fish: what) */
+    BOOPIE_DO_FISH_EARLY,     /* tapped before a bite: it swam off */
+    BOOPIE_DO_FISH_MISSED,    /* not tapped in time */
     BOOPIE_DO_COUNT,
 } boopie_do_t;
 
@@ -88,10 +95,19 @@ const char *boopie_furni_where(boopie_furni_t f);   /* "客厅" ... */
 void boopie_world_set_furniture(uint32_t out);      /* bit f: furniture f is out */
 
 /* What can be picked in the woods: each spot gives one of these, once a day. */
-typedef enum { BOOPIE_ITEM_BERRY = 0, BOOPIE_ITEM_MUSHROOM, BOOPIE_ITEM_COUNT } boopie_item_t;
+typedef enum { BOOPIE_ITEM_BERRY = 0, BOOPIE_ITEM_MUSHROOM, BOOPIE_ITEM_SHELL, BOOPIE_ITEM_FISH, BOOPIE_ITEM_COUNT } boopie_item_t;
 const char *boopie_item_name(boopie_item_t item);
-boopie_item_t boopie_gather_item(int spot);
-#define BOOPIE_GATHER_SPOTS 5
+bool boopie_item_edible(boopie_item_t item);   /* shells are only to keep */
+boopie_item_t boopie_gather_item(int spot);    /* the woods' 0 to 4, the beach's 5 to 7 */
+#define BOOPIE_GATHER_SPOTS 8
+
+/*
+ * Fishing off the pier: the line's out a few seconds, then a bite, and a tap
+ * within a moment lands it. What bites: mostly a small fish, from level 8
+ * now and then a big one, rarely a golden one, and sometimes an old boot.
+ */
+typedef enum { BOOPIE_FISH_SMALL = 0, BOOPIE_FISH_BIG, BOOPIE_FISH_GOLD, BOOPIE_FISH_BOOT, BOOPIE_FISH_KINDS } boopie_fish_t;
+#define BOOPIE_FISH_BITE_S 1.2f   /* a bite lasts this long */
 
 /* A room's things, and its background at a level. */
 const boopie_thing_t *boopie_room_things(boopie_room_t room, int *count);
@@ -152,6 +168,11 @@ typedef struct {
     int last_slime;           /* the kind just beaten or gone */
     boopie_do_t event;        /* for the next tick to hand on */
     int level;                /* the last level ticked with */
+    bool fishing;             /* the line's out */
+    bool bite;                /* and a fish is on it */
+    float fish_t;             /* till the bite, or while it lasts */
+    int fish_kind;            /* what's biting */
+    int last_fish;            /* what was caught */
 } boopie_world_t;
 
 void boopie_world_init(boopie_world_t *w, uint32_t seed);
@@ -164,7 +185,8 @@ void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
  * (and its index comes back); on the floor, it walks there (-1); elsewhere
  * nothing (-2). Asleep, a tap anywhere but the bed wakes it (-3). In the
  * woods: on a slime, off it goes after it (-4); fighting, a tap is a hit on
- * the slime (-5) or a miss (-6), and nothing else.
+ * the slime (-5) or a miss (-6), and nothing else. Fishing, a tap reels in:
+ * a catch with a bite on (-7), too soon without (-8).
  */
 int boopie_world_tap(boopie_world_t *w, int level, float x, float y);
 

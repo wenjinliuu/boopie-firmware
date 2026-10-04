@@ -25,10 +25,11 @@ HERE = Path(__file__).resolve().parent
 COMPONENT = HERE.parent
 
 (NOTHING, GAMES, BOOKS, RADIO, FEED, UPSTAIRS, DOWNSTAIRS, OUTSIDE, SLEEP, WARDROBE, RENAME, STATUS,
- PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED, GATHER, FURNI) = range(23)
+ PLOT, INSIDE, MAIL, WILD, HOME_PATH, CHEST, SLIME_FIGHT, SLIME_WIN, SLIME_FLED, GATHER, FURNI,
+ BEACH_SIGN, FISH, FISH_BITE, FISH_CAUGHT, FISH_EARLY, FISH_MISSED) = range(29)
 IDLE, WALKING, USING, SLEEPING = range(4)
-LIVING, BEDROOM, YARD, WOODS = range(4)
-WIDTH = {YARD: 360, WOODS: 520}
+LIVING, BEDROOM, YARD, WOODS, BEACH = range(5)
+WIDTH = {YARD: 360, WOODS: 520, BEACH: 440}
 GREEN, BLUE, PINK, GOLD = range(4)
 AWAY, ROAM, FIGHTING, POOF = range(4)
 
@@ -99,7 +100,8 @@ class BoopieWorldTest(unittest.TestCase):
                 if t["room"] in WIDTH:
                     # The view follows the pet across: only up and down must fit.
                     if t["act"]:
-                        hint_over = 0 if t["act"] == INSIDE else 16   # the house's hint is over its door
+                        # the house's hint is over its door, the pier's halfway out
+                        hint_over = 0 if t["act"] in (INSIDE, FISH) else 16
                         self.assertGreaterEqual(t["box"][1] + 16 - hint_over, 6, t)
                         self.assertLessEqual(t["box"][3], 128, t)
                         self.assertLess(0, t["box"][0], t)
@@ -205,9 +207,52 @@ class BoopieWorldTest(unittest.TestCase):
 
     def test_the_woods_have_things_to_pick(self) -> None:
         def spots(level: int) -> list[int]:
-            return sorted(t["x"] for t in self.things(level) if t["act"] == GATHER and t["shown"])
+            return sorted(t["x"] for t in self.things(level)
+                          if t["act"] == GATHER and t["shown"] and t["room"] == WOODS)
         self.assertEqual(len(spots(1)), 3)                     # mushrooms ...
         self.assertEqual(len(spots(4)), 5)                     # ... and berry bushes from 4
+
+    def test_to_the_beach_and_back(self) -> None:
+        sign = self.thing(1, BEACH_SIGN, YARD)
+        home = self.thing(1, HOME_PATH, BEACH)
+        mat = self.thing(1, OUTSIDE)
+        s = self.run_w(f"tap:{mat['x']}:{mat['y'] - 3}", "tick:3", f"tap:{sign['x']}:{sign['y'] - 8}", "tick:4",
+                       f"tap:{home['x']}:{home['y'] - 8}", "tick:1.5")
+        self.assertEqual((s[3]["room"], s[3]["acts"]), (BEACH, [BEACH_SIGN]))
+        self.assertLess(math.hypot(s[3]["x"] - home["use"][0], s[3]["y"] - home["use"][1]), 3)
+        self.assertEqual((s[5]["room"], s[5]["acts"]), (YARD, [HOME_PATH]))
+        self.assertLess(math.hypot(s[5]["x"] - sign["use"][0], s[5]["y"] - sign["use"][1]), 3)   # back by its sign
+        shells = [t for t in self.things(1) if t["room"] == BEACH and t["act"] == GATHER and t["shown"]]
+        self.assertEqual(len(shells), 3)
+
+    def fish(self, *after: str):
+        pier = self.thing(1, FISH, BEACH)
+        return self.run_w("beach", f"tap:{pier['x']}:{pier['y'] - 30}", "tick:16", *after), pier
+
+    def test_out_along_the_pier_to_fish(self) -> None:
+        s, pier = self.fish()
+        self.assertEqual(s[1]["tap"] >= 0, True)
+        self.assertIn(FISH, s[2]["acts"])
+        self.assertAlmostEqual(s[2]["x"], pier["use"][0], delta=1)   # out at its end, over the water
+        self.assertAlmostEqual(s[2]["y"], pier["use"][1], delta=1)
+
+    def test_a_bite_then_a_tap_lands_it(self) -> None:
+        s, _ = self.fish("tick:7", "tap:10:120", "tick:0.1")
+        self.assertIn(FISH_BITE, s[2]["acts"] + s[3]["acts"])
+        # Ticks of 7 s run past a 1.2 s bite: it got away ...
+        self.assertIn(FISH_MISSED, s[2]["acts"] + s[3]["acts"])
+        s, _ = self.fish("tap:10:120", "tick:0.1")
+        self.assertEqual(s[3]["tap"], -8)                      # ... too soon: scared off
+        self.assertEqual(s[4]["acts"], [FISH_EARLY])
+
+    def test_a_tap_in_the_bite_catches(self) -> None:
+        caught = 0
+        for wait in (2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0):
+            s, _ = self.fish(f"tick:{wait}", "tap:10:120", "tick:0.1")
+            if s[4]["tap"] == -7:
+                self.assertEqual(s[5]["acts"], [FISH_CAUGHT])
+                caught += 1
+        self.assertGreater(caught, 0)
 
     def test_floor_and_wall(self) -> None:
         s = self.run_w("tap:90:90", "tick:1.5", "tap:78:10")

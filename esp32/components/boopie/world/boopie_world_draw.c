@@ -170,6 +170,57 @@ static void slime(const boopie_world_t *w, int i, const boopie_world_look_t *loo
     }
 }
 
+/* The beach: foam coming in and going out along the shore, and crabs about. */
+static int shore_y(int x)
+{
+    return 46 + (int)(3 * sinf(x * 0.05f) + 2 * sinf(x * 0.13f + 2));   /* as tools/boopie/world_art.py draws it */
+}
+
+static void waves(float t)
+{
+    float reach = 2.5f + 2.5f * sinf(t * 0.9f);
+    for (int sx = 0; sx < N; sx++) {
+        int x = sx + s_cam;
+        int y = shore_y(x) + (int)(reach + sinf(x * 0.21f + t * 1.7f) * 0.8f);
+        put(sx, y, 0xf4f8fc);
+        if ((x + (int)(t * 6)) % 3) {
+            put(sx, y - 1, 0xc8e4f4);
+        }
+    }
+}
+
+static void crabs(float t)
+{
+    static const float AT[][3] = { { 180, 70, 22 }, { 360, 118, 16 }, { 60, 112, 14 } };   /* x, y, how far it goes */
+    for (int k = 0; k < 3; k++) {
+        float x = AT[k][0] + sinf(t * 0.5f + k * 2) * AT[k][2];
+        bool step = ((int)(t * 6) + k) & 1;
+        blit(step ? BOOPIE_ART_CRAB_A : BOOPIE_ART_CRAB_B, (int)x, (int)AT[k][1]);
+    }
+}
+
+/* The line from the pet out to the float, bobbing; under, when a fish bites, with a "!". */
+static void fishing(const boopie_world_t *w, const boopie_world_look_t *look)
+{
+    if (!w->fishing) {
+        return;
+    }
+    int px = (int)w->x - s_cam, py = (int)w->y - 12;
+    int fx = px + 15 * (w->facing < 0 ? -1 : 1), fy = (int)w->y - 4;   /* off the pier's end, in the water */
+    int dip = w->bite ? (((int)(look->t * 10) & 1) ? 2 : 0) : (int)(sinf(look->t * 3) * 1.2f);
+    for (int k = 0; k <= 10; k++) {   /* the line, sagging */
+        float u = k / 10.0f;
+        put(px + (int)((fx - px) * u), py + (int)((fy + dip - py) * u + sinf(u * 3.14159f) * 2), 0xe8e8f0);
+    }
+    put(fx, fy + dip, 0xf04848);
+    put(fx + 1, fy + dip, 0xf04848);
+    put(fx, fy + dip + 1, 0xffffff);
+    put(fx + 1, fy + dip + 1, 0xffffff);
+    if (w->bite) {
+        blit(BOOPIE_ART_HINT_BANG, fx + s_cam, fy + dip - 2);   /* over the float */
+    }
+}
+
 /* Fireflies in the woods at night: drifting, blinking. */
 static void fireflies(float t)
 {
@@ -286,6 +337,7 @@ static void night(const boopie_thing_t *t, int n, int level)
         case BOOPIE_ART_HOUSE_FRONT: lights[nl++] = (light_t){ t[i].x, t[i].y - 14, 40, 0xffd090 }; break;
         case BOOPIE_ART_MUSHROOM_RING: lights[nl++] = (light_t){ t[i].x, t[i].y - 4, 30, 0xc8b0ff }; break;
         case BOOPIE_ART_FAIRY_LIGHTS: lights[nl++] = (light_t){ t[i].x, t[i].y - 2, 44, 0xffe0b0 }; break;
+        case BOOPIE_ART_LIGHTHOUSE: lights[nl++] = (light_t){ t[i].x, t[i].y - 50, 60, 0xfff0b0 }; break;
         case BOOPIE_ART_TREE_HOUSE: lights[nl++] = (light_t){ t[i].x + 6, t[i].y - 45, 22, 0xffe0a0 }; break;
         default: break;
         }
@@ -342,6 +394,9 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
             dst[x * 3 + 2] = (uint8_t)c;
         }
     }
+    if (w->room == BOOPIE_ROOM_BEACH) {
+        waves(look->t);   /* under the pier */
+    }
     int n;
     const boopie_thing_t *t = boopie_room_things(w->room, &n);
     for (int layer = BOOPIE_LAYER_FLOOR; layer <= BOOPIE_LAYER_WALL; layer++) {
@@ -354,6 +409,9 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
                 }
             }
         }
+    }
+    if (w->room == BOOPIE_ROOM_BEACH) {
+        crabs(look->t);
     }
     /* What stands, back to front, and the pet and the slimes among it. */
     bool pet_drawn = false;
@@ -399,6 +457,7 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
         }
         done[next] = 1;
     }
+    fishing(w, look);
     if (look->night) {
         night(t, n, look->level);
         if (w->room == BOOPIE_ROOM_WOODS) {
@@ -420,6 +479,11 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
                 top = t[i].y - 6;
             } else if (t[i].act == BOOPIE_DO_PLOT) {
                 hint = plot_hint(&t[i], look, &top);
+            } else if (t[i].act == BOOPIE_DO_FISH) {
+                if (w->fishing || w->y < t[i].y - 8) {
+                    continue;   /* out on it already */
+                }
+                top = t[i].y - 18;   /* halfway out along it */
             } else if (t[i].art == BOOPIE_ART_HOUSE_FRONT) {
                 top = t[i].y - 18;   /* over its door, not its roof */
             }

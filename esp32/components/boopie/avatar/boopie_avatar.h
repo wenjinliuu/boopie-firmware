@@ -154,6 +154,9 @@ unsigned boopie_avatar_gathered(void);
 bool boopie_avatar_gather(int spot, int item);
 int boopie_avatar_items(int item);
 bool boopie_avatar_snack(int item, bool *fed);
+/* Something won out there (a catch): `count` of an item into the bag (item
+ * -1 for none), and experience and stars toward the daily caps. */
+void boopie_avatar_world_reward(int item, int count, int xp, int stars, int *got_stars);
 
 /* Furniture (boopie_furni_t): what's out (bought and not put away, bit f),
  * whether one's bought, buying one for `price` stars (then it's out; false

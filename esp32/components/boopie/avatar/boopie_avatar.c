@@ -107,8 +107,8 @@ static boopie_garden_t s_garden;   /* 小花园 */
  * each spot was picked, what's in the bag, the furniture bought and the
  * furniture put away. Kept in NVS as it is: only ever append. */
 #define WOODS_CHESTS 4
-#define WOODS_SPOTS 8
-#define BAG_ITEMS 4
+#define WOODS_SPOTS 12
+#define BAG_ITEMS 12
 static struct {
     int32_t chest_day[WOODS_CHESTS];
     uint32_t slimes;
@@ -439,6 +439,8 @@ static void load(void)
     if (getenv("BOOPIE_BAG")) {
         s_woods.items[0] = 3;   /* berries */
         s_woods.items[1] = 2;   /* mushrooms */
+        s_woods.items[2] = 4;   /* shells */
+        s_woods.items[3] = 1;   /* fish */
     }
     const char *name = getenv("BOOPIE_NAME");
     if (name) {
@@ -1006,6 +1008,22 @@ bool boopie_avatar_snack(int item, bool *fed)
     show_event(&ev);
     save();
     return true;
+}
+
+void boopie_avatar_world_reward(int item, int count, int xp, int stars, int *got_stars)
+{
+    ensure_loaded();
+    if (item >= 0 && item < BAG_ITEMS) {
+        s_woods.items[item] = (uint16_t)(s_woods.items[item] + count > 999 ? 999 : s_woods.items[item] + count);
+    }
+    boopie_pet_event_t ev = { 0 };
+    boopie_pet_game(&s_pet_state, xp, stars, &ev);
+    boopie_avatar_react(BOOPIE_EXPR_HAPPY, 2.0f);
+    show_event(&ev);
+    if (got_stars) {
+        *got_stars = ev.stars;
+    }
+    save();
 }
 
 uint32_t boopie_avatar_furniture(void)

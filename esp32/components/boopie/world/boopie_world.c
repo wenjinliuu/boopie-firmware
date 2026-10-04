@@ -102,6 +102,8 @@ static const boopie_thing_t OUTSIDE[] = {
     { A(BEEHIVE), 316, 130, 15, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(BARN), 326, 70, 20, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(SIGN), 344, 114, 1, 0, STAND, BOOPIE_DO_WILD, A(HINT_TREE), -8, 2, 0 },
+    { A(SIGN_HOME), 14, 104, 1, 0, STAND, BOOPIE_DO_BEACH, A(HINT_WAVE), 8, 2, 0 },
+    { A(BIRD_BATH), 66, 122, 7, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
     { A(SWING), 122, 108, 1, 0, STAND, BOOPIE_DO_FURNI, A(HINT_HEART), 0, 2, BOOPIE_FURNI_SWING },
     { A(WINDMILL_A), 228, 58, 1, 0, STAND, BOOPIE_DO_FURNI, 0, 0, 0, BOOPIE_FURNI_WINDMILL },
 };
@@ -143,6 +145,33 @@ static const boopie_thing_t WOODS[] = {
     { A(CHEST_SHUT), 500, 112, 8, 0, STAND, BOOPIE_DO_CHEST, A(HINT_KEY), -10, 2, 1 },
 };
 
+/*
+ * The beach, west of the yard: the sea along the top, a pier out into it to
+ * fish from (at the left end, clear of the clock over the middle), shells to pick up (once a day each), crabs about. An umbrella at
+ * 3, a deck chair at 5, a sandcastle at 7, the lighthouse at 9 (lit at
+ * night), a tide pool at 11, a boat at 13, a hammock at 16.
+ */
+static const boopie_thing_t BEACH[] = {
+    { A(PIER), 40, 66, 1, 0, FLOOR, BOOPIE_DO_FISH, A(HINT_FISH), 0, -36, 0 },
+    { A(TIDE_POOL), 330, 124, 11, 0, FLOOR, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(SIGN), 424, 108, 1, 0, STAND, BOOPIE_DO_HOME_PATH, A(HINT_HOUSE), -8, 2, 0 },
+    { A(LIGHTHOUSE), 166, 74, 9, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PALM), 130, 72, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PALM), 300, 70, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PALM), 402, 74, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(PALM), 52, 126, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(UMBRELLA), 192, 104, 3, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BEACH_CHAIR), 214, 110, 5, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(SANDCASTLE), 250, 120, 7, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(BOAT), 364, 92, 13, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(HAMMOCK), 222, 84, 16, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(STARFISH), 112, 114, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(STARFISH), 276, 96, 1, 0, STAND, BOOPIE_DO_NOTHING, 0, 0, 0, 0 },
+    { A(SHELL), 194, 124, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_SHELL), 8, 0, 5 },
+    { A(SHELL), 340, 98, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_SHELL), 8, 0, 6 },
+    { A(SHELL), 66, 94, 1, 0, STAND, BOOPIE_DO_GATHER, A(HINT_SHELL), 8, 0, 7 },
+};
+
 /* Where each slime keeps to: its patch's middle, and how far it strays. */
 static const float SLIME_HOME[BOOPIE_SLIMES] = { 130, 300, 430 };
 #define SLIME_RANGE 36.0f
@@ -158,6 +187,7 @@ static const struct {
     [BOOPIE_ROOM_BEDROOM] = { BEDROOM, (int)(sizeof BEDROOM / sizeof BEDROOM[0]), 16, 70, 142, 124, BOOPIE_WORLD_W },
     [BOOPIE_ROOM_OUTSIDE] = { OUTSIDE, (int)(sizeof OUTSIDE / sizeof OUTSIDE[0]), 10, 70, 350, 126, 360 },
     [BOOPIE_ROOM_WOODS] = { WOODS, (int)(sizeof WOODS / sizeof WOODS[0]), 10, 70, 510, 126, 520 },
+    [BOOPIE_ROOM_BEACH] = { BEACH, (int)(sizeof BEACH / sizeof BEACH[0]), 10, 66, 430, 126, 440 },
 };
 
 int boopie_room_width(boopie_room_t room)
@@ -189,6 +219,9 @@ boopie_art_id_t boopie_room_background(boopie_room_t room, int level)
     }
     if (room == BOOPIE_ROOM_WOODS) {
         return BOOPIE_ART_BG_WOODS;
+    }
+    if (room == BOOPIE_ROOM_BEACH) {
+        return BOOPIE_ART_BG_BEACH;
     }
     if (room == BOOPIE_ROOM_BEDROOM) {
         return level >= 10 ? BOOPIE_ART_BG_UP_STARS : BOOPIE_ART_BG_UP;
@@ -230,12 +263,19 @@ void boopie_world_set_furniture(uint32_t out)
 
 const char *boopie_item_name(boopie_item_t item)
 {
-    return item == BOOPIE_ITEM_BERRY ? "蓝莓" : item == BOOPIE_ITEM_MUSHROOM ? "蘑菇" : "";
+    static const char *const NAMES[BOOPIE_ITEM_COUNT] = { "蓝莓", "蘑菇", "贝壳", "小鱼" };
+    return (int)item >= 0 && item < BOOPIE_ITEM_COUNT ? NAMES[item] : "";
+}
+
+bool boopie_item_edible(boopie_item_t item)
+{
+    return item != BOOPIE_ITEM_SHELL;
 }
 
 boopie_item_t boopie_gather_item(int spot)
 {
-    return spot >= 3 ? BOOPIE_ITEM_BERRY : BOOPIE_ITEM_MUSHROOM;   /* the woods' table: mushrooms, then bushes */
+    /* The woods' table: mushrooms, then bushes; then the beach's shells. */
+    return spot >= 5 ? BOOPIE_ITEM_SHELL : spot >= 3 ? BOOPIE_ITEM_BERRY : BOOPIE_ITEM_MUSHROOM;
 }
 
 bool boopie_thing_shown(const boopie_thing_t *t, int level)
@@ -286,7 +326,12 @@ static void on_floor(const boopie_world_t *w, float *x, float *y)
 
 static void walk_to(boopie_world_t *w, float x, float y, int pending)
 {
-    on_floor(w, &x, &y);
+    const boopie_thing_t *t = boopie_world_thing(w, pending);
+    if (!t || t->act != BOOPIE_DO_FISH) {
+        on_floor(w, &x, &y);
+    } else if (fabsf(w->x - x) > 1) {
+        y = (float)t->y;   /* to the pier's foot first, then out along it over the water */
+    }
     w->tx = x;
     w->ty = y;
     w->pending = pending;
@@ -465,7 +510,9 @@ static int fight_tap(boopie_world_t *w, float x, float y)
 
 void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
 {
+    boopie_room_t was = w->room;
     w->room = room;
+    w->fishing = w->bite = false;
     w->state = BOOPIE_PET_IDLE;
     w->state_t = 0;
     w->pending = -1;
@@ -478,7 +525,8 @@ void boopie_world_enter(boopie_world_t *w, boopie_room_t room, boopie_do_t from)
                       : from == BOOPIE_DO_OUTSIDE    ? BOOPIE_DO_INSIDE
                       : from == BOOPIE_DO_INSIDE     ? BOOPIE_DO_OUTSIDE
                       : from == BOOPIE_DO_WILD       ? BOOPIE_DO_HOME_PATH
-                      : from == BOOPIE_DO_HOME_PATH  ? BOOPIE_DO_WILD
+                      : from == BOOPIE_DO_BEACH      ? BOOPIE_DO_HOME_PATH
+                      : from == BOOPIE_DO_HOME_PATH  ? (was == BOOPIE_ROOM_BEACH ? BOOPIE_DO_BEACH : BOOPIE_DO_WILD)
                                                      : from;
     int n;
     const boopie_thing_t *t = boopie_room_things(room, &n);
@@ -518,6 +566,16 @@ int boopie_world_tap(boopie_world_t *w, int level, float x, float y)
     const boopie_thing_t *t = boopie_room_things(w->room, &n);
     if (w->fight >= 0) {
         return fight_tap(w, x, y);
+    }
+    if (w->fishing) {
+        /* Reeling in: a fish if one's biting, else it's scared off. */
+        bool caught = w->bite;
+        w->fishing = w->bite = false;
+        w->last_fish = w->fish_kind;
+        w->event = caught ? BOOPIE_DO_FISH_CAUGHT : BOOPIE_DO_FISH_EARLY;
+        w->state_t = 0;
+        w->idle_for = 3.0f;
+        return caught ? -7 : -8;
     }
     if (w->state != BOOPIE_PET_SLEEPING) {
         for (int i = 0; i < BOOPIE_SLIMES; i++) {
@@ -616,6 +674,21 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
         }
         return BOOPIE_DO_NOTHING;
     }
+    if (w->fishing) {
+        w->state_t = 0;   /* it waits by its line */
+        w->fish_t -= dt;
+        if (w->fish_t > 0) {
+            return BOOPIE_DO_NOTHING;
+        }
+        if (!w->bite) {
+            w->bite = true;
+            w->fish_t = BOOPIE_FISH_BITE_S;
+            return BOOPIE_DO_FISH_BITE;
+        }
+        w->fishing = w->bite = false;
+        w->idle_for = 3.0f;
+        return BOOPIE_DO_FISH_MISSED;
+    }
     if (w->chase >= 0) {
         boopie_slime_t *s = &w->slimes[w->chase];
         if (s->state != BOOPIE_SLIME_ROAM) {
@@ -656,6 +729,11 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
             w->x = w->tx;
             w->y = w->ty;
             w->walked += d;
+            const boopie_thing_t *t = boopie_world_thing(w, w->pending);
+            if (t && t->act == BOOPIE_DO_FISH && fabsf(w->y - (t->y + t->use_dy)) > 1) {
+                walk_to(w, t->x + t->use_dx, t->y + t->use_dy, w->pending);   /* at the pier's foot: out along it */
+                return BOOPIE_DO_NOTHING;
+            }
             w->state = w->pending >= 0 ? BOOPIE_PET_USING : BOOPIE_PET_IDLE;
             w->state_t = 0;
             w->idle_for = 2.0f + 5.0f * frand(w);
@@ -686,6 +764,18 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
             boopie_world_enter(w, BOOPIE_ROOM_WOODS, act);
         } else if (act == BOOPIE_DO_HOME_PATH) {
             boopie_world_enter(w, BOOPIE_ROOM_OUTSIDE, act);
+        } else if (act == BOOPIE_DO_BEACH) {
+            boopie_world_enter(w, BOOPIE_ROOM_BEACH, act);
+        } else if (act == BOOPIE_DO_FISH) {
+            /* The line's out: a bite in 2 to 6 seconds, and what it is. */
+            w->fishing = true;
+            w->bite = false;
+            w->fish_t = 2 + frand(w) * 4;
+            int roll = (int)(rnd(w) % 100);
+            w->fish_kind = roll < 5                        ? BOOPIE_FISH_GOLD
+                           : roll < 17                     ? BOOPIE_FISH_BOOT
+                           : w->level >= 8 && roll < 45    ? BOOPIE_FISH_BIG
+                                                           : BOOPIE_FISH_SMALL;
         }
         (void)level;
         return act;
@@ -697,7 +787,11 @@ boopie_do_t boopie_world_tick(boopie_world_t *w, int level, float dt)
         if (w->state_t >= w->idle_for) {
             int x0, y0, x1, y1;
             boopie_room_floor(w->room, &x0, &y0, &x1, &y1);
-            walk_to(w, x0 + frand(w) * (x1 - x0), y0 + frand(w) * (y1 - y0), -1);
+            if (w->y < y0) {
+                walk_to(w, w->x, (float)y0 + 2, -1);   /* off the pier first, the way it came */
+            } else {
+                walk_to(w, x0 + frand(w) * (x1 - x0), y0 + frand(w) * (y1 - y0), -1);
+            }
         }
         return BOOPIE_DO_NOTHING;
     }

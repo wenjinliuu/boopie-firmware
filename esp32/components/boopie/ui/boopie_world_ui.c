@@ -114,12 +114,18 @@ static row_cb_t s_row_cb;
 static int s_armed = -1;            /* the shop: a row tapped once, to buy on the second */
 static lv_obj_t *s_rows[12];
 
+/* A slime fight, or the line out: every tap is for that. */
+static bool busy(void)
+{
+    return s_world.fight >= 0 || s_world.fishing;
+}
+
 static void close_panel(void)
 {
     if (s_panel) {
         lv_obj_delete_async(s_panel);
         s_panel = NULL;
-        muse_ui_set_swipe_enabled(s_world.fight < 0);   /* a slime fight keeps it off */
+        muse_ui_set_swipe_enabled(!busy());   /* a slime fight, or fishing, keeps it off */
     }
     s_row_cb = NULL;
     s_armed = -1;
@@ -315,8 +321,9 @@ static void bag_panel(void)
     for (int i = 0; i < BOOPIE_ITEM_COUNT; i++) {
         int n = boopie_avatar_items(i);
         if (n) {
-            snprintf(v, sizeof v, "× %d 喂它", n);
-            row(box, i, boopie_item_name((boopie_item_t)i), v, true);
+            bool edible = boopie_item_edible((boopie_item_t)i);
+            snprintf(v, sizeof v, edible ? "× %d 喂它" : "× %d", n);
+            row(box, edible ? i : -1, boopie_item_name((boopie_item_t)i), v, edible);
             any++;
         }
     }
@@ -336,8 +343,8 @@ static void bag_panel(void)
     }
     snprintf(v, sizeof v, "%d 件", owned);
     row(box, -1, "皮肤", v, false);
-    note(box, any ? "点吃的喂给它：饿了能当一顿饭。森林里每天能摘蓝莓和蘑菇。"
-                  : "森林里每天能摘蓝莓和蘑菇，农场收获也记在这里。");
+    note(box, any ? "点吃的喂给它：饿了能当一顿饭。森林里摘蓝莓蘑菇，海边捡贝壳、钓鱼。"
+                  : "森林里每天能摘蓝莓和蘑菇，海边能捡贝壳、钓鱼。");
 }
 
 /* ---- 商店: the current character's skins, for stars ---- */
@@ -630,9 +637,9 @@ static void gather(int spot)
     boopie_item_t item = boopie_gather_item(spot);
     if (boopie_avatar_gather(spot, item)) {
         boopie_sound_play(BOOPIE_SOUND_SCORE);
-        say("摘到%s！放进背包啦", boopie_item_name(item));
+        say(item == BOOPIE_ITEM_SHELL ? "捡到%s！放进背包啦" : "摘到%s！放进背包啦", boopie_item_name(item));
     } else if (boopie_avatar_gathered() >> spot & 1) {
-        say("今天摘过啦，明天再长出来");
+        say(item == BOOPIE_ITEM_SHELL ? "今天捡过啦，明天浪会冲来新的" : "今天摘过啦，明天再长出来");
     } else {
         say("还没对上时间，连上网再来摘吧");
     }
@@ -670,7 +677,7 @@ static void use_furni(int f)
 
 static void fight_over(void)
 {
-    if (!s_panel) {
+    if (!s_panel && !busy()) {
         muse_ui_set_swipe_enabled(true);
     }
 }
@@ -695,6 +702,39 @@ static void slime_fight(void)
     muse_ui_set_swipe_enabled(false);   /* every tap is for the slime */
     boopie_sound_play(BOOPIE_SOUND_POKE);
     say("%s！%d 秒内点中它 %d 次", SLIME_NAMES[s->kind], (int)BOOPIE_SLIME_FIGHT_S, s->hp);
+}
+
+/* ---- 海边: fishing off the pier ---- */
+
+static void caught(void)
+{
+    int got = 0;
+    switch (s_world.last_fish) {
+    case BOOPIE_FISH_BIG:
+        boopie_avatar_world_reward(BOOPIE_ITEM_FISH, 2, 10, 0, &got);
+        boopie_sound_play(BOOPIE_SOUND_GOLD);
+        say("好大一条鱼！小鱼 +2");
+        break;
+    case BOOPIE_FISH_GOLD:
+        boopie_avatar_world_reward(-1, 0, 15, 3, &got);
+        boopie_sound_play(BOOPIE_SOUND_GOLD);
+        if (got) {
+            say("金色的鱼！★ +%d", got);
+        } else {
+            say("金色的鱼！摸一摸放回去啦");
+        }
+        break;
+    case BOOPIE_FISH_BOOT:
+        boopie_sound_play(BOOPIE_SOUND_POKE);
+        say("钓到一只旧靴子……");
+        break;
+    default:
+        boopie_avatar_world_reward(BOOPIE_ITEM_FISH, 1, 5, 0, &got);
+        boopie_sound_play(BOOPIE_SOUND_SCORE);
+        say("钓到一条小鱼！放进背包啦");
+        break;
+    }
+    fight_over();
 }
 
 /* ---------------------------------------------------------------- doing things */
@@ -729,6 +769,24 @@ static void act(boopie_do_t what, int arg)
     case BOOPIE_DO_HOME_PATH: say("回到家门口啦"); break;
     case BOOPIE_DO_CHEST: open_chest(arg); break;
     case BOOPIE_DO_GATHER: gather(arg); break;
+    case BOOPIE_DO_BEACH: say("到海边啦！去码头钓鱼吧"); break;
+    case BOOPIE_DO_FISH:
+        muse_ui_set_swipe_enabled(false);   /* every tap is for the line */
+        say("抛竿～ 浮漂一沉就点屏幕");
+        break;
+    case BOOPIE_DO_FISH_BITE:
+        boopie_sound_play(BOOPIE_SOUND_NOTIFY);
+        say("上钩了！快点！");
+        break;
+    case BOOPIE_DO_FISH_CAUGHT: caught(); break;
+    case BOOPIE_DO_FISH_EARLY:
+        say("太早啦，鱼吓跑了");
+        fight_over();
+        break;
+    case BOOPIE_DO_FISH_MISSED:
+        say("鱼跑掉了…再试一次");
+        fight_over();
+        break;
     case BOOPIE_DO_FURNI: use_furni(arg); break;
     case BOOPIE_DO_SLIME_FIGHT: slime_fight(); break;
     case BOOPIE_DO_SLIME_WIN: slime_won(); break;
@@ -777,6 +835,8 @@ static void on_tap(lv_event_t *e)
     int r = boopie_world_tap(&s_world, st.level, x, y);
     if (r == -3) {
         say("嗯…早上了吗？");
+    } else if (r == -7 || r == -8) {
+        /* reeled in: what came up is said next frame */
     } else if (r == -5) {
         boopie_sound_play(BOOPIE_SOUND_SCORE);   /* a hit */
     } else if (r == -4) {
@@ -811,10 +871,11 @@ static void frame(lv_timer_t *timer)
     float dt = (float)(now - s_last_us) / 1e6f;
     s_last_us = now;
     if (!shown()) {
-        if (s_world.fight >= 0) {
-            /* Away mid-fight (the screen off, another page): it's over, and the swipe back. */
+        if (busy()) {
+            /* Away mid-fight or fishing (the screen off, another page): it's over, and the swipe back. */
             s_world.fight_left = 0;
             boopie_world_tick(&s_world, s_world.level, 0);
+            s_world.fishing = s_world.bite = false;
             muse_ui_set_swipe_enabled(true);
         }
         return;
@@ -863,7 +924,7 @@ static void frame(lv_timer_t *timer)
     if (s_t - s_said_at > SAY_S) {
         lv_obj_add_flag(s_say, LV_OBJ_FLAG_HIDDEN);
     }
-    if (s_t >= s_chat_at && !s_panel && s_world.fight < 0 && s_t - s_said_at > SAY_S + 2) {
+    if (s_t >= s_chat_at && !s_panel && !busy() && s_t - s_said_at > SAY_S + 2) {
         chatter(&st, hour);
         s_chat_at = s_t + CHAT_EVERY_S + (float)(rand() % 6);
     }
@@ -976,10 +1037,14 @@ void boopie_world_ui_build(lv_obj_t *tile)
 bool boopie_world_ui_back(void)
 {
     muse_board->display_lock(-1);
-    bool open = s_panel != NULL || s_world.fight >= 0;
+    bool open = s_panel != NULL || busy();
     close_panel();
     if (s_world.fight >= 0) {
         s_world.fight_left = 0;   /* given up: the slime's off */
+    }
+    if (s_world.fishing) {
+        s_world.fishing = s_world.bite = false;   /* the line in */
+        muse_ui_set_swipe_enabled(true);
     }
     muse_board->display_unlock();
     return open;
@@ -988,10 +1053,12 @@ bool boopie_world_ui_back(void)
 bool boopie_world_ui_go(const char *room)
 {
     static const char *const NAMES[] = { [BOOPIE_ROOM_LIVING] = "living", [BOOPIE_ROOM_BEDROOM] = "bedroom",
-                                         [BOOPIE_ROOM_OUTSIDE] = "outside", [BOOPIE_ROOM_WOODS] = "woods" };
+                                         [BOOPIE_ROOM_OUTSIDE] = "outside", [BOOPIE_ROOM_WOODS] = "woods",
+                                         [BOOPIE_ROOM_BEACH] = "beach" };
     for (int r = 0; r < (int)(sizeof NAMES / sizeof NAMES[0]); r++) {
         if (NAMES[r] && !strcmp(room, NAMES[r])) {
-            boopie_world_enter(&s_world, (boopie_room_t)r, r == BOOPIE_ROOM_WOODS     ? BOOPIE_DO_WILD
+            boopie_world_enter(&s_world, (boopie_room_t)r, r == BOOPIE_ROOM_BEACH     ? BOOPIE_DO_BEACH
+                                                         : r == BOOPIE_ROOM_WOODS   ? BOOPIE_DO_WILD
                                                          : r == BOOPIE_ROOM_OUTSIDE ? BOOPIE_DO_OUTSIDE
                                                          : r == BOOPIE_ROOM_BEDROOM ? BOOPIE_DO_UPSTAIRS
                                                                                     : BOOPIE_DO_INSIDE);

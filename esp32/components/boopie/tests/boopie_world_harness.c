@@ -65,6 +65,10 @@ int main(int argc, char **argv)
             }
             printf("{\"far\": %.1f, \"x\": [%.1f, %.1f], \"y\": [%.1f, %.1f], \"walked\": %.1f}\n", far, min_x, max_x,
                    min_y, max_y, w.walked);
+        } else if (!strcmp(op, "beach")) {
+            w.level = level;
+            boopie_world_enter(&w, BOOPIE_ROOM_BEACH, BOOPIE_DO_BEACH);
+            printf("{\"room\": %d, \"x\": %.1f, \"y\": %.1f}\n", w.room, w.x, w.y);
         } else if (!strcmp(op, "woods")) {
             w.level = level;
             boopie_world_enter(&w, BOOPIE_ROOM_WOODS, BOOPIE_DO_WILD);

@@ -708,6 +708,181 @@ def windmill_b(L, x, y):
     windmill(L, x, y, 0.3 + math.pi / 4)
 
 
+
+# ---------------------------------------------------------------- the beach
+
+SEA = (96, 168, 224)
+SEA_D = (72, 140, 208)
+SEA_L = (136, 200, 236)
+SAND_B = (240, 222, 172)
+SAND_BD = (224, 202, 150)
+WET = (214, 192, 146)
+BEACH_W = 440   # the beach: west of the yard, nearly three screens
+
+
+def shore_y(x):
+    return 46 + int(3 * math.sin(x * 0.05) + 2 * math.sin(x * 0.13 + 2))
+
+
+def bg_beach():
+    import random
+    r = random.Random(11)
+    im = Image.new("RGB", (BEACH_W, W), SAND_B)
+    px = im.load()
+    for x in range(BEACH_W):
+        sy = shore_y(x)
+        for y in range(sy):
+            c = SEA_D if y < 14 else SEA if y < sy - 8 else SEA_L
+            if (y < 14 and (x + y * 3) % 17 == 0) or (14 <= y < sy - 8 and (x * 2 + y * 5) % 29 == 0):
+                c = SEA_L
+            px[x, y] = c
+        for y in range(sy, sy + 9):   # wet sand where the waves reach
+            px[x, y] = WET if (y < sy + 7 or (x + y) % 2) else SAND_B
+    for _ in range(60):   # glints on the water
+        x, y = r.randrange(BEACH_W - 3), r.randrange(2, 38)
+        if y < shore_y(x) - 4:
+            px[x, y] = (232, 244, 252); px[x + 1, y] = (232, 244, 252)
+    for _ in range(260):   # the sand's grain
+        x, y = r.randrange(BEACH_W), r.randrange(58, W)
+        if px[x, y] == SAND_B:
+            px[x, y] = SAND_BD
+    for _ in range(26):   # pebbles
+        x, y = r.randrange(2, BEACH_W - 3), r.randrange(60, W - 3)
+        c = r.choice(((200, 190, 176), (176, 168, 160), (232, 200, 200)))
+        px[x, y] = c; px[x + 1, y] = c
+    return im
+
+
+def pier(L, x, y):
+    """Planks out over the water: a floor mark (no outline) with its posts drawn in."""
+    L.rect(x - 7, y - 40, x + 7, y, (176, 128, 84))
+    for k in range(y - 40, y + 1, 4):
+        L.rect(x - 7, k, x + 7, k, (148, 104, 68))
+    for py_ in (y - 38, y - 20):
+        L.rect(x - 9, py_, x - 8, py_ + 5, (120, 84, 56)); L.rect(x + 8, py_, x + 9, py_ + 5, (120, 84, 56))
+
+
+def palm(L, x, y):
+    for k in range(26):
+        tx = x + int(4 * math.sin(k / 26 * 1.6))
+        L.rect(tx - 2, y - k, tx + 1, y - k, (176, 132, 84) if k % 4 else (148, 108, 68))
+    tx, ty = x + 4, y - 27
+    for a in (-2.6, -2.0, -1.3, -0.4, 0.3, -3.1):
+        for t in range(14):
+            fx, fy = tx + t * math.cos(a), ty + t * math.sin(a) + t * t * 0.04
+            L.rect(fx - 1, fy - 1, fx + 1, fy, (88, 168, 88) if t < 10 else (120, 192, 104))
+    L.ell(tx - 3, ty - 1, tx + 1, ty + 3, (140, 96, 60))
+
+
+def umbrella(L, x, y):
+    L.rect(x, y - 24, x, y, (200, 200, 208))
+    for k in range(-14, 15):
+        h = int(7 * (1 - (k / 14) ** 2))
+        c = (232, 88, 88) if (k + 14) // 5 % 2 else (252, 248, 240)
+        L.rect(x + k, y - 24 - h, x + k, y - 24, c)
+    L.ell(x - 10, y - 4, x + 10, y, (112, 176, 232))
+    L.rect(x - 9, y - 3, x + 9, y - 2, (248, 216, 96))
+
+
+def beach_chair(L, x, y):
+    L.rect(x - 8, y - 3, x + 8, y - 2, (176, 128, 84))
+    L.poly([(x - 8, y - 4), (x + 4, y - 4), (x + 8, y - 14), (x + 5, y - 14)], (96, 168, 232))
+    L.rect(x - 7, y - 1, x - 6, y, (148, 104, 68)); L.rect(x + 6, y - 1, x + 7, y, (148, 104, 68))
+
+
+def sandcastle(L, x, y):
+    c, d = (232, 204, 140), (210, 180, 120)
+    L.rect(x - 10, y - 8, x + 10, y, c)
+    L.rect(x - 4, y - 16, x + 4, y - 8, c)
+    for tx in (x - 10, x + 7):
+        L.rect(tx, y - 12, tx + 3, y - 8, d)
+    for k in range(-4, 5, 2):
+        L.put(x + k, y - 17, c)
+    L.rect(x - 1, y - 5, x + 1, y, (176, 140, 92))
+    L.rect(x, y - 24, x, y - 16, (120, 84, 56)); L.rect(x + 1, y - 24, x + 4, y - 22, (232, 88, 88))
+
+
+def lighthouse(L, x, y):
+    L.ell(x - 10, y - 4, x + 10, y + 1, (168, 160, 152))
+    L.poly([(x - 7, y - 2), (x - 4, y - 44), (x + 4, y - 44), (x + 7, y - 2)], (252, 248, 240))
+    for k in (y - 12, y - 28):
+        L.poly([(x - 7 + (y - k) * 3 // 44, k), (x + 7 - (y - k) * 3 // 44, k),
+                (x + 7 - (y - k + 7) * 3 // 44, k - 7), (x - 7 + (y - k + 7) * 3 // 44, k - 7)], (224, 72, 72))
+    L.rect(x - 5, y - 46, x + 5, y - 44, (60, 60, 72))
+    L.rect(x - 4, y - 52, x + 4, y - 47, (255, 236, 150))
+    L.poly([(x - 6, y - 52), (x, y - 58), (x + 6, y - 52)], (224, 72, 72))
+    L.rect(x - 2, y - 8, x + 2, y - 2, (120, 84, 56))
+
+
+def boat(L, x, y):
+    L.poly([(x - 18, y - 9), (x + 18, y - 9), (x + 13, y), (x - 13, y)], (232, 96, 80))
+    L.rect(x - 18, y - 10, x + 18, y - 9, (252, 248, 240))
+    L.rect(x - 1, y - 30, x, y - 10, (148, 104, 68))
+    L.poly([(x + 1, y - 29), (x + 13, y - 12), (x + 1, y - 12)], (252, 248, 240))
+    L.rect(x - 10, y - 6, x + 8, y - 5, (196, 72, 64))
+
+
+def hammock(L, x, y):
+    for px_ in (x - 16, x + 16):
+        L.rect(px_ - 1, y - 18, px_ + 1, y, (148, 104, 68))
+    for k in range(-15, 16):
+        sag = int(6 * (1 - (k / 15) ** 2))
+        L.rect(x + k, y - 15 + sag, x + k, y - 13 + sag, (248, 168, 88) if (k + 15) // 3 % 2 else (252, 236, 200))
+
+
+def tide_pool(L, x, y):
+    """A pool among the rocks: a floor mark."""
+    L.ell(x - 14, y - 9, x + 14, y, (176, 168, 160))
+    L.ell(x - 12, y - 8, x + 12, y - 1, (88, 176, 200))
+    L.ell(x - 9, y - 7, x - 2, y - 4, (140, 212, 228))
+    L.rect(x + 4, y - 5, x + 6, y - 3, (248, 144, 80)); L.put(x + 5, y - 6, (248, 144, 80))
+
+
+def shell(L, x, y):
+    L.ell(x - 4, y - 5, x + 4, y, (248, 196, 200))
+    for k in (-2, 0, 2):
+        L.rect(x + k, y - 4, x + k, y - 1, (220, 150, 160))
+    L.rect(x - 1, y, x + 1, y, (220, 150, 160))
+
+
+def starfish(L, x, y):
+    for a in range(5):
+        ang = -math.pi / 2 + a * 2 * math.pi / 5
+        for t in range(5):
+            L.rect(x + t * math.cos(ang) - 1, y - 4 + t * math.sin(ang), x + t * math.cos(ang), y - 4 + t * math.sin(ang),
+                   (248, 152, 96))
+    L.put(x, y - 4, (255, 200, 140))
+
+
+def crab(L, x, y, step):
+    c = (232, 88, 72)
+    L.ell(x - 5, y - 5, x + 5, y, c)
+    L.rect(x - 2, y - 7, x - 2, y - 5, c); L.rect(x + 2, y - 7, x + 2, y - 5, c)
+    L.put(x - 2, y - 8, (30, 30, 30)); L.put(x + 2, y - 8, (30, 30, 30))
+    for side in (-1, 1):
+        L.ell(x + side * 8 - 2, y - 8, x + side * 8 + 2, y - 4, c)
+        for k in range(3):
+            lx = x + side * (4 + k)
+            L.put(lx, y + (1 if (k + step) % 2 else 0), sh(c, 0.8))
+
+
+def crab_a(L, x, y):
+    crab(L, x, y, 0)
+
+
+def crab_b(L, x, y):
+    crab(L, x, y, 1)
+
+
+def bird_bath(L, x, y):
+    L.rect(x - 2, y - 10, x + 2, y, (200, 196, 188))
+    L.rect(x - 5, y - 2, x + 5, y, (200, 196, 188))
+    L.ell(x - 8, y - 14, x + 8, y - 8, (200, 196, 188))
+    L.ell(x - 6, y - 13, x + 6, y - 10, (120, 184, 232))
+    L.ell(x + 2, y - 19, x + 7, y - 14, (120, 152, 216)); L.put(x + 8, y - 17, (248, 192, 64))
+    L.put(x + 5, y - 18, (30, 30, 30))
+
+
 # ---------------------------------------------------------------- the woods
 
 MOSS = (132, 184, 108)
@@ -995,6 +1170,15 @@ def hint(L, x, y, kind):
     elif kind == "mushroom":
         L.ell(x - 4, y - 4, x + 4, y + 1, (224, 72, 72)); L.rect(x - 1, y + 1, x + 1, y + 3, (240, 228, 200))
         L.put(x - 2, y - 2, (255, 255, 255)); L.put(x + 1, y - 3, (255, 255, 255))
+    elif kind == "wave":
+        for k in range(-4, 5):
+            L.put(x + k, y + int(1.5 * math.sin(k * 1.2)), (72, 140, 208))
+            L.put(x + k, y + 3 + int(1.5 * math.sin(k * 1.2 + 1)), (120, 184, 232))
+    elif kind == "fish":
+        L.ell(x - 4, y - 2, x + 2, y + 2, (96, 152, 216)); L.poly([(x + 2, y), (x + 5, y - 3), (x + 5, y + 3)], (96, 152, 216))
+        L.put(x - 2, y - 1, (30, 30, 30))
+    elif kind == "shell":
+        L.ell(x - 3, y - 3, x + 3, y + 2, (240, 160, 168)); L.rect(x, y - 2, x, y + 1, (200, 120, 132))
     elif kind == "tree":
         L.poly([(x, y - 4), (x - 4, y + 1), (x + 4, y + 1)], (88, 152, 88)); L.rect(x, y + 1, x, y + 3, (140, 96, 60))
 
@@ -1088,11 +1272,15 @@ SPRITES = [
     ("wall_clock", wall_clock, False), ("record_player", record_player, False),
     ("fairy_lights", fairy_lights, True), ("teddy", teddy, False), ("swing", swing, False),
     ("windmill_a", windmill_a, False), ("windmill_b", windmill_b, False),
+    ("pier", pier, True), ("palm", palm, False), ("umbrella", umbrella, False), ("beach_chair", beach_chair, False),
+    ("sandcastle", sandcastle, False), ("lighthouse", lighthouse, False), ("boat", boat, False),
+    ("hammock", hammock, False), ("tide_pool", tide_pool, True), ("shell", shell, False), ("starfish", starfish, False),
+    ("crab_a", crab_a, False), ("crab_b", crab_b, False), ("bird_bath", bird_bath, False),
 ]
 HINTS = ["zzz", "shirt", "game", "pen", "note", "book", "food", "up", "down", "door", "info", "bang", "water", "plus",
-         "mail", "tree", "house", "key", "heart", "berry", "mushroom"]
+         "mail", "tree", "house", "key", "heart", "berry", "mushroom", "wave", "fish", "shell"]
 BACKGROUNDS = [("bg_down", bg_down), ("bg_down_fancy", bg_down_fancy), ("bg_up", bg_up), ("bg_up_stars", bg_up_stars),
-               ("bg_outside", bg_outside), ("bg_woods", bg_woods)]
+               ("bg_outside", bg_outside), ("bg_woods", bg_woods), ("bg_beach", bg_beach)]
 
 
 def draw_sprite(fn, flat):
@@ -1181,7 +1369,7 @@ def main() -> int:
 
     if args.png:
         args.png.mkdir(parents=True, exist_ok=True)
-        sheet = Image.new("RGBA", (W * 4 + 40 + OUT_W + WOODS_W, W + 10 + 70 * 7), (40, 44, 56, 255))
+        sheet = Image.new("RGBA", (W * 4 + 50 + OUT_W + WOODS_W + BEACH_W, W + 10 + 70 * 7), (40, 44, 56, 255))
         x = y = 0
         for i, (name, im, *_) in enumerate(images):
             if i < len(BACKGROUNDS):
