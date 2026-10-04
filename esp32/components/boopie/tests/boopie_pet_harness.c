@@ -160,6 +160,22 @@ int main(void)
     raw[0] = 9;
     printf(",\"load_bad\":[%d,%d]", boopie_pet_load(&loaded, raw, sizeof raw), boopie_pet_load(&loaded, raw, 10));
 
+    /* Lv 24 to 25 and 25 to 26: the milestone's 50 more, then the usual 20. */
+    boopie_pet_init(&p);
+    tick_at(&p, T(0, 9, 0), 0);
+    uint32_t to25 = 0;
+    for (int l = 1; l < 25; l++) {
+        to25 += boopie_pet_need(l);
+    }
+    p.xp = to25 - 5;
+    st0 = p.stars;
+    boopie_pet_game(&p, 10, 0, NULL);
+    uint32_t m25 = p.stars - st0;
+    p.xp = to25 + boopie_pet_need(25) - 5;
+    st0 = p.stars;
+    boopie_pet_game(&p, 10, 0, NULL);
+    printf(",\"milestone\":[%u,%u,%d]", m25, p.stars - st0, boopie_pet_unlock_level(BOOPIE_UNLOCK_COLOUR, 12));
+
     printf(",\"unlocks\":[%d,%d,%d,%d,%d]}\n", boopie_pet_unlock_level(BOOPIE_UNLOCK_COLOUR, 2),
            boopie_pet_unlock_level(BOOPIE_UNLOCK_SCENE, 1), boopie_pet_unlock_level(BOOPIE_UNLOCK_SCENE, 8),
            boopie_pet_unlock_level(BOOPIE_UNLOCK_ACCESSORY, 3), boopie_pet_unlock_level(BOOPIE_UNLOCK_COLOUR, 99));

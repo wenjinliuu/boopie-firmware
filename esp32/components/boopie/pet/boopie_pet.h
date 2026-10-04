@@ -35,6 +35,9 @@
 
 /* Levels never stop; a level takes 80 + 30 x level, at most 620. */
 #define BOOPIE_PET_LEVEL_STARS 20
+/* And from Lv 25, every fifth level: this many more. */
+#define BOOPIE_PET_MILESTONE_FROM 25
+#define BOOPIE_PET_MILESTONE_STARS 50
 
 typedef enum {
     BOOPIE_XP_MEET = 0,     /* the first time each day: 10, and 2 stars */

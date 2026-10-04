@@ -118,6 +118,9 @@ const char *boopie_skin_name(int skin);         /* "星空" */
 boopie_char_t boopie_skin_character(int skin);  /* the character it's for, or BOOPIE_SKIN_MUSE */
 int boopie_skin_price(int skin);                /* stars */
 bool boopie_skin_collector(int skin);           /* 典藏 */
+/* Festivals it's on sale in, bit f for boopie_fest_t f (1 春节, 3 万圣节, 4 圣诞,
+ * 5 元旦); 0: always. Once bought it's kept. */
+uint32_t boopie_skin_limited(int skin);
 boopie_scene_t boopie_skin_scene(int skin);     /* the background it brings */
 int boopie_skin_from_key(const char *key);      /* or -1 */
 

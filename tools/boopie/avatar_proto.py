@@ -908,6 +908,7 @@ class Skin:
     face_fx: str = ""   # drawn over the face: "scanlines"
     back_fx: str = ""   # drawn behind the character, over the background: "embers"
     draft: bool = False # still a design under review, not in the firmware
+    limited: str = ""   # on sale only in a festival ("spring", "halloween", "xmas"); kept once bought
 
 
 SKINS = {
@@ -947,6 +948,28 @@ SKINS = {
                           glow=(255, 160, 200), extra={"hair": "d9809e", "top": "f6c6d6"}),
     "doubao_winter": Skin("doubao_winter", "doubao", "冬装", "典藏", 300, "snow", "f2c9b4",
                           extra={"top": "e6d9bf"}, body_fx="winter"),
+    # A third for each, a new palette (★200), and three for festivals only (★250).
+    "boopie_mint": Skin("boopie_mint", "boopie", "薄荷", "普通", 200, "default", "b8f0d8",
+                        cheek=(255, 150, 170), outline=(60, 156, 124)),
+    "muse_berry": Skin("muse_berry", "muse", "莓果", "普通", 200, "petals", "b46ab4"),
+    "gpt_jade": Skin("gpt_jade", "gpt", "翡翠", "普通", 200, "fireflies", "9fd8b8",
+                     cheek=(230, 150, 150), extra={"bands_colour": "2e7d5b"}),
+    "codex_retro": Skin("codex_retro", "codex", "复古绿屏", "普通", 200, "matrix", "d8d2bc",
+                        cheek=(230, 150, 120), outline=(110, 100, 80),
+                        extra={"screen": (8, 30, 10), "glyph": (80, 255, 120), "glyph_follows_light": False}),
+    "klaude_peach": Skin("klaude_peach", "klaude", "蜜桃", "普通", 200, "petals", "ffc0a8", eye=(90, 40, 32),
+                         cheek=(255, 122, 138), outline=(200, 100, 80)),
+    "whale_sunset": Skin("whale_sunset", "whale", "晚霞", "普通", 200, "default", "ff9e7a",
+                         outline=(180, 80, 60), extra={"belly": ((255, 214, 176), (255, 240, 220))}),
+    "doubao_sport": Skin("doubao_sport", "doubao", "运动装", "普通", 200, "default", "f2c9b4",
+                         extra={"hair": "3a2a20", "top": "3a7bd5"}),
+    "boopie_newyear": Skin("boopie_newyear", "boopie", "新春", "典藏", 250, "default", "cc2a2a",
+                           cheek=(255, 176, 160), glow=(255, 211, 74), outline=(138, 16, 16), limited="spring"),
+    "klaude_pumpkin": Skin("klaude_pumpkin", "klaude", "南瓜", "典藏", 250, "default", "ff8c1a",
+                           eye=(58, 26, 0), cheek=(255, 200, 80), outline=(160, 74, 0), limited="halloween"),
+    "whale_xmas": Skin("whale_xmas", "whale", "圣诞树", "典藏", 250, "snow", "2f8f4f",
+                       glow=(255, 211, 74), outline=(20, 90, 40),
+                       extra={"belly": ((216, 240, 216), (244, 255, 244))}, limited="xmas"),
 }
 
 

@@ -232,6 +232,22 @@ bool boopie_avatar_wear(int skin, const char **error)
     return true;
 }
 
+bool boopie_avatar_skin_on_sale(int skin)
+{
+    uint32_t limited = boopie_skin_limited(skin);
+    boopie_fest_t f = boopie_avatar_festival();
+    return !limited || (f != BOOPIE_FEST_NONE && (limited >> f & 1));
+}
+
+const char *boopie_avatar_skin_when(int skin)
+{
+    uint32_t limited = boopie_skin_limited(skin);
+    return limited >> BOOPIE_FEST_SPRING & 1  ? "春节限定"
+           : limited >> BOOPIE_FEST_HALLOWEEN & 1 ? "万圣节限定"
+           : limited >> BOOPIE_FEST_XMAS & 1      ? "圣诞限定"
+                                                  : "";
+}
+
 bool boopie_avatar_buy(int skin, const char **error)
 {
     ensure_loaded();
@@ -240,6 +256,10 @@ bool boopie_avatar_buy(int skin, const char **error)
         return false;
     }
     if (!boopie_avatar_owns(skin)) {
+        if (!boopie_avatar_skin_on_sale(skin)) {
+            *error = "on sale only in its festival";
+            return false;
+        }
         uint32_t price = (uint32_t)boopie_skin_price(skin);
         if (s_pet_state.stars < price) {
             *error = "not enough stars";

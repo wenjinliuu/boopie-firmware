@@ -2264,6 +2264,7 @@ typedef struct {
     body_fx_t body_fx;
     face_fx_t face_fx;
     back_fx_t back_fx;
+    uint16_t limited;         /* bit f: on sale only in festival f (boopie_fest_t); 0 always */
 } skin_t;
 
 #define SKIN(k, n, c, coll, stars, sc, col) .key = k, .name = n, .character = c, .collector = coll, \
@@ -2300,11 +2301,37 @@ static const skin_t SKINS[] = {
       .glow = SET(0xffa0c8), .hair = SET(0xd9809e), .top = SET(0xf6c6d6) },
     { SKIN("doubao_winter", "冬装", BOOPIE_CHAR_DOUBAO, true, 300, BOOPIE_SCENE_SNOW, 0xf2c9b4),
       .top = SET(0xe6d9bf), .body_fx = FX_BODY_WINTER },
+    /* A third for each, a new palette, and three for festivals only. */
+    { SKIN("boopie_mint", "薄荷", BOOPIE_CHAR_BOOPIE, false, 200, BOOPIE_SCENE_DEFAULT, 0xb8f0d8),
+      .cheek = SET(0xff96aa), .outline = SET(0x3c9c7c) },
+    { SKIN("muse_berry", "莓果", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_PETALS, 0xb46ab4) },
+    { SKIN("gpt_jade", "翡翠", BOOPIE_CHAR_GPT, false, 200, BOOPIE_SCENE_FIREFLIES, 0x9fd8b8),
+      .cheek = SET(0xe69696), .bands = SET(0x2e7d5b) },
+    { SKIN("codex_retro", "复古绿屏", BOOPIE_CHAR_CODEX, false, 200, BOOPIE_SCENE_MATRIX, 0xd8d2bc),
+      .cheek = SET(0xe69678), .outline = SET(0x6e6450), .screen = SET(0x081e0a), .glyph = SET(0x50ff78),
+      .glyph_fixed = true },
+    { SKIN("klaude_peach", "蜜桃", BOOPIE_CHAR_KLAUDE, false, 200, BOOPIE_SCENE_PETALS, 0xffc0a8),
+      .eye = SET(0x5a2820), .cheek = SET(0xff7a8a), .outline = SET(0xc86450) },
+    { SKIN("whale_sunset", "晚霞", BOOPIE_CHAR_WHALE, false, 200, BOOPIE_SCENE_DEFAULT, 0xff9e7a),
+      .outline = SET(0xb4503c), .belly = { SET(0xffd6b0), SET(0xfff0dc) } },
+    { SKIN("doubao_sport", "运动装", BOOPIE_CHAR_DOUBAO, false, 200, BOOPIE_SCENE_DEFAULT, 0xf2c9b4),
+      .hair = SET(0x3a2a20), .top = SET(0x3a7bd5) },
+    { SKIN("boopie_newyear", "新春", BOOPIE_CHAR_BOOPIE, true, 250, BOOPIE_SCENE_DEFAULT, 0xcc2a2a),
+      .cheek = SET(0xffb0a0), .glow = SET(0xffd34a), .outline = SET(0x8a1010), .limited = 1u << 1 | 1u << 5 },
+    { SKIN("klaude_pumpkin", "南瓜", BOOPIE_CHAR_KLAUDE, true, 250, BOOPIE_SCENE_DEFAULT, 0xff8c1a),
+      .eye = SET(0x3a1a00), .cheek = SET(0xffc850), .outline = SET(0xa04a00), .limited = 1u << 3 },
+    { SKIN("whale_xmas", "圣诞树", BOOPIE_CHAR_WHALE, true, 250, BOOPIE_SCENE_SNOW, 0x2f8f4f),
+      .glow = SET(0xffd34a), .outline = SET(0x145a28), .belly = { SET(0xd8f0d8), SET(0xf4fff4) }, .limited = 1u << 4 },
 };
 #define SKIN_COUNT (int)(sizeof(SKINS) / sizeof(SKINS[0]))
 _Static_assert(SKIN_COUNT <= 32, "NVS keeps what's owned in a u32");
 
 static int s_skin = -1;
+
+uint32_t boopie_skin_limited(int skin)
+{
+    return skin >= 0 && skin < (int)(sizeof SKINS / sizeof SKINS[0]) ? SKINS[skin].limited : 0;
+}
 
 int boopie_skin_count(void)
 {

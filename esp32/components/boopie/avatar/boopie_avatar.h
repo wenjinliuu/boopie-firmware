@@ -86,6 +86,10 @@ int boopie_avatar_skin(void);
 int boopie_avatar_of_skin(int skin);   /* the avatar it's for */
 bool boopie_avatar_owns(int skin);
 bool boopie_avatar_wear(int skin, const char **error);
+/* A festival skin is on sale only in its festival (boopie_skin_limited);
+ * the rest always. Its festival's word for the shop ("春节限定"), or "". */
+bool boopie_avatar_skin_on_sale(int skin);
+const char *boopie_avatar_skin_when(int skin);
 bool boopie_avatar_buy(int skin, const char **error);
 
 /* Accessories (boopie_acc_t) the current character wears, BOOPIE_ACC_BIT()s;

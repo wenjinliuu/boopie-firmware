@@ -93,6 +93,10 @@ class BoopiePetTest(unittest.TestCase):
         # About 95 a day: level 11, two stars a day and twenty a level.
         self.assertEqual(self.r["month"], {"xp": 2850, "level": 11, "stars": 30 * 2 + 10 * 20})
 
+    def test_milestones(self) -> None:
+        # Reaching Lv 25: 20 + 50; Lv 26: 20; the last colour at Lv 40.
+        self.assertEqual(self.r["milestone"], [70, 20, 40])
+
     def test_unlock_table(self) -> None:
         # Mint at 2, stars at 3, glitch at 20, party hat at 19, nothing past the list.
         self.assertEqual(self.r["unlocks"], [2, 3, 20, 19, 0])

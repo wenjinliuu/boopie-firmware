@@ -1384,6 +1384,11 @@ static const struct {
     { "蜜桃橙", 0xffb08a },
     { "珊瑚红", 0xff7a7a },
     { "奶白", 0xf4efe6 },
+    /* Boopie: for the long haul, Lv 25 to 40. */
+    { "流光金", 0xf2c14e },
+    { "极光青", 0x5ee0c8 },
+    { "星夜蓝", 0x4a5fd0 },
+    { "石墨灰", 0x5a5a6a },
 };
 #define AVATAR_COLOUR_COUNT (int)(sizeof(AVATAR_COLOURS) / sizeof(AVATAR_COLOURS[0]))
 
@@ -1526,7 +1531,8 @@ static void build_avatar_page(lv_obj_t *tile)
     row(s_skin_box, NULL, "原样", &s_skin_none_check, on_skin_choice, (void *)(intptr_t)-1);
     for (int i = 0; i < boopie_skin_count() && i < SKIN_ROWS_MAX; i++) {
         char name[48];
-        snprintf(name, sizeof name, "%s%s", boopie_skin_name(i), boopie_skin_collector(i) ? "（典藏）" : "");
+        snprintf(name, sizeof name, "%s%s", boopie_skin_name(i),
+                 boopie_skin_limited(i) ? "（限定）" : boopie_skin_collector(i) ? "（典藏）" : "");
         s_skin_rows[i] = row(s_skin_box, NULL, name, &s_skin_checks[i], on_skin_choice, (void *)(intptr_t)i);
     }
     note(list, "配饰");
@@ -1583,7 +1589,9 @@ static void tick_avatar(void)
         } else if (boopie_avatar_owns(i)) {
             v[0] = '\0';
         } else if (i == s_skin_short && lv_tick_elaps(s_skin_short_at) < 2500) {
-            snprintf(v, sizeof v, "星星不够");
+            snprintf(v, sizeof v, "%s", boopie_avatar_skin_on_sale(i) ? "星星不够" : "节日才能买");
+        } else if (!boopie_avatar_skin_on_sale(i)) {
+            snprintf(v, sizeof v, "%s", boopie_avatar_skin_when(i));
         } else {
             snprintf(v, sizeof v, "★ %d", boopie_skin_price(i));
         }

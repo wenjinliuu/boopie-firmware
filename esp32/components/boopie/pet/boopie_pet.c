@@ -13,7 +13,7 @@ static const uint16_t XP_CAP[BOOPIE_XP_SOURCE_COUNT] = { 10, 40, 20, 30, BOOPIE_
 #define MEET_STARS 2
 
 /* Colours by index as the settings page lists them (0 own, 1 cherry pink). */
-static const uint8_t COLOUR_LEVEL[] = { 1, 1, 2, 4, 7, 9, 12, 15, 17 };
+static const uint8_t COLOUR_LEVEL[] = { 1, 1, 2, 4, 7, 9, 12, 15, 17, 25, 30, 35, 40 };
 /* Scenes as boopie_scene_t: default stars fireflies snow petals bubbles matrix neon_grid glitch. */
 static const uint8_t SCENE_LEVEL[] = { 1, 3, 6, 11, 8, 13, 16, 18, 20 };
 /* Accessories: bow, crown, scarf, party hat. */
@@ -72,12 +72,19 @@ static void add_xp(boopie_pet_t *p, int xp, boopie_pet_event_t *ev)
     }
     int before = boopie_pet_level(p->xp, NULL, NULL);
     p->xp += (uint32_t)xp;
-    int gained = boopie_pet_level(p->xp, NULL, NULL) - before;
-    p->stars += (uint32_t)(gained * BOOPIE_PET_LEVEL_STARS);
+    int after = boopie_pet_level(p->xp, NULL, NULL);
+    int gained = after - before;
+    int stars = gained * BOOPIE_PET_LEVEL_STARS;
+    for (int l = before + 1; l <= after; l++) {
+        if (l >= BOOPIE_PET_MILESTONE_FROM && l % 5 == 0) {
+            stars += BOOPIE_PET_MILESTONE_STARS;   /* Lv 25, 30, 35 ...: something to reach for */
+        }
+    }
+    p->stars += (uint32_t)stars;
     if (ev) {
         ev->xp += xp;
         ev->levels += gained;
-        ev->stars += gained * BOOPIE_PET_LEVEL_STARS;
+        ev->stars += stars;
     }
 }
 
