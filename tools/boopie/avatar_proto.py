@@ -1231,10 +1231,12 @@ SKINS = {
                        extra={"belly": ((216, 240, 216), (244, 255, 244))}, limited="xmas"),
     # Muse in armour: silver plates from the neck down, a pink bow, a sword (drawn over Muse's own frame).
     "muse_knight": Skin("muse_knight", "muse", "骑士", "典藏", 300, "default", "d9c7a8"),
-    # Muse in a bunny or dino hood, or as a Teletubby (drawn over Muse's own frame: boopie_pixel.c muse_headgear).
+    # Muse in a bunny or dino hood, as a Teletubby, a rubber duck or a chef (drawn over Muse's own frame: boopie_pixel.c muse_headgear).
     "muse_bunny": Skin("muse_bunny", "muse", "小兔", "普通", 200, "petals", "f6f2f4"),
     "muse_dino": Skin("muse_dino", "muse", "恐龙", "普通", 250, "default", "5fb08a"),
     "muse_tubby": Skin("muse_tubby", "muse", "天线宝宝", "主题", 200, "petals", "9a6ad6"),
+    "muse_duck": Skin("muse_duck", "muse", "小黄鸭", "主题", 200, "bubbles", "ffd84a"),
+    "muse_chef": Skin("muse_chef", "muse", "厨师", "主题", 200, "default", "f4f2ee"),
     # Themes: 蕾姆, and two of 海绵宝宝's friends.
     "doubao_rem": Skin("doubao_rem", "doubao", "蕾姆", "典藏", 300, "petals", "f2c9b4",
                        extra={"hair": "8cc0f0", "top": "f3a6c4", "rem": True}),

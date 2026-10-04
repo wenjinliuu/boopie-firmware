@@ -2676,7 +2676,7 @@ typedef struct {
 
 enum {
     MUSE_FX_NONE = 0, MUSE_FX_SHORTS, MUSE_FX_KNIGHT,
-    MUSE_FX_BUNNY, MUSE_FX_DINO, MUSE_FX_TUBBY,
+    MUSE_FX_BUNNY, MUSE_FX_DINO, MUSE_FX_TUBBY, MUSE_FX_DUCK, MUSE_FX_CHEF,
 };
 
 #define SKIN(k, n, c, coll, stars, sc, col) .key = k, .name = n, .character = c, .collector = coll, \
@@ -2736,10 +2736,12 @@ static const skin_t SKINS[] = {
       .glow = SET(0xffd34a), .outline = SET(0x145a28), .belly = { SET(0xd8f0d8), SET(0xf4fff4) }, .limited = 1u << 4 },
     { SKIN("muse_knight", "骑士", BOOPIE_SKIN_MUSE, true, 300, BOOPIE_SCENE_DEFAULT, 0xd9c7a8),
       .muse_fx = MUSE_FX_KNIGHT },
-    /* Muse in a bunny or dino hood, or as a Teletubby: ears, eyes, spikes or a hat on top (muse_headgear). */
+    /* Muse in a bunny or dino hood, as a Teletubby, a rubber duck or a chef: ears, eyes, spikes or a hat on top (muse_headgear). */
     { SKIN("muse_bunny", "小兔", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_PETALS, 0xf6f2f4), .muse_fx = MUSE_FX_BUNNY },
     { SKIN("muse_dino", "恐龙", BOOPIE_SKIN_MUSE, false, 250, BOOPIE_SCENE_DEFAULT, 0x5fb08a), .muse_fx = MUSE_FX_DINO },
     { SKIN("muse_tubby", "天线宝宝", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_PETALS, 0x9a6ad6), .muse_fx = MUSE_FX_TUBBY },
+    { SKIN("muse_duck", "小黄鸭", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_BUBBLES, 0xffd84a), .muse_fx = MUSE_FX_DUCK },
+    { SKIN("muse_chef", "厨师", BOOPIE_SKIN_MUSE, false, 200, BOOPIE_SCENE_DEFAULT, 0xf4f2ee), .muse_fx = MUSE_FX_CHEF },
     /* Themes: 蕾姆, and two of 海绵宝宝's friends. */
     { SKIN("doubao_rem", "蕾姆", BOOPIE_CHAR_DOUBAO, true, 300, BOOPIE_SCENE_PETALS, 0xf2c9b4),
       .hair = SET(0x8cc0f0), .top = SET(0xf3a6c4), .look = LOOK_REM },
@@ -3777,8 +3779,31 @@ static void muse_headgear(const skin_t *sk, double t)
         muse_sprite(ANT, 7, hx + sway, hy + 1, &fur, fur.mid);
         break;
     }
+    case MUSE_FX_DUCK: {   /* a curl of feathers */
+        static const char *const TUFT[] = { ".oo..", "olbo.", ".obo.", "..obo" };
+        muse_sprite(TUFT, 4, hx + 1, hy + 1, &fur, fur.mid);
+        break;
+    }
+    case MUSE_FX_CHEF: {   /* a tall puffy hat */
+        static const char *const HAT[] = { ".oo..ooo..oo.", "owwoowwwoowwo", "owwwwwwwwwwwo", ".owwwwwwwwwo.",
+                                           "..owdwwwdwo..", "..owdwwwdwo..", "..ooooooooo.." };
+        muse_sprite(HAT, 7, hx, hy + 2, &fur, (rgb_t){ 215, 215, 222 });
+        break;
+    }
     default:
         break;
+    }
+}
+
+/* Paints c over Muse's fur, inside the box. */
+static void muse_fur_box(const uint8_t *fb, int x0, int y0, int x1, int y1, rgb_t c)
+{
+    for (int y = y0 < 0 ? 0 : y0; y <= y1 && y < N; y++) {
+        for (int x = x0 < 0 ? 0 : x0; x <= x1 && x < N; x++) {
+            if (fb[y * N + x] >= MUSE_FUR0 && fb[y * N + x] <= MUSE_FUR1) {
+                s_img[y][x] = c;
+            }
+        }
     }
 }
 
@@ -3790,7 +3815,7 @@ static void muse_skin_over(const uint8_t *fb, double t)
     }
     if (sk->muse_fx >= MUSE_FX_BUNNY) {
         muse_headgear(sk, t);
-        if (sk->muse_fx != MUSE_FX_TUBBY) {
+        if (sk->muse_fx < MUSE_FX_TUBBY) {
             return;
         }
     }
@@ -3807,8 +3832,29 @@ static void muse_skin_over(const uint8_t *fb, double t)
         return;
     }
     int neck = (int)lroundf(s_slots.neck_y);
+    int cx = (int)lroundf(s_slots.neck_x);
+    if (sk->muse_fx == MUSE_FX_DUCK) {   /* orange feet and a little beak on its tummy */
+        muse_fur_box(fb, 0, bottom - 1, N - 1, bottom, (rgb_t){ 240, 140, 40 });
+        static const char *const BEAK[] = { ".ooooooo.", "oddddddd" "o", "ooooooooo", "oddddddd" "o", ".ooooooo." };
+        ramp_t fur = ramp(sk->colour);
+        muse_sprite(BEAK, 5, cx, neck + 7, &fur, (rgb_t){ 250, 150, 50 });
+        return;
+    }
+    if (sk->muse_fx == MUSE_FX_CHEF) {   /* an apron with a pocket, its strings up to the neck */
+        int hw = (int)lroundf(s_slots.neck_w * 0.28f), top = neck + 3;
+        rgb_t apron = { 140, 190, 235 }, dark = { 90, 140, 195 };
+        muse_fur_box(fb, cx - hw, top, cx + hw, bottom - 2, apron);
+        muse_fur_box(fb, cx - hw, top, cx + hw, top, dark);
+        muse_fur_box(fb, cx - hw + 1, neck + 1, cx - hw + 1, top - 1, dark);
+        muse_fur_box(fb, cx + hw - 1, neck + 1, cx + hw - 1, top - 1, dark);
+        muse_fur_box(fb, cx - 2, top + 4, cx + 2, top + 4, dark);   /* the pocket */
+        muse_fur_box(fb, cx - 2, top + 4, cx - 2, top + 6, dark);
+        muse_fur_box(fb, cx + 2, top + 4, cx + 2, top + 6, dark);
+        muse_fur_box(fb, cx - 2, top + 6, cx + 2, top + 6, dark);
+        return;
+    }
     if (sk->muse_fx == MUSE_FX_TUBBY) {   /* the screen on its tummy, a shine sliding over now and then */
-        int hw = (int)lroundf(s_slots.neck_w * 0.3f), cx = (int)lroundf(s_slots.neck_x);
+        int hw = (int)lroundf(s_slots.neck_w * 0.3f);
         int top = neck + 3, h = (bottom - top) * 6 / 10;
         if (h > 9) {
             h = 9;
