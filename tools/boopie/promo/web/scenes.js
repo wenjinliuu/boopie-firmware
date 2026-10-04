@@ -816,10 +816,10 @@ function sRemote(ctx, t) {
 // ---------------------------------------------------------------- the timeline
 // [start, end, scene, its natural length]: a scene plays faster or slower to fit
 // the song's sections (song/boopie.mp3, 90.9 s; bars 1.858 s from 1.0 s).
-const TIMELINE = [
+const TIMELINE_75 = [
   [0, 6.6, sIntro, 6.6], [6.6, 10.3, sProduct, 4], [10.3, 14.0, sSetup, 3.6], [14.0, 17.7, sConnect, 4.6],
   [17.7, 25.2, sMuse, 8], [25.2, 32.6, sRemote, 7.4],
   [32.6, 37.2, sChorus, 4.6], [37.2, 43.0, sVoice, 6], [43.0, 47.6, sCommand, 4], [47.6, 53.0, sMoods, 4.4],
   [53.0, 58.6, sSkins, 7.6], [58.6, 64.2, sGames, 5.6], [64.2, 79.0, sWorld, 12.4], [79.0, 90.6, sOutro, 11.6],
 ];
-const DURATION = 90.6;
+

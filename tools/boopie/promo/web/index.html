@@ -7,29 +7,52 @@
 <script src="lib.js"></script>
 <script src="mascots.js"></script>
 <script src="scenes.js"></script>
+<script src="lyrics.js"></script>
+<script src="sync.js"></script>
 <script>
 const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
 const layer = document.createElement('canvas');
 layer.width = W; layer.height = H;
 const lctx = layer.getContext('2d');
-const FADE = 0.35;
+const FADE = 0.3;
+// The scenes in the top of the frame (the karaoke has the bottom), pulsing on the
+// beat, each cutting in with a punch: in from a little big and blurred, the last
+// one shrinking away.
 function frame(t) {
-  backdrop(ctx, t);
-  sparkles(ctx, t, 26, 0.8);
   GT = t;
-  for (const [a, b, fn, natural] of TIMELINE) {
+  const kick = beatKick(), strong = inChorus(t) ? 1 : 0.45;
+  backdrop(ctx, t);
+  // the backdrop breathes with the beat
+  ctx.fillStyle = `rgba(255,255,255,${0.10 * kick * strong})`;
+  ctx.fillRect(0, 0, W, H);
+  sparkles(ctx, t, 30, 0.6 + 0.6 * kick * strong);
+  for (const [a, b, fn, natural, punch] of TIMELINE) {
     if (t < a - FADE || t > b + FADE) continue;
-    const al = Math.min(seg(t, a - FADE, a + 0.05), 1 - seg(t, b - 0.05, b + FADE));
+    const inK = seg(t, a - FADE, a + 0.08), outK = seg(t, b - 0.05, b + FADE);
+    const al = Math.min(inK, 1 - outK);
     if (al <= 0) continue;
     lctx.clearRect(0, 0, W, H);
     lctx.save();
     fn(lctx, (t - a) * (natural || (b - a)) / (b - a));
     lctx.restore();
+    const zoomIn = (1 - easeOut(inK)) * (punch ? 0.16 : 0.08), zoomOut = easeIn(outK) * 0.06;
+    const sc = 0.88 * (1 + zoomIn - zoomOut + 0.012 * kick * strong);
     ctx.save();
     ctx.globalAlpha = al;
-    ctx.drawImage(layer, 0, 0);
+    if (zoomIn > 0.01 || zoomOut > 0.01) ctx.filter = `blur(${(zoomIn * 60 + zoomOut * 60).toFixed(1)}px)`;
+    ctx.translate(W / 2, 475);
+    ctx.scale(sc, sc);
+    ctx.drawImage(layer, -W / 2, -540);
     ctx.restore();
+    ctx.filter = 'none';
   }
+  // a flash on the punchy cuts
+  for (const [a, , , , punch] of TIMELINE) {
+    if (!punch) continue;
+    const q = (t - a) / 0.35;
+    if (q > 0 && q < 1) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - q)})`; ctx.fillRect(0, 0, W, H); }
+  }
+  karaoke(ctx, t);
   const end = seg(t, DURATION - 0.6, DURATION);   // to white
   if (end > 0) { ctx.fillStyle = `rgba(255,255,255,${end})`; ctx.fillRect(0, 0, W, H); }
 }
