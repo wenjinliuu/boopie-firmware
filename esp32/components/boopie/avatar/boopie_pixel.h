@@ -88,6 +88,9 @@ typedef struct {
     boopie_amb_fest_t fest;
 } boopie_ambient_t;
 void boopie_pixel_set_ambient(const boopie_ambient_t *a);
+/* How much of the sun or moon shows, 0..1: they come by now and then rather
+ * than sit there all day (the caller fades them in and out). */
+void boopie_pixel_set_sky_show(float show);
 
 /* Its id ("stars") and display name ("星空"); NULL out of range. */
 const char *boopie_scene_key(boopie_scene_t s);

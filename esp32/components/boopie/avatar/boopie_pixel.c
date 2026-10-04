@@ -1024,20 +1024,41 @@ static void petal(int i, double t, bool front)
 
 static boopie_ambient_t s_amb;
 
+static float s_sky_show = 1;
+
 void boopie_pixel_set_ambient(const boopie_ambient_t *a)
 {
     s_amb = a ? *a : (boopie_ambient_t){ 0 };
 }
 
-static void disc(double cx, double cy, double r, rgb_t c)
+void boopie_pixel_set_sky_show(float show)
+{
+    s_sky_show = show < 0 ? 0 : show > 1 ? 1 : show;
+}
+
+/* A pixel of the sun or moon, as much as shows: dithered out as it goes. */
+static void sky_put(double x, double y, rgb_t c)
+{
+    int xi = (int)rint(x), yi = (int)rint(y);
+    if (s_sky_show >= 1 || BAYER[(yi & 3)][(xi & 3)] < s_sky_show) {
+        putd(x, y, c);
+    }
+}
+
+static void disc_with(void (*put)(double, double, rgb_t), double cx, double cy, double r, rgb_t c)
 {
     for (int dy = -(int)r - 1; dy <= (int)r + 1; dy++) {
         for (int dx = -(int)r - 1; dx <= (int)r + 1; dx++) {
             if (dx * dx + dy * dy <= r * r + 0.5) {
-                putd(cx + dx, cy + dy, c);
+                put(cx + dx, cy + dy, c);
             }
         }
     }
+}
+
+static void disc(double cx, double cy, double r, rgb_t c)
+{
+    disc_with(putd, cx, cy, r, c);
 }
 
 static void cloud(double x, double y, rgb_t c, rgb_t lit)
@@ -1054,12 +1075,12 @@ static void cloud(double x, double y, rgb_t c, rgb_t lit)
 
 static void sun(double cx, double cy, double r, double t)
 {
-    disc(cx, cy, r, (rgb_t){ 255, 214, 90 });
-    putd(cx - 1, cy - 1, (rgb_t){ 255, 246, 190 });
+    disc_with(sky_put, cx, cy, r, (rgb_t){ 255, 214, 90 });
+    sky_put(cx - 1, cy - 1, (rgb_t){ 255, 246, 190 });
     for (int k = 0; k < 8; k++) {   /* rays, turning slowly, every other one longer */
         double a = k * 0.7853981633974483 + t * 0.15;
         double len = r + 2 + (k % 2) * (1 + 0.6 * sin(t * 2 + k));
-        putd(cx + cos(a) * len, cy + sin(a) * len, (rgb_t){ 200, 150, 40 });
+        sky_put(cx + cos(a) * len, cy + sin(a) * len, (rgb_t){ 200, 150, 40 });
     }
 }
 
@@ -1079,13 +1100,13 @@ static void night_stars(double t, int n)
 
 static void moon(double cx, double cy, double r, bool full)
 {
-    disc(cx, cy, r, (rgb_t){ 250, 236, 170 });
+    disc_with(sky_put, cx, cy, r, (rgb_t){ 250, 236, 170 });
     if (full) {
-        putd(cx - 1, cy, (rgb_t){ 220, 200, 130 });
-        putd(cx + 1, cy + 1, (rgb_t){ 220, 200, 130 });
+        sky_put(cx - 1, cy, (rgb_t){ 220, 200, 130 });
+        sky_put(cx + 1, cy + 1, (rgb_t){ 220, 200, 130 });
         return;
     }
-    disc(cx + r * 0.6, cy - r * 0.4, r, (rgb_t){ 0, 0, 0 });   /* the crescent's shadow: the sky is black */
+    disc_with(sky_put, cx + r * 0.6, cy - r * 0.4, r, (rgb_t){ 0, 0, 0 });   /* the crescent's shadow: the sky is black */
 }
 
 static void raindrop(int i, double t, bool front)
@@ -1224,8 +1245,8 @@ static void ambient_back(double t)
         moon(9, 8, 3.5, false);
     } else if (!night && s_amb.weather == BOOPIE_AMB_SUNNY) {
         if (s_amb.sky == BOOPIE_SKY_DUSK) {
-            disc(52, 46, 3, (rgb_t){ 255, 140, 70 });   /* setting */
-            putd(51, 45, (rgb_t){ 255, 200, 140 });
+            disc_with(sky_put, 52, 46, 3, (rgb_t){ 255, 140, 70 });   /* setting */
+            sky_put(51, 45, (rgb_t){ 255, 200, 140 });
         } else {
             sun(50, s_amb.sky == BOOPIE_SKY_MORNING ? 12 : 8, 3, t);
         }

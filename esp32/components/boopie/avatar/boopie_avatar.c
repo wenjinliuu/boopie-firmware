@@ -16,6 +16,7 @@
 #include "boopie_avatar.h"
 #include "boopie_sound.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1666,6 +1667,19 @@ void muse_pixel_render(const muse_pose_t *p)
     bp.overlays = on;
     bp.scene = p->mode == MUSE_MODE_OFF ? BOOPIE_SCENE_DEFAULT : shown_scene();
     set_ambient(bp.scene == BOOPIE_SCENE_DEFAULT && p->mode != MUSE_MODE_OFF);
+    {
+        /* The sun or moon comes by for a while on waking and after a talk,
+         * then every ten minutes, rather than sitting there all day. */
+        static int s_mode = -1;
+        static float s_mode_since;
+        if ((int)p->mode != s_mode) {
+            s_mode = (int)p->mode;
+            s_mode_since = p->t;
+        }
+        float k = fmodf(p->t - s_mode_since, 600.0f);
+        float show = k < 1.5f ? k / 1.5f : k < 15.0f ? 1.0f : k < 17.0f ? (17.0f - k) / 2.0f : 0.0f;
+        boopie_pixel_set_sky_show(show);
+    }
     bp.scene_t = p->t;
     if (s_avatar == BOOPIE_AVATAR_MUSE) {
         /* Muse's own renderer draws the expression, a pet one included, and
