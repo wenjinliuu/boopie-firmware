@@ -1360,7 +1360,8 @@ static char *build_register_json(void) {
     cJSON *game_optional = cJSON_CreateObject();
     cJSON_AddItemToObject(game_optional, "game", string_param(
         "Which game: whack (戳戳布比, poke the pet as it pops up; the default), "
-        "catch (接零食, tilt to catch falling snacks) or maze (重力迷宫, tilt a ball out of a maze)."));
+        "catch (接零食, tilt to catch falling snacks), maze (重力迷宫, tilt a ball out of a maze) "
+        "or hop (跳跳布比, tap to hop the pet through the gaps between pillars)."));
     add_command(commands, "game.start",
                 "Open a game on the screen for the user to play, when they want to play "
                 "with their pet. Rounds earn the pet experience and stars.",

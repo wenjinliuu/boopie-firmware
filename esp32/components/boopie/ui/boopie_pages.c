@@ -116,6 +116,7 @@ static const app_t APPS[] = {
     { "戳戳布比", "宠物冒头就戳它", "whack", -1 },
     { "接零食", "倾斜接住掉下的零食", "catch", BOOPIE_ICON_CATCH },
     { "重力迷宫", "倾斜把小球滚出迷宫", "maze", BOOPIE_ICON_MAZE },
+    { "跳跳布比", "点一下跳，钻过柱子", "hop", BOOPIE_ICON_HOP },
     { "聊天记录", "最近 100 条", "chat", BOOPIE_ICON_CHAT },
     { "相册", "Muse 给你看过的图", "album", BOOPIE_ICON_ALBUM },
     { "白噪音", "雨声、海浪，助眠专注", "noise", BOOPIE_ICON_NOISE },

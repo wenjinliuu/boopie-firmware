@@ -16,6 +16,7 @@
 #include "boopie_whack.h"
 #include "boopie_catch.h"
 #include "boopie_maze.h"
+#include "boopie_hop.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "lvgl.h"
@@ -59,6 +60,7 @@ typedef struct {
 
 typedef struct {
     const char *id, *title, *intro;
+    const char *done;   /* the results card's title, when it isn't a record */
     boopie_game_t which;
     void (*start)(uint32_t seed);
     /* Plays dt seconds; the sound to play for it, or BOOPIE_SOUND_COUNT. */
@@ -75,6 +77,7 @@ typedef struct {
 static boopie_whack_t s_whack;
 static boopie_catch_t s_catch;
 static boopie_maze_t s_maze;
+static boopie_hop_t s_hop;
 
 static state_t s_state;
 static const game_def_t *s_def;
@@ -181,13 +184,38 @@ static void maze_render(int h)
 }
 static void maze_extra(char *out, size_t cap) { snprintf(out, cap, "过了 %d 关  ★ %d", s_maze.level, s_maze.stars); }
 
+static void hop_start(uint32_t seed) { boopie_hop_start(&s_hop, seed); }
+static boopie_sound_t hop_tick(float dt, const steer_t *in)
+{
+    (void)in;
+    switch (boopie_hop_tick(&s_hop, dt)) {
+    case BOOPIE_HOP_PASSED: return BOOPIE_SOUND_SCORE;
+    case BOOPIE_HOP_STAR: return BOOPIE_SOUND_GOLD;
+    case BOOPIE_HOP_CRASHED: return BOOPIE_SOUND_CLOUD;
+    default: return BOOPIE_SOUND_COUNT;
+    }
+}
+static void hop_tap(float x, float y)
+{
+    (void)x;
+    (void)y;
+    boopie_hop_flap(&s_hop);
+    s_tap_points = 0;
+}
+static bool hop_over(void) { return s_hop.over; }
+static int hop_score(void) { return s_hop.score; }
+static void hop_render(int h) { boopie_pixel_render_hop(&s_hop, h); }
+static void hop_extra(char *out, size_t cap) { snprintf(out, cap, "过了 %d 根  ★ %d", s_hop.passed, s_hop.stars); }
+
 static const game_def_t GAMES[] = {
-    { "whack", "戳戳布比", "宠物冒头就戳它\n别戳小乌云！\n\n点一下开始", BOOPIE_GAME_WHACK, whack_start, whack_tick,
+    { "whack", "戳戳布比", "宠物冒头就戳它\n别戳小乌云！\n\n点一下开始", "时间到", BOOPIE_GAME_WHACK, whack_start, whack_tick,
       whack_tap, whack_over, whack_score, boopie_whack_reward, whack_render, whack_extra },
-    { "catch", "接零食", "左右倾斜或按住屏幕\n接住掉下来的零食\n躲开雷雨云！\n点一下开始", BOOPIE_GAME_CATCH, catch_start,
+    { "catch", "接零食", "左右倾斜或按住屏幕\n接住掉下来的零食\n躲开雷雨云！\n点一下开始", "时间到", BOOPIE_GAME_CATCH, catch_start,
       catch_tick, NULL, catch_over, catch_score, boopie_catch_reward, catch_render, catch_extra },
-    { "maze", "重力迷宫", "倾斜板子或按住屏幕\n把小球滚到绿色出口\n顺路摘星星加分\n点一下开始", BOOPIE_GAME_MAZE, maze_start,
+    { "maze", "重力迷宫", "倾斜板子或按住屏幕\n把小球滚到绿色出口\n顺路摘星星加分\n点一下开始", "时间到", BOOPIE_GAME_MAZE, maze_start,
       maze_tick, NULL, maze_over, maze_score, boopie_maze_reward, maze_render, maze_extra },
+    { "hop", "跳跳布比", "点屏幕让宠物往上跳\n钻过柱子中间的缝\n别碰柱子和地面！\n点一下开始", "撞到啦", BOOPIE_GAME_HOP,
+      hop_start, hop_tick, hop_tap, hop_over, hop_score, boopie_hop_reward, hop_render, hop_extra },
 };
 #define GAME_COUNT (int)(sizeof GAMES / sizeof GAMES[0])
 
@@ -330,7 +358,7 @@ static void finish(void)
     } else {
         snprintf(lines + n, sizeof lines - n, "%s", xp || stars ? "今天的奖励领完啦" : "再接再厉");
     }
-    show_card(record ? "新纪录！" : "时间到", lines, true);
+    show_card(record ? "新纪录！" : s_def->done, lines, true);
 }
 
 static void tick(lv_timer_t *t)
@@ -393,6 +421,9 @@ static void on_press(lv_event_t *e)
     switch (s_state) {
     case G_READY:
         start();
+        if (s_def->tap == hop_tap) {
+            hop_tap(0, 0);   /* the tap that starts it is its first hop */
+        }
         break;
     case G_PAUSE:
         set_paused(false);

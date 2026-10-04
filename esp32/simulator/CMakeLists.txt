@@ -187,6 +187,7 @@ add_executable(muse_simulator
     "${BOOPIE_COMPONENT_DIR}/game/boopie_whack.c"
     "${BOOPIE_COMPONENT_DIR}/game/boopie_catch.c"
     "${BOOPIE_COMPONENT_DIR}/game/boopie_maze.c"
+    "${BOOPIE_COMPONENT_DIR}/game/boopie_hop.c"
     # Boopie: the Chinese and English text font.
     "${BOOPIE_COMPONENT_DIR}/font/boopie_font.c"
     "${BOOPIE_COMPONENT_DIR}/font/boopie_pixel_font.c"

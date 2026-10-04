@@ -13,6 +13,7 @@ set(srcs
     "game/boopie_whack.c"
     "game/boopie_catch.c"
     "game/boopie_maze.c"
+    "game/boopie_hop.c"
     "ime/boopie_pinyin.c"
     "ime/boopie_pinyin_dict.c"
     "store/boopie_assets.c"

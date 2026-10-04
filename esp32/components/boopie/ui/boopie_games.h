@@ -16,7 +16,8 @@
  * rest take the lock themselves, from any task.
  */
 
-/* Opens a game by id: "whack" (戳戳布比), "catch" (接零食), "maze" (重力迷宫);
+/* Opens a game by id: "whack" (戳戳布比), "catch" (接零食), "maze" (重力迷宫),
+ * "hop" (跳跳布比);
  * false if there's no such game, or another is open. */
 bool boopie_games_open_locked(const char *game);
 bool boopie_games_open(const char *game);

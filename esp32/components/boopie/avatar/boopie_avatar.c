@@ -258,6 +258,7 @@ static void apply(void)
 static const char *TAG = "boopie_avatar";
 static const char *const GAME_KEYS[BOOPIE_GAME_COUNT] = {   /* NVS */
     [BOOPIE_GAME_WHACK] = "best_whack", [BOOPIE_GAME_CATCH] = "best_catch", [BOOPIE_GAME_MAZE] = "best_maze",
+    [BOOPIE_GAME_HOP] = "best_hop",
 };
 #define NS "boopie"
 

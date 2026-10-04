@@ -15,6 +15,7 @@
 #include "boopie_whack.h"
 #include "boopie_catch.h"
 #include "boopie_maze.h"
+#include "boopie_hop.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -3290,6 +3291,97 @@ void boopie_pixel_render_maze(const boopie_maze_t *g)
     put(bx, by, (rgb_t){ 255, 255, 255 });
     /* The score under the maze. */
     draw_number(g->score, 0, 32, oy + size + 2 < 57 ? oy + size + 2 : 57, 1, (rgb_t){ 242, 239, 255 });
+}
+
+void boopie_pixel_render_hop(const boopie_hop_t *g, int head)
+{
+    if (head < 0 || head > BOOPIE_CHAR_COUNT) {
+        head = BOOPIE_CHAR_BOOPIE;
+    }
+    memset(s_img, 0, sizeof(s_img));
+    s_dst = s_img;
+    s_dst_mask = NULL;
+    /* Far off: a night sky's stars, twinkling, and clouds drifting at a third of the pillars' pace. */
+    static const uint8_t STARS[][2] = { { 14, 12 }, { 30, 8 }, { 46, 14 }, { 54, 26 }, { 9, 30 }, { 38, 22 },
+                                        { 24, 40 }, { 50, 40 }, { 18, 20 } };
+    for (int i = 0; i < (int)(sizeof STARS / sizeof STARS[0]); i++) {
+        bool lit = ((int)(g->t * 2 + i * 0.7f) % 3) != 0;
+        put(STARS[i][0], STARS[i][1], lit ? (rgb_t){ 90, 86, 140 } : (rgb_t){ 46, 42, 80 });
+    }
+    float drift = g->t * g->speed / 3;
+    for (int c = 0; c < 2; c++) {
+        float cx = fmodf(70 + c * 40 - drift, 80) - 8, cy = 18 + c * 15;
+        for (int dx = -5; dx <= 5; dx++) {
+            put(cx + dx, cy, (rgb_t){ 40, 36, 72 });
+            if (dx > -4 && dx < 4) put(cx + dx, cy - 1, (rgb_t){ 40, 36, 72 });
+            if (dx > -2 && dx < 2) put(cx + dx, cy - 2, (rgb_t){ 40, 36, 72 });
+        }
+    }
+    /* The pillars: green, lit on the left, with a cap at each end of the gap. */
+    for (int i = 0; i < BOOPIE_HOP_PIPES; i++) {
+        const boopie_hop_pipe_t *pp = &g->pipes[i];
+        int x0 = (int)floorf(pp->x);
+        int top = (int)rintf(pp->gap_y - pp->gap_h / 2), bottom = (int)rintf(pp->gap_y + pp->gap_h / 2);
+        for (int y = 0; y < BOOPIE_HOP_GROUND; y++) {
+            bool cap = y == top - 1 || y == top - 2 || y == bottom || y == bottom + 1;
+            if (y >= top && y < bottom) {
+                continue;
+            }
+            int from = cap ? x0 - 1 : x0, to = cap ? x0 + BOOPIE_HOP_PIPE_W : x0 + BOOPIE_HOP_PIPE_W - 1;
+            for (int x = from; x <= to; x++) {
+                rgb_t c = x == from + 1 ? (rgb_t){ 160, 245, 180 } : x == to ? (rgb_t){ 40, 120, 72 }
+                                                                             : (rgb_t){ 90, 205, 125 };
+                if (cap && (y == top - 1 || y == bottom + 1)) {
+                    c = (rgb_t){ 40, 120, 72 };   /* the cap's lip */
+                }
+                put(x, y, c);
+            }
+        }
+        if (pp->star) {
+            float sx = pp->x + BOOPIE_HOP_PIPE_W / 2.0f, sy = pp->gap_y;
+            spark(sx, sy, (rgb_t){ 255, 210, 70 }, ((int)(g->t * 6) & 1) ? 1 : 2);
+            put(sx, sy, (rgb_t){ 255, 246, 200 });
+        }
+    }
+    /* The ground, scrolling with the pillars. */
+    int shift = (int)(g->t * g->speed);
+    for (int x = 0; x < N; x++) {
+        put(x, BOOPIE_HOP_GROUND, (rgb_t){ 110, 230, 140 });
+        put(x, BOOPIE_HOP_GROUND + 1, (rgb_t){ 60, 160, 90 });
+        for (int y = BOOPIE_HOP_GROUND + 2; y < N; y++) {
+            bool stripe = ((x + shift + y) / 3) % 2;
+            put(x, y, stripe ? (rgb_t){ 120, 80, 50 } : (rgb_t){ 96, 62, 40 });
+        }
+    }
+    /* The pet: dazed after a crash, a puff under it just after a hop. */
+    int px = (int)rintf(BOOPIE_HOP_X) - HEAD_W / 2, py = (int)rintf(g->y) - HEAD_H / 2;
+    bool dazed = g->crashed > 0;
+    for (int j = 0; j < HEAD_H; j++) {
+        for (int k = 0; k < HEAD_W; k++) {
+            char ch = HEADS[head][j][k];
+            if (ch == '.') {
+                continue;
+            }
+            rgb_t c = head_colour(head, ch, false);
+            if (dazed && ch == 'e') {
+                c = (rgb_t){ 255, 255, 255 };
+            }
+            put(px + k, py + j, c);
+        }
+    }
+    if (g->hopped < 0.15f && !dazed) {
+        put(BOOPIE_HOP_X - 3, py + HEAD_H + 1, (rgb_t){ 200, 200, 230 });
+        put(BOOPIE_HOP_X, py + HEAD_H + 2, (rgb_t){ 200, 200, 230 });
+        put(BOOPIE_HOP_X + 3, py + HEAD_H + 1, (rgb_t){ 200, 200, 230 });
+    }
+    if (dazed) {
+        for (int i = 0; i < 3; i++) {
+            float a = g->t * 9 + i * 2.094f;
+            put(BOOPIE_HOP_X + 6 * cosf(a), py - 2 + 1.5f * sinf(a), (rgb_t){ 255, 220, 80 });
+        }
+    }
+    /* The score on top of it all. */
+    draw_number(g->score, 0, 32, 7, 2, (rgb_t){ 242, 239, 255 });
 }
 
 void boopie_pixel_head_image(int head, uint16_t *dst, int scale)

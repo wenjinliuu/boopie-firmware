@@ -7,6 +7,8 @@
  *   catch SEED BOT     BOT: still (never moves), chase (after the food, round the clouds)
  *   maze SEED BOT      BOT: still, solve (tilts along the way out); also checks
  *                      every maze is perfect and the ball never in a wall
+ *   hop SEED BOT       BOT: still (never taps), aim (taps to keep at the next gap);
+ *                      stops at 180 s if it hasn't crashed
  */
 
 #include <math.h>
@@ -15,6 +17,7 @@
 #include <string.h>
 
 #include "boopie_catch.h"
+#include "boopie_hop.h"
 #include "boopie_maze.h"
 
 #define DT (1.0f / 30)
@@ -170,12 +173,58 @@ static int play_maze(uint32_t seed, const char *bot)
     return 0;
 }
 
+static int play_hop(uint32_t seed, const char *bot)
+{
+    boopie_hop_t g;
+    boopie_hop_start(&g, seed);
+    int flaps = 0, crashes = 0, events_passed = 0, events_star = 0;
+    float min_gap = 99, max_speed = 0, min_y = 99, max_y = -99;
+    while (!g.over && g.t < 180) {
+        if (strcmp(bot, "aim") == 0) {
+            /* The next gap still ahead of the pet; tap when below its middle and falling. */
+            const boopie_hop_pipe_t *next = NULL;
+            for (int i = 0; i < BOOPIE_HOP_PIPES; i++) {
+                const boopie_hop_pipe_t *p = &g.pipes[i];
+                if (p->x + BOOPIE_HOP_PIPE_W >= BOOPIE_HOP_X - BOOPIE_HOP_HALF_W && (!next || p->x < next->x)) {
+                    next = p;
+                }
+            }
+            float target = next ? next->gap_y + 1.5f : 30;
+            if (g.y > target && g.vy >= 0) {
+                boopie_hop_flap(&g);
+                flaps++;
+            }
+        }
+        boopie_hop_event_t ev = boopie_hop_tick(&g, DT);
+        crashes += ev == BOOPIE_HOP_CRASHED;
+        events_passed += ev == BOOPIE_HOP_PASSED;
+        events_star += ev == BOOPIE_HOP_STAR;
+        for (int i = 0; i < BOOPIE_HOP_PIPES; i++) {
+            min_gap = fminf(min_gap, g.pipes[i].gap_h);
+        }
+        max_speed = fmaxf(max_speed, g.speed);
+        min_y = fminf(min_y, g.y);
+        max_y = fmaxf(max_y, g.y);
+    }
+    int xp, stars;
+    boopie_hop_reward(g.score, &xp, &stars);
+    printf("{\"score\": %d, \"passed\": %d, \"stars\": %d, \"over\": %d, \"crashes\": %d, \"t\": %.2f, "
+           "\"flaps\": %d, \"min_gap\": %.2f, \"max_speed\": %.2f, \"min_y\": %.2f, \"max_y\": %.2f, "
+           "\"xp\": %d, \"reward_stars\": %d, \"events\": [%d, %d]}\n",
+           g.score, g.passed, g.stars, g.over, crashes, g.t, flaps, min_gap, max_speed, min_y, max_y, xp, stars,
+           events_passed, events_star);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 4) {
-        fprintf(stderr, "usage: %s catch|maze SEED BOT\n", argv[0]);
+        fprintf(stderr, "usage: %s catch|maze|hop SEED BOT\n", argv[0]);
         return 2;
     }
     uint32_t seed = (uint32_t)strtoul(argv[2], NULL, 10);
+    if (strcmp(argv[1], "hop") == 0) {
+        return play_hop(seed, argv[3]);
+    }
     return strcmp(argv[1], "catch") == 0 ? play_catch(seed, argv[3]) : play_maze(seed, argv[3]);
 }

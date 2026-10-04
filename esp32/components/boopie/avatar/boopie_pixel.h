@@ -188,12 +188,15 @@ void boopie_pixel_set_slots(const float slots[5]);
 struct boopie_whack;
 void boopie_pixel_render_whack(const struct boopie_whack *g, int head);
 
-/* 接零食 (game/boopie_catch.h) and 重力迷宫 (game/boopie_maze.h), the same way:
+/* 接零食 (game/boopie_catch.h), 重力迷宫 (game/boopie_maze.h) and 跳跳布比
+ * (game/boopie_hop.h), the same way:
  * the pet catching is `head`, as boopie_pixel_render_whack(). */
 struct boopie_catch;
 struct boopie_maze;
+struct boopie_hop;
 void boopie_pixel_render_catch(const struct boopie_catch *g, int head);
 void boopie_pixel_render_maze(const struct boopie_maze *g);
+void boopie_pixel_render_hop(const struct boopie_hop *g, int head);
 
 /* A character's 13 x 10 head (as in the games) in its own colours, `scale`
  * pixels a cell, RGB565 row by row into dst (13*scale x 10*scale); black

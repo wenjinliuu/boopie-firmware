@@ -32,6 +32,7 @@ typedef enum {
     BOOPIE_ICON_CHAT,
     BOOPIE_ICON_ALBUM,
     BOOPIE_ICON_NOISE,
+    BOOPIE_ICON_HOP,
     /* 白噪音's sounds. */
     BOOPIE_ICON_NOISE_WHITE,
     BOOPIE_ICON_NOISE_PINK,

@@ -1,9 +1,10 @@
 # Copyright (c) 2026 Boopie contributors
 # SPDX-License-Identifier: Apache-2.0
 
-"""接零食 and 重力迷宫 (game/boopie_catch.c, game/boopie_maze.c), played by bots:
+"""接零食, 重力迷宫 and 跳跳布比 (game/boopie_catch.c, boopie_maze.c, boopie_hop.c), played by bots:
 a round ends on time, playing well scores and earns the reward, standing
-still doesn't; every maze is perfect and the ball never goes through a wall.
+still doesn't; every maze is perfect and the ball never goes through a wall;
+the hopping pet falls without taps and gets through gap after gap with them.
 
 Run from esp32/: python3 -m unittest discover -s components/boopie/tests -p 'test_*.py'
 """
@@ -30,7 +31,8 @@ class BoopieGamesTest(unittest.TestCase):
         cc = shlex.split(os.environ.get("CC", "cc"))
         subprocess.run(cc + ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-I", str(COMPONENT / "game"),
                              str(HERE / "boopie_games_harness.c"), str(COMPONENT / "game" / "boopie_catch.c"),
-                             str(COMPONENT / "game" / "boopie_maze.c"), "-lm", "-o", str(cls.exe)], check=True)
+                             str(COMPONENT / "game" / "boopie_maze.c"), str(COMPONENT / "game" / "boopie_hop.c"),
+                             "-lm", "-o", str(cls.exe)], check=True)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -76,6 +78,22 @@ class BoopieGamesTest(unittest.TestCase):
         g = self.play("maze", 3, "still")
         self.assertEqual((g["score"], g["level"], g["in_wall"]), (0, 0, 0))
         self.assertEqual((g["x"], g["y"]), (3.5, 3.5))
+
+    def test_hop_without_taps_falls_to_the_ground(self) -> None:
+        g = self.play("hop", 1, "still")
+        self.assertEqual((g["over"], g["crashes"], g["score"], g["xp"]), (1, 1, 0, 0))
+        self.assertLess(g["t"], 2.5)   # down, then the tumble
+
+    def test_hop_aiming_gets_through_and_it_gets_harder(self) -> None:
+        for seed in (1, 7, 42, 2026, 99):
+            g = self.play("hop", seed, "aim")
+            self.assertGreaterEqual(g["passed"], 50, g)
+            self.assertEqual(g["score"], g["passed"] + 2 * g["stars"], g)
+            self.assertGreater(g["stars"], 0, g)
+            self.assertEqual(g["min_gap"], 16.5, g)      # the gaps narrow to their least
+            self.assertEqual(g["max_speed"], 24.0, g)    # and the pillars come faster
+            self.assertGreaterEqual(g["min_y"], 5 + 3.5 - 0.01)   # the top holds it
+            self.assertEqual((g["xp"], g["reward_stars"]), (15, 3))
 
 
 if __name__ == "__main__":
