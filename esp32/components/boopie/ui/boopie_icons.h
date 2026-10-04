@@ -54,6 +54,10 @@ const lv_image_dsc_t *boopie_icon(boopie_icon_t which, int scale);
  * tile), made once per picture. */
 const lv_image_dsc_t *boopie_icon_keyed(const lv_image_dsc_t *rgb565);
 
+/* The art with a dark outline round it, to stand on any background (the
+ * world's buttons), made once. */
+const lv_image_dsc_t *boopie_icon_outlined(boopie_icon_t which, int scale);
+
 /* Its tile colour. */
 uint32_t boopie_icon_tile_colour(boopie_icon_t which);
 

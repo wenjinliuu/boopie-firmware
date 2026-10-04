@@ -49,7 +49,6 @@
 #include "boopie_avatar.h"
 #include "boopie_font.h"   /* Boopie: Chinese and English reply text */
 #include "boopie_pages.h"  /* Boopie: the pages round the face */
-#include "boopie_icons.h"  /* Boopie: the way to 小窝 */
 #include "boopie_games.h"  /* Boopie: the games, over everything */
 #include "boopie_guide.h"  /* Boopie: the setup guide */
 #include "boopie_setup.h"  /* Boopie: phone setup over the hotspot */
@@ -105,7 +104,6 @@ static lv_obj_t *s_face;
 static lv_obj_t *s_settings;
 /* Boopie: the pages round the face (boopie_pages.c): apps, cards, the pet. */
 static lv_obj_t *s_apps, *s_cards, *s_pet;
-static void on_home_clicked(lv_event_t *e);   /* Boopie: the face's way to 小窝 */
 static lv_obj_t *s_dots[3];
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_ble_icon;
@@ -452,18 +450,6 @@ static void build_button_icons(lv_obj_t *face)
     s_aux_icon = make_label(face, s_small ? &lv_font_montserrat_14 : &lv_font_montserrat_28, COLOR_DIM);
     lv_label_set_text(s_aux_icon, muse_board->touch ? LV_SYMBOL_POWER : LV_SYMBOL_LIST);
     lv_obj_align(s_aux_icon, a->align, a->x, a->y);
-    if (muse_board->touch && !s_small) {
-        /* Boopie: the way to 小窝, a little house opposite the bottom button. */
-        lv_obj_t *home = lv_image_create(face);
-        lv_image_set_src(home, boopie_icon(BOOPIE_ICON_HOUSE, 3));
-        lv_obj_align(home, a->align, -a->x, a->y);
-        lv_obj_add_flag(home, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_ext_click_area(home, 16);
-        lv_obj_set_style_transform_scale(home, 220, LV_STATE_PRESSED);
-        lv_obj_set_style_transform_pivot_x(home, 18, 0);
-        lv_obj_set_style_transform_pivot_y(home, 16, 0);
-        lv_obj_add_event_cb(home, on_home_clicked, LV_EVENT_CLICKED, NULL);
-    }
 }
 
 /*
@@ -479,12 +465,6 @@ static int s_strokes;
 static int s_dir[2];            /* each axis: the way it's going, -1, 0, 1 */
 static int32_t s_turn[2];       /* where it last turned, or got furthest */
 static uint32_t s_held_since;
-
-static void on_home_clicked(lv_event_t *e)
-{
-    (void)e;
-    muse_ui_open_nest();   /* Boopie: 小窝 */
-}
 
 static void on_canvas_touch(lv_event_t *e)
 {

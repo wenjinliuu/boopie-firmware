@@ -170,6 +170,72 @@ const lv_image_dsc_t *boopie_icon(boopie_icon_t which, int scale)
     return &s_made[s_count++].dsc;
 }
 
+const lv_image_dsc_t *boopie_icon_outlined(boopie_icon_t which, int scale)
+{
+    static struct {
+        int which, scale;
+        lv_image_dsc_t dsc;
+    } s_made[8];
+    static int s_count;
+    if ((int)which < 0 || which >= BOOPIE_ICON_COUNT || scale < 1) {
+        return NULL;
+    }
+    for (int i = 0; i < s_count; i++) {
+        if (s_made[i].which == (int)which && s_made[i].scale == scale) {
+            return &s_made[i].dsc;
+        }
+    }
+    if (s_count == 8) {
+        return NULL;
+    }
+    /* The art a cell bigger all round, then each empty cell touching it inked. */
+    const art_t *a = &ART[which];
+    int cw = (int)strlen(a->rows[0]) + 2, ch = a->h + 2;
+    uint32_t cells[24 * 24] = { 0 };
+    if (cw > 24 || ch > 24) {
+        return NULL;
+    }
+    for (int j = 0; j < a->h; j++) {
+        for (int i = 0; i + 2 < cw; i++) {
+            const char *k = a->rows[j][i] != '.' ? strchr(a->keys, a->rows[j][i]) : NULL;
+            cells[(j + 1) * cw + i + 1] = k ? 0xff000000u | a->colours[k - a->keys] : 0;
+        }
+    }
+    uint32_t inked[24 * 24];
+    memcpy(inked, cells, sizeof inked);
+    for (int j = 0; j < ch; j++) {
+        for (int i = 0; i < cw; i++) {
+            if (cells[j * cw + i]) {
+                continue;
+            }
+            bool touch = (i > 0 && cells[j * cw + i - 1]) || (i + 1 < cw && cells[j * cw + i + 1])
+                         || (j > 0 && cells[(j - 1) * cw + i]) || (j + 1 < ch && cells[(j + 1) * cw + i]);
+            if (touch) {
+                inked[j * cw + i] = 0xff282c38;
+            }
+        }
+    }
+    int w = cw * scale, h = ch * scale;
+    uint32_t *px = lv_malloc((size_t)w * h * sizeof(uint32_t));
+    if (!px) {
+        return NULL;
+    }
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            px[y * w + x] = inked[(y / scale) * cw + x / scale];
+        }
+    }
+    s_made[s_count].which = (int)which;
+    s_made[s_count].scale = scale;
+    s_made[s_count].dsc = (lv_image_dsc_t){
+        .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_ARGB8888, .w = w, .h = h,
+                    .stride = w * sizeof(uint32_t) },
+        .data_size = (uint32_t)(w * h * sizeof(uint32_t)),
+        .data = (const uint8_t *)px,
+    };
+    return &s_made[s_count++].dsc;
+}
+
 const lv_image_dsc_t *boopie_icon_keyed(const lv_image_dsc_t *src)
 {
     static struct {

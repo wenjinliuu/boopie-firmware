@@ -42,7 +42,6 @@
 #define INK 0x282c38             /* the panels' dark */
 #define PAPER 0xf8f8f0
 #define BLUE 0x4068b8
-#define GOLD 0xe8c448
 
 static lv_obj_t *s_tile, *s_image, *s_say, *s_say_text, *s_panel, *s_back_hint;
 static lv_image_dsc_t s_dsc;
@@ -558,32 +557,18 @@ static void frame(lv_timer_t *timer)
 
 static lv_obj_t *button(lv_obj_t *parent, int index, boopie_icon_t icon, const char *name, int x)
 {
-    /* A gold ring round a blue disc, edged dark, as in the monster games' menus. */
-    lv_obj_t *b = lv_obj_create(parent);
-    lv_obj_remove_style_all(b);
-    lv_obj_set_size(b, 52, 52);
-    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(b, lv_color_hex(GOLD), 0);
-    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(b, lv_color_hex(INK), 0);
-    lv_obj_set_style_border_width(b, 3, 0);
-    lv_obj_set_style_transform_scale(b, 230, LV_STATE_PRESSED);
-    lv_obj_set_style_transform_pivot_x(b, 26, 0);
-    lv_obj_set_style_transform_pivot_y(b, 26, 0);
+    /* The icon alone, big, outlined so it reads over the room; it shrinks a little pressed. */
+    lv_obj_t *b = lv_image_create(parent);
+    const lv_image_dsc_t *art = boopie_icon_outlined(icon, 5);
+    lv_image_set_src(b, art);
     lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(b, LV_ALIGN_BOTTOM_MID, x, -22);
-    lv_obj_t *disc = lv_obj_create(b);
-    lv_obj_remove_style_all(disc);
-    lv_obj_set_size(disc, 38, 38);
-    lv_obj_set_style_radius(disc, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(disc, lv_color_hex(BLUE), 0);
-    lv_obj_set_style_bg_opa(disc, LV_OPA_COVER, 0);
-    lv_obj_remove_flag(disc, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_center(disc);
-    lv_obj_t *img = lv_image_create(disc);
-    lv_image_set_src(img, boopie_icon(icon, 2));
-    lv_obj_center(img);
+    lv_obj_set_ext_click_area(b, 10);
+    lv_obj_align(b, LV_ALIGN_BOTTOM_MID, x, -24);
+    if (art) {
+        lv_obj_set_style_transform_pivot_x(b, art->header.w / 2, 0);
+        lv_obj_set_style_transform_pivot_y(b, art->header.h / 2, 0);
+    }
+    lv_obj_set_style_transform_scale(b, 220, LV_STATE_PRESSED);
     lv_obj_add_event_cb(b, on_button, LV_EVENT_CLICKED, (void *)(intptr_t)index);
     /* Its name above it, on a dark tab so it reads over anything. */
     lv_obj_t *tab = lv_obj_create(parent);
@@ -595,7 +580,7 @@ static lv_obj_t *button(lv_obj_t *parent, int index, boopie_icon_t icon, const c
     lv_obj_set_style_pad_hor(tab, 4, 0);
     lv_obj_remove_flag(tab, LV_OBJ_FLAG_CLICKABLE);
     label(tab, &boopie_font_pixel_24, 0xffffff, name);
-    lv_obj_align_to(tab, b, LV_ALIGN_OUT_TOP_MID, 0, -2);
+    lv_obj_align_to(tab, b, LV_ALIGN_OUT_TOP_MID, 0, -4);
     return b;
 }
 
