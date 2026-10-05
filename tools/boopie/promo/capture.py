@@ -39,6 +39,7 @@ CLIPS = {
     "boopie_confetti": (dict(B, BOOPIE_OVERLAY="confetti"), ["face=happy", "advance=100"], 40, 66),
     "muse_idle": (av("muse"), ["face=idle", "advance=800"], 60, 66),
     "muse_happy": (av("muse"), ["face=happy", "advance=100"], 30, 66),
+    "muse_think": (av("muse"), ["face=thinking", "progress=0.5", "advance=300"], 120, 66),
     "muse_speaking": (av("muse"), ["face=speaking", "level=0.6", "progress=0.5",
                                    "caption=你好，我是 Muse！很高兴认识你～", "advance=300"], 45, 66),
     "setup_qr": (B, ["menu=setup", "advance=800"], 15, 66),
@@ -58,6 +59,8 @@ for a in ("muse", "boopie", "gpt", "codex", "klaude", "whale", "doubao"):
     CLIPS[f"char_{a}"] = (av(a), ["face=happy", "advance=400", "face=idle", "advance=200"], 24, 66)
 for c, k in sim_shots.SKINS:
     CLIPS[f"skin_{k}"] = (av(c, BOOPIE_SKIN=k), ["face=idle", "advance=700"], 16, 66)
+for sc in ("stars", "fireflies", "petals", "bubbles", "snow", "default", "neon_grid", "matrix", "glitch"):
+    CLIPS[f"muse_think_{sc}"] = (av("muse", BOOPIE_SCENE=sc, TZ="UTC+10"), ["face=thinking", "progress=0.5", "advance=1500"], 60, 66)
 for e in ("hungry", "eating", "sleepy", "sad", "dizzy"):
     CLIPS[f"pet_{e}"] = (dict(B, BOOPIE_PET=e), ["face=idle", "advance=600"], 30, 66)
 for o in ("surprise", "blush", "confetti", "hearts"):
