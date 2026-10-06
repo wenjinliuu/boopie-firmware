@@ -79,6 +79,7 @@
 #include "muse_glue.h"
 #include "boopie_tools.h"    /* Boopie: what the board does for the AI */
 #include "muse_settings.h"   /* Boopie: the BLE switch, at boot */
+#include "boopie_ota.h"      /* Boopie: when a new app counts as working */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -2453,13 +2454,24 @@ static void on_ws_control_status(const char *status) {
 // We gate validation on the control WS coming up: that's the channel a future
 // device.ota would arrive on, so if the new image can't reach it, reverting is
 // the only way to keep the device recoverable.
+// Boopie: updates come from our own server instead, and Muse may not be the
+// brain at all (小智), so the test is the UI running and Wi-Fi, if set up,
+// connected (boopie_ota_healthy): what our update check needs.
+static bool ota_image_healthy(void) {
+#if CONFIG_MUSE_ENABLED
+    return boopie_ota_healthy();
+#else
+    return noise_ctrl_is_connected();
+#endif
+}
+
 static void ota_verify_task(void *arg) {
     (void)arg;
     int64_t deadline = esp_timer_get_time() + OTA_VERIFY_TIMEOUT_US;
     while (esp_timer_get_time() < deadline) {
-        if (noise_ctrl_is_connected()) {
+        if (ota_image_healthy()) {
             if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
-                ESP_LOGI(TAG, "OTA image validated (control WS up)");
+                ESP_LOGI(TAG, "OTA image validated (running well)");
             } else {
                 ESP_LOGE(TAG, "esp_ota_mark_app_valid_cancel_rollback failed");
             }
@@ -2476,7 +2488,7 @@ static void ota_verify_task(void *arg) {
         // Only returns when there is no valid partition to revert to.
         ESP_LOGE(TAG, "rollback failed: no valid partition to revert to");
     } else {
-        ESP_LOGW(TAG, "running image not validated (control WS never came up)");
+        ESP_LOGW(TAG, "running image not validated (never ran well enough)");
     }
     stack_monitor_record(NULL);
     vTaskDelete(NULL);

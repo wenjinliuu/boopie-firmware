@@ -11,7 +11,7 @@
 
 const esp_app_desc_t *esp_app_get_description(void)
 {
-    static const esp_app_desc_t DESC = { "sim" };
+    static const esp_app_desc_t DESC = { "sim", "12:00:00", "Oct  6 2026" };
     return &DESC;
 }
 
@@ -237,3 +237,37 @@ bool boopie_vpn_active(void) { return getenv("BOOPIE_VPN") != NULL; }
 
 /* Boopie: the voice task's notes (the simulator has none). */
 void muse_voice_clear_notes(void) {}
+
+/* ---- Boopie's updates: BOOPIE_OTA=found|latest|downloading|off picks what the page shows ---- */
+#include "boopie_ota.h"
+
+bool boopie_ota_enabled(void) { return true; }
+void boopie_ota_check(void) {}
+void boopie_ota_install(void) {}
+void boopie_ota_ui_alive(void) {}
+const char *boopie_ota_news(void) { return NULL; }
+
+void boopie_ota_info(boopie_ota_info_t *out)
+{
+    const char *s = getenv("BOOPIE_OTA");
+    memset(out, 0, sizeof *out);
+    out->state = BOOPIE_OTA_IDLE;
+    if (!s) {
+        return;
+    }
+    if (strcmp(s, "latest") == 0) {
+        out->state = BOOPIE_OTA_LATEST;
+        strcpy(out->msg, "已经是最新版");
+        return;
+    }
+    if (strcmp(s, "off") == 0) {
+        out->state = BOOPIE_OTA_OFF;
+        strcpy(out->msg, "这个版本没有开在线更新");
+        return;
+    }
+    out->state = strcmp(s, "downloading") == 0 ? BOOPIE_OTA_DOWNLOADING : BOOPIE_OTA_FOUND;
+    out->percent = 42;
+    strcpy(out->version, "1.1.0");
+    strcpy(out->notes, "宠物会偶尔说话了\n设置里加了「系统更新」和「关于」\n修了换装后返回会卡住的问题");
+    strcpy(out->msg, out->state == BOOPIE_OTA_FOUND ? "有新版本" : "正在下载新版本……");
+}

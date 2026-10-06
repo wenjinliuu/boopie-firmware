@@ -30,6 +30,7 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "nvs.h"
+#include "sdkconfig.h"
 
 #include "boopie_ss.h"
 #include "boopie_store.h"
@@ -53,6 +54,7 @@ static const char *TAG = "boopie_vpn";
 /* The names that go through the VPN: Muse's, and its server if it's moved. */
 static const char *const DOMAINS[] = { "muse.ai", "metaaivm.com" };
 static char s_extra_host[64];
+static char s_ota_host[96];   /* Boopie's update server (CONFIG_BOOPIE_OTA_URL) */
 
 static SemaphoreHandle_t s_lock;
 static boopie_vpn_node_t *s_nodes;      /* in PSRAM */
@@ -125,7 +127,8 @@ static bool proxied(const char *name)
             return true;
         }
     }
-    return s_extra_host[0] && strcasecmp(name, s_extra_host) == 0;
+    return (s_extra_host[0] && strcasecmp(name, s_extra_host) == 0)
+           || (s_ota_host[0] && strcasecmp(name, s_ota_host) == 0);
 }
 
 /* lwip asks this before it looks a name up (CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM). */
@@ -815,6 +818,7 @@ void boopie_vpn_init(const char *extra_host)
     if (extra_host && !proxied(extra_host) && strcmp(extra_host, "") != 0) {
         strlcpy(s_extra_host, extra_host, sizeof s_extra_host);
     }
+    url_host(CONFIG_BOOPIE_OTA_URL, s_ota_host, sizeof s_ota_host);
     for (int i = 0; i < BOOPIE_VPN_NODES_MAX; i++) {
         s_latency[i] = -1;
     }

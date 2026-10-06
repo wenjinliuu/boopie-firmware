@@ -16,6 +16,7 @@
 
 #include "ota.h"
 #include "esp_app_desc.h"
+#include "esp_log.h"
 #include "sdkconfig.h"
 
 #include <stddef.h>
@@ -290,6 +291,8 @@ void ota_start(const char *url, bool force, ota_status_cb cb, void *user) {
 void ota_start(const char *url, bool force, ota_status_cb cb, void *user) {
     (void)url;
     (void)force;
+    // Boopie: updates come only from our own server (components/boopie/ota).
+    ESP_LOGW("link.ota", "update request ignored: this firmware updates itself");
     if (cb) {
         ota_event_t ev = {
             .result = OTA_RESULT_SKIPPED,

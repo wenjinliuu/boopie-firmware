@@ -38,6 +38,7 @@
 #include "muse_voice.h"
 #include "muse_wifi.h"
 #include "boopie_xiaozhi.h"
+#include "boopie_ota.h"
 
 static const char *TAG = "muse";
 
@@ -74,8 +75,9 @@ void muse_app_run(const muse_board_t *board)
     ESP_ERROR_CHECK(board->init());
     ESP_ERROR_CHECK(muse_settings_init());
     boopie_clock_start();   /* Boopie: the time, for the pet */
-    boopie_assets_init();   /* Boopie: fonts, sounds (the firmware's own without them) */
     boopie_store_mount();   /* Boopie: chat history, pictures, notes */
+    boopie_ota_boot();      /* Boopie: an updated assets pack, written before anything reads it */
+    boopie_assets_init();   /* Boopie: fonts, sounds (the firmware's own without them) */
     {
         /* Boopie: the VPN, with Muse's server if it's been moved off the default. */
         char host[MUSE_HOST_MAX + 1];
@@ -107,6 +109,7 @@ void muse_app_run(const muse_board_t *board)
     if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
         muse_hatch_start();
     }
+    boopie_ota_start();       /* Boopie: our own updates, checked daily, installed on a yes */
     boopie_xiaozhi_start();   /* Boopie: 小智, when it's the brain: its activation code, then where to talk */
     /* Home Link owns the radios; these just hand it the saved settings. */
     muse_wifi_apply();

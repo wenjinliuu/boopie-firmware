@@ -44,6 +44,9 @@ typedef enum {
     BOOPIE_ICON_NOISE_PINK,
     BOOPIE_ICON_NOISE_RAIN,
     BOOPIE_ICON_NOISE_WAVES,
+    /* Settings: 系统更新, 关于. */
+    BOOPIE_ICON_UPDATE,
+    BOOPIE_ICON_INFO,
     BOOPIE_ICON_COUNT,
 } boopie_icon_t;
 

@@ -52,7 +52,7 @@ endif()
 idf_component_register(
     SRCS ${srcs}
     EMBED_FILES ${embed}
-    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup" "vpn" "world" "xiaozhi" "tools"
+    INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup" "vpn" "world" "xiaozhi" "tools" "ota"
     REQUIRES esp_driver_i2c
     PRIV_REQUIRES espcoredump nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs mbedtls esp_http_client lwip
 )

@@ -57,6 +57,7 @@
 #include "boopie_guide.h"  /* Boopie: the setup guide */
 #include "boopie_setup.h"  /* Boopie: phone setup over the hotspot */
 #include "boopie_vpn.h"    /* Boopie: the VPN mark in the status line */
+#include "boopie_ota.h"    /* Boopie: news of an update */
 
 static const char *TAG = "muse_ui";
 
@@ -1512,6 +1513,15 @@ static void update_power(float now)
             s_said_us = now_us;
             muse_state_set_caption("VPN 连不上了，去设置换个节点吧");
             boopie_avatar_react(BOOPIE_EXPR_SAD, 3.0f);
+        }
+    }
+    /* Boopie: our own updates: the UI's up (a new app is kept), and news of one. */
+    boopie_ota_ui_alive();
+    {
+        const char *news = boopie_ota_news();
+        if (news) {
+            muse_state_set_caption("有新版本 %s 啦，去「设置 · 系统更新」看看", news);
+            boopie_avatar_react(BOOPIE_EXPR_HAPPY, 3.0f);
         }
     }
     const char *clock = boopie_pages_clock();

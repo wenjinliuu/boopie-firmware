@@ -62,7 +62,7 @@ if(CONFIG_MUSE_ENABLED)
     # Boopie: the avatar switcher stands in for muse_pixel_*; Muse's own
     # renderer is built as jolly_pixel_* (below) and drawn when Muse is chosen.
     list(APPEND srcs "${muse_pixel_src}" "../boopie/avatar/boopie_avatar.c" "../boopie/ui/boopie_pages.c" "../boopie/ui/boopie_games.c"
-         "../boopie/ui/boopie_input.c" "../boopie/ui/boopie_guide.c" "../boopie/ui/boopie_setup.c" "../boopie/ui/boopie_heads.c" "../boopie/ui/boopie_viewers.c" "../boopie/ui/boopie_icons.c" "../boopie/ui/boopie_noise_ui.c" "../boopie/ui/boopie_world_ui.c" "../boopie/xiaozhi/boopie_xz_proto.c" "../boopie/xiaozhi/boopie_xiaozhi.c" "../boopie/xiaozhi/boopie_xz_voice.c" "../boopie/tools/boopie_tools_spec.c" "../boopie/tools/boopie_tools.c"
+         "../boopie/ui/boopie_input.c" "../boopie/ui/boopie_guide.c" "../boopie/ui/boopie_setup.c" "../boopie/ui/boopie_heads.c" "../boopie/ui/boopie_viewers.c" "../boopie/ui/boopie_icons.c" "../boopie/ui/boopie_noise_ui.c" "../boopie/ui/boopie_world_ui.c" "../boopie/xiaozhi/boopie_xz_proto.c" "../boopie/xiaozhi/boopie_xiaozhi.c" "../boopie/xiaozhi/boopie_xz_voice.c" "../boopie/tools/boopie_tools_spec.c" "../boopie/tools/boopie_tools.c" "../boopie/ota/boopie_ota.c"
          "../boopie/setup/boopie_setup_web.c")
     list(APPEND embed "../boopie/setup/setup.html")   # Boopie: the phone setup page
     if(CONFIG_MUSE_BOARD_WAVESHARE_S3_175C)
@@ -93,7 +93,7 @@ set(muse_priv_requires
     bt esp-tls mbedtls esp_app_format esp_http_client
     noise_core minimp3
     esp_lcd esp_adc esp_driver_i2s esp_driver_ledc esp_driver_spi esp_driver_uart esp_wifi
-    esp_driver_pcnt esp_http_server esp_netif spi_flash)
+    esp_driver_pcnt esp_http_server esp_netif spi_flash app_update esp_partition)
 list(APPEND muse_priv_requires camera)
 # Boopie: fonts and line breaking for Chinese text, and the avatars.
 list(APPEND muse_priv_requires boopie)

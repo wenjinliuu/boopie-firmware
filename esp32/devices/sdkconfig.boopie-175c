@@ -29,3 +29,8 @@ CONFIG_MBEDTLS_CHACHAPOLY_C=y
 # at the top certificate's issuer; browsers find the other path. The
 # subscription's site did ("No matching trusted root certificate found").
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY=y
+
+# Boopie: updates come from our own server (components/boopie/ota), signed
+# with our key; Muse's update commands (BLE, Wi-Fi setup, control channel) are
+# turned away.
+CONFIG_HOMEHUB_OTA_ENABLED=n

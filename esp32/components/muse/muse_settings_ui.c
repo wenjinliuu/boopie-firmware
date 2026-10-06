@@ -46,6 +46,7 @@
 #include "boopie_heads.h"
 #include "boopie_sdk_token.h"
 #include "boopie_vpn.h"
+#include "boopie_ota.h"
 #include "boopie_xiaozhi.h"
 #include "boopie_history.h"
 #include "boopie_store.h"
@@ -1891,7 +1892,7 @@ static void build_vpn_page(lv_obj_t *tile)
     s_vpn_list = column(list);
     note(list, "支持 Shadowsocks（ss）节点：在机场后台复制订阅时，选「通用 / V2rayN」或「Clash」都可以；"
                "vmess、vless、trojan 节点用不了。存好就自动开 VPN、更新并测速，选一个能连上的节点。"
-               "订阅开头那几条「剩余流量」「到期时间」只是信息，不是节点。只有 Muse 走 VPN，小智、校时直连。");
+               "订阅开头那几条「剩余流量」「到期时间」只是信息，不是节点。只有 Muse 和系统更新走 VPN，小智、校时直连。");
     s_vpn_shown = 0;
 }
 
@@ -1962,6 +1963,172 @@ static void tick_vpn(void)
 }
 
 static const page_t VPN = { &s_vpn, build_vpn_page };
+
+/* ---------- 系统更新 (Boopie) ---------- */
+
+static lv_obj_t *s_update, *s_home_update, *s_upd_status, *s_upd_check, *s_upd_box, *s_upd_title, *s_upd_notes,
+                *s_upd_bar, *s_upd_go, *s_upd_go_lbl;
+static uint32_t s_upd_armed;   /* the first tap on 立即更新, waiting for the second */
+
+static void on_upd_check(lv_event_t *e)
+{
+    (void)e;
+    boopie_ota_check();
+}
+
+/* Asked twice: the first tap says what will happen, the second starts it. */
+static void on_upd_go(lv_event_t *e)
+{
+    (void)e;
+    if (s_upd_armed && lv_tick_elaps(s_upd_armed) < 6000) {
+        s_upd_armed = 0;
+        boopie_ota_install();
+    } else {
+        s_upd_armed = lv_tick_get();
+    }
+}
+
+static void build_update_page(lv_obj_t *tile)
+{
+    lv_obj_t *list;
+    s_update = page(tile, "系统更新", true, &list);
+    char now[48];
+    snprintf(now, sizeof now, "当前版本  %s", esp_app_get_description()->version);
+    note(list, now);
+    s_upd_status = note(list, "");
+    s_upd_check = button(list, LV_SYMBOL_REFRESH "  检查更新", COLOR_ACCENT, on_upd_check, NULL);
+    s_upd_box = column(list);
+    lv_obj_set_style_radius(s_upd_box, 18, 0);
+    lv_obj_set_style_bg_opa(s_upd_box, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(s_upd_box, lv_color_hex(COLOR_CARD), 0);
+    lv_obj_set_style_pad_all(s_upd_box, 14, 0);
+    s_upd_title = label(s_upd_box, &lv_font_montserrat_20, COLOR_OK, "");
+    lv_obj_set_width(s_upd_title, lv_pct(100));
+    lv_obj_set_style_text_align(s_upd_title, LV_TEXT_ALIGN_CENTER, 0);
+    s_upd_notes = label(s_upd_box, &lv_font_montserrat_16, COLOR_TEXT, "");
+    lv_obj_set_width(s_upd_notes, lv_pct(100));
+    lv_label_set_long_mode(s_upd_notes, LV_LABEL_LONG_MODE_WRAP);
+    s_upd_bar = lv_bar_create(s_upd_box);
+    lv_obj_set_size(s_upd_bar, lv_pct(100), 14);
+    lv_bar_set_range(s_upd_bar, 0, 100);
+    lv_obj_set_style_bg_color(s_upd_bar, lv_color_hex(0x2a2345), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_upd_bar, lv_color_hex(COLOR_OK), LV_PART_INDICATOR);
+    s_upd_go = button(s_upd_box, LV_SYMBOL_DOWNLOAD "  立即更新", COLOR_OK, on_upd_go, &s_upd_go_lbl);
+    lv_obj_add_flag(s_upd_box, LV_OBJ_FLAG_HIDDEN);
+    note(list, "每天自动检查一次，有新版本会让宠物告诉你，点了「立即更新」才会装。"
+               "更新包带签名，只装 Boopie 自己发布的版本；VPN 开着时走 VPN 下载。"
+               "更新时别断电，装好会自动重启；新版本跑不起来会自动回到旧版本。");
+    s_upd_armed = 0;
+}
+
+static void show_if(lv_obj_t *o, bool show)
+{
+    if (show == lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) {
+        if (show) {
+            lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+static void tick_update(void)
+{
+    static boopie_ota_info_t info;   /* big (the notes): not on the stack */
+    boopie_ota_info(&info);
+    bool busy = info.state == BOOPIE_OTA_DOWNLOADING || info.state == BOOPIE_OTA_RESTARTING;
+    bool found = info.version[0] && (info.state == BOOPIE_OTA_FOUND || info.state == BOOPIE_OTA_FAILED || busy);
+    set_text(s_upd_status, info.state == BOOPIE_OTA_IDLE ? "还没检查过" : info.msg);
+    lv_obj_set_style_text_color(s_upd_status, lv_color_hex(info.state == BOOPIE_OTA_FAILED ? COLOR_WARN
+                                                           : info.state == BOOPIE_OTA_LATEST ? COLOR_OK : COLOR_DIM), 0);
+    show_if(s_upd_check, info.state != BOOPIE_OTA_OFF && !busy);
+    show_if(s_upd_box, found);
+    if (!found) {
+        return;
+    }
+    char t[48];
+    snprintf(t, sizeof t, "新版本 %s", info.version);
+    set_text(s_upd_title, t);
+    set_text(s_upd_notes, info.notes[0] ? info.notes : "（这次没写更新说明）");
+    show_if(s_upd_bar, busy);
+    lv_bar_set_value(s_upd_bar, info.percent, LV_ANIM_OFF);
+    show_if(s_upd_go, !busy);
+    bool armed = s_upd_armed && lv_tick_elaps(s_upd_armed) < 6000;
+    set_text(s_upd_go_lbl, armed ? "再点一下开始（几分钟，别断电）"
+                         : info.state == BOOPIE_OTA_FAILED ? LV_SYMBOL_REFRESH "  重试更新" : LV_SYMBOL_DOWNLOAD "  立即更新");
+}
+
+static const page_t UPDATE = { &s_update, build_update_page };
+
+/* ---------- 关于 (Boopie) ---------- */
+
+/* Who made it: shown on the 关于 page. */
+static const struct {
+    const char *what, *value;
+} ABOUT_AUTHOR[] = {
+    { "作者", "wenjinliuu" },
+    { "项目", "github.com/wenjinliuu/boopie-firmware" },
+};
+
+static lv_obj_t *s_about_page;
+
+static lv_obj_t *about_card(lv_obj_t *list, const char *heading, const char *body)
+{
+    lv_obj_t *c = column(list);
+    lv_obj_set_style_radius(c, 18, 0);
+    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(c, lv_color_hex(COLOR_CARD), 0);
+    lv_obj_set_style_pad_all(c, 14, 0);
+    lv_obj_set_style_pad_row(c, 6, 0);
+    label(c, &lv_font_montserrat_20, COLOR_ACCENT, heading);
+    lv_obj_t *l = label(c, &lv_font_montserrat_16, COLOR_TEXT, body);
+    lv_obj_set_width(l, lv_pct(100));
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
+    return c;
+}
+
+static void build_about_page(lv_obj_t *tile)
+{
+    lv_obj_t *list;
+    s_about_page = page(tile, "关于", true, &list);
+    lv_obj_t *head = lv_image_create(list);
+    const lv_image_dsc_t *big = boopie_head(boopie_avatar_current(), 7);
+    if (big) {
+        lv_image_set_src(head, big);
+    }
+    const esp_app_desc_t *app = esp_app_get_description();
+    char line[96];
+    snprintf(line, sizeof line, "Boopie  %s", app->version);
+    lv_obj_t *t = label(list, &lv_font_montserrat_20, COLOR_TEXT, line);
+    (void)t;
+    about_card(list, "Boopie 是什么",
+               "一只住在圆形小屏里的电子宠物，也是会聊天的 AI 小伙伴。"
+               "它会饿、会困、会长大，有自己的小世界、小游戏和一柜子皮肤；"
+               "按住说话，就能找 Muse 或小智聊天。");
+    about_card(list, "怎么做出来的",
+               "跑在微雪 ESP32-S3 1.75 寸圆形 AMOLED 开发板上。"
+               "从 Meta 开源的 Muse Gadget SDK 改起，界面是 LVGL 画的，中文用思源黑体。"
+               "个人爱好项目，品牌形象仅供个人使用。");
+    /* Each on its own lines, the value under its name: a web address is long. */
+    for (size_t i = 0; i < sizeof ABOUT_AUTHOR / sizeof ABOUT_AUTHOR[0]; i++) {
+        lv_obj_t *c = column(list);
+        lv_obj_set_style_radius(c, 18, 0);
+        lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(c, lv_color_hex(COLOR_CARD), 0);
+        lv_obj_set_style_pad_hor(c, 16, 0);
+        lv_obj_set_style_pad_ver(c, 10, 0);
+        lv_obj_set_style_pad_row(c, 2, 0);
+        label(c, &lv_font_montserrat_16, COLOR_DIM, ABOUT_AUTHOR[i].what);
+        lv_obj_t *v = label(c, &lv_font_montserrat_16, COLOR_ACCENT, ABOUT_AUTHOR[i].value);
+        lv_obj_set_width(v, lv_pct(100));
+        lv_label_set_long_mode(v, LV_LABEL_LONG_MODE_WRAP);
+    }
+    snprintf(line, sizeof line, "构建于 %s %s", app->date, app->time);
+    note(list, line);
+    note(list, "感谢 Muse Gadget SDK（Apache-2.0）、ESP-IDF、LVGL、思源黑体（SIL OFL）。");
+}
+
+static const page_t ABOUT = { &s_about_page, build_about_page };
 
 /* ---------- Storage (Boopie) ---------- */
 
@@ -2088,6 +2255,8 @@ static void build_home(lv_obj_t *tile)
     icon_row(list, BOOPIE_ICON_DISPLAY, "显示与熄屏", &s_home_sleep, on_nav, (void *)&SLEEP);
     icon_row(list, BOOPIE_ICON_BATTERY, "电池", &s_home_battery, on_nav, (void *)&BATTERY);
     icon_row(list, BOOPIE_ICON_STORAGE, "存储空间", &s_home_storage, on_nav, (void *)&STORAGE);
+    icon_row(list, BOOPIE_ICON_UPDATE, "系统更新", &s_home_update, on_nav, (void *)&UPDATE);
+    icon_row(list, BOOPIE_ICON_INFO, "关于", NULL, on_nav, (void *)&ABOUT);
     /* Boopie: no power off here; holding the bottom button opens the power menu. */
     s_about = note(list, "");
 }
@@ -2105,6 +2274,13 @@ static void tick_home(void)
     char st[16];
     snprintf(st, sizeof st, "已用 %u%%", st_total ? (unsigned)((uint64_t)boopie_store_used() * 100 / st_total) : 0u);
     set_text(s_home_storage, st);
+    {
+        static boopie_ota_info_t u;   /* big (the notes): not on the stack */
+        boopie_ota_info(&u);
+        set_text(s_home_update, u.state == BOOPIE_OTA_FOUND && u.version[0] ? "有新版本"
+                                : u.state == BOOPIE_OTA_DOWNLOADING ? "更新中" : "");
+        lv_obj_set_style_text_color(s_home_update, lv_color_hex(u.state == BOOPIE_OTA_FOUND ? COLOR_OK : COLOR_DIM), 0);
+    }
 
     muse_ble_status_t b;
     muse_ble_status(&b);
@@ -2179,6 +2355,8 @@ void muse_settings_ui_tick(bool visible)
         tick_xiaozhi();  /* Boopie */
     } else if (s_current == s_storage) {
         tick_storage();  /* Boopie */
+    } else if (s_current == s_update) {
+        tick_update();   /* Boopie */
     }
 }
 
@@ -2215,7 +2393,7 @@ void muse_settings_ui_open(const char *name)
     } PAGES[] = { { "wifi", &WIFI }, { "muse", &HATCH }, { "avatar", &AVATAR }, { "bluetooth", &BLE },
                   { "sound", &SOUND }, { "sleep", &SLEEP }, { "battery", &BATTERY }, { "power", &POWER },
                   { "brain", &BRAIN }, { "xiaozhi", &XIAOZHI }, { "vpn", &VPN },
-                  { "storage", &STORAGE } };
+                  { "storage", &STORAGE }, { "update", &UPDATE }, { "about", &ABOUT } };
     if (strcmp(name, "home") == 0) {
         s_back_to = NULL;
         show(s_home);
