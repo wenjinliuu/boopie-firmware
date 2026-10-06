@@ -73,10 +73,6 @@ typedef struct {
      * so the chip can light-sleep. Buttons still wake it. NULL: LVGL keeps
      * running. */
     void (*display_pause)(bool pause);
-    /* Boopie: runs fn with nothing on the panel's bus, the send task parked
-     * between bands. Switching Wi-Fi's mode (the phone setup's hotspot on or
-     * off) with a transfer on the wire left it never finishing. NULL: fn just runs. */
-    void (*display_quiet)(void (*fn)(void *arg), void *arg);
 
     /* Codec handles for one duplex, 2-slot I2S bus, not yet opened. */
     esp_err_t (*audio_init)(esp_codec_dev_handle_t *spk, esp_codec_dev_handle_t *mic);

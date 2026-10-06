@@ -132,7 +132,7 @@ bool boopie_setup_web_start(boopie_setup_ap_t *ap)
     s_setup_on = true;
     return true;
 }
-void boopie_setup_web_stop(void) { s_setup_on = false; }
+bool boopie_setup_web_stop(void) { s_setup_on = false; return false; }
 int boopie_setup_web_clients(void)
 {
     const char *n = getenv("BOOPIE_SETUP_CLIENTS");

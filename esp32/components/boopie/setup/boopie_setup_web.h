@@ -37,7 +37,9 @@ enum {
 };
 
 bool boopie_setup_web_start(boopie_setup_ap_t *ap);
-void boopie_setup_web_stop(void);
+/* The page off. The hotspot goes with a restart (true: one is coming in a
+ * moment), as taking it down at run time stalls the screen on this board. */
+bool boopie_setup_web_stop(void);
 /* Phones joined to the hotspot now. */
 int boopie_setup_web_clients(void);
 /* Bumped by each save; with the bits saved so far. */

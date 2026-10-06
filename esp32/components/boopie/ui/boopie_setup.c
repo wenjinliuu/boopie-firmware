@@ -23,6 +23,7 @@
 #define IDLE_CLOSE_S 600
 
 typedef enum { V_NONE, V_FAILED, V_JOIN, V_OPEN, V_SAVED } view_t;
+static bool s_restarting;   /* closed with the hotspot up: a restart is coming */
 
 static lv_obj_t *s_root;
 static view_t s_view;
@@ -149,14 +150,31 @@ bool boopie_setup_active(void)
     return s_root != NULL;
 }
 
+static void show_restarting(void *arg)
+{
+    (void)arg;
+    if (!s_root) {
+        return;
+    }
+    lv_obj_clean(s_root);
+    lv_obj_align(text(s_root, &lv_font_montserrat_28, COLOR_TEXT, "重启一下"), LV_ALIGN_CENTER, 0, -20);
+    lv_obj_align(text(s_root, &lv_font_montserrat_16, COLOR_DIM, "关掉热点，马上回来"), LV_ALIGN_CENTER, 0, 24);
+}
+
 void boopie_setup_close(void)
 {
-    if (!s_root) {
+    if (!s_root || s_restarting) {
         return;
     }
     uint32_t saved = 0;
     boopie_setup_web_saves(&saved);
-    boopie_setup_web_stop();
+    if (boopie_setup_web_stop()) {
+        /* The hotspot goes with a restart: say so (after this event: the
+         * button may be its target), and stay up till then. */
+        s_restarting = true;
+        lv_async_call(show_restarting, NULL);
+        return;
+    }
     lv_obj_delete_async(s_root);   /* maybe from its own button */
     s_root = NULL;
     s_view = V_NONE;
@@ -170,7 +188,7 @@ void boopie_setup_close(void)
 
 void boopie_setup_tick(void)
 {
-    if (!s_root || s_view == V_FAILED) {
+    if (!s_root || s_view == V_FAILED || s_restarting) {
         return;
     }
     uint32_t saves = boopie_setup_web_saves(NULL);
