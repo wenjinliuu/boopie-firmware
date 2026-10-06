@@ -22,6 +22,16 @@ name: Boopie release
 on:
   push:
     tags: ["v*"]
+  # Or from the Actions tab (Run workflow): the tag vX.Y.Z is made here, on the
+  # chosen branch, with the notes as its message.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, x.y.z"
+        required: true
+      notes:
+        description: "What's new (shown on the board; \\n for a new line)"
+        required: true
 
 permissions:
   contents: read
@@ -34,16 +44,39 @@ jobs:
   prepare:
     name: Version, server and key
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.v.outputs.version }}
       url: ${{ steps.url.outputs.url }}
       pubkey: ${{ steps.key.outputs.pubkey }}
     steps:
       - id: v
+        env:
+          INPUT: ${{ inputs.version }}
         run: |
-          v="${GITHUB_REF_NAME#v}"
-          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::tag $GITHUB_REF_NAME isn't vX.Y.Z"; exit 1; }
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then v="${INPUT#v}"; else v="${GITHUB_REF_NAME#v}"; fi
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version $v isn't x.y.z"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Run by hand: tag this commit (a tag pushed with this token starts no
+      # other run, so this one carries on).
+      - if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            echo "::error::v$VERSION already exists"; exit 1
+          fi
+          printf '%b\n' "$NOTES" > "$RUNNER_TEMP/notes.txt"
+          git tag -a "v$VERSION" -F "$RUNNER_TEMP/notes.txt"
+          git push origin "v$VERSION"
 
       - id: key
         env:
@@ -86,10 +119,12 @@ jobs:
         working-directory: esp32
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      TAG: v${{ needs.prepare.outputs.version }}
       BUILD_DIR: build-release
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: v${{ needs.prepare.outputs.version }}
           persist-credentials: false
 
       - name: Build
@@ -116,8 +151,8 @@ jobs:
         run: |
           out="$GITHUB_WORKSPACE/out"
           git -C "$GITHUB_WORKSPACE" config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git -C "$GITHUB_WORKSPACE" fetch --depth=1 origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME" || true
-          notes=$(git -C "$GITHUB_WORKSPACE" tag -l --format='%(contents:subject)%0a%(contents:body)' "$GITHUB_REF_NAME" | sed '/^-----BEGIN PGP/,$d')
+          git -C "$GITHUB_WORKSPACE" fetch --depth=1 origin "+refs/tags/$TAG:refs/tags/$TAG" || true
+          notes=$(git -C "$GITHUB_WORKSPACE" tag -l --format='%(contents:subject)%0a%(contents:body)' "$TAG" | sed '/^-----BEGIN PGP/,$d')
           [ -n "${notes//[$'\n ']/}" ] || notes=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%B)
           printf '%s\n' "$notes" > notes.txt
           python3 ../tools/boopie/ota_release.py --version "$VERSION" --app "$BUILD_DIR/muse-gadget.bin" \
@@ -144,11 +179,13 @@ jobs:
       contents: write
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
+      TAG: v${{ needs.prepare.outputs.version }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: v${{ needs.prepare.outputs.version }}
           persist-credentials: false
 
       - uses: actions/download-artifact@v4
@@ -208,9 +245,9 @@ jobs:
           (cd out && zip -qr "boopie-$VERSION-flash.zip" flash)
           files=("out/boopie-$VERSION-merged.bin" "out/boopie-$VERSION-unlocked-merged.bin" "out/boopie-$VERSION-flash.zip")
           # A tag made from the Releases page comes with its release: add the files to it.
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
           else
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Boopie $VERSION" \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Boopie $VERSION" \
               --notes-file out/notes.txt "${files[@]}"
           fi
