@@ -208,10 +208,13 @@ const uint8_t boopie_pixel_wide[{len(wide_bits)}] = {{
 {rows(bytes(wide_bits), 16)}
 }};
 
-/* 12 x 12 cells, one bit a pixel, rows top down, MSB first: 18 bytes each. */
+/* 12 x 12 cells, one bit a pixel, rows top down, MSB first: 18 bytes each.
+ * With the assets partition they're read from there (boopie_pixel_font.c). */
+#ifndef BOOPIE_DATA_IN_ASSETS
 const uint8_t boopie_pixel_bits[{n * 18}] = {{
 {rows(b"".join(cells), 18)}
 }};
+#endif
 """)
     print(f"{n} glyphs ({sum(wides)} wide, {from_cubic} from Cubic 11), {len(missing)} missing, "
           f"{len(mismatched)} wrong width -> {args.out.relative_to(ROOT)}", file=sys.stderr)

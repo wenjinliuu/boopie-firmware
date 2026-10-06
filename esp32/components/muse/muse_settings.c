@@ -234,6 +234,11 @@ void muse_settings_set_wifi_on(bool on)
     notify(MUSE_SETTING_WIFI);
 }
 
+void muse_settings_clear_ble_at_boot(void)
+{
+    save_u8("ble_on", 0);   /* on for this run, off at the next boot */
+}
+
 void muse_settings_set_ble_on(bool on)
 {
     s.ble_on = on;

@@ -78,6 +78,7 @@
 #if CONFIG_MUSE_ENABLED
 #include "muse_glue.h"
 #include "boopie_tools.h"    /* Boopie: what the board does for the AI */
+#include "muse_settings.h"   /* Boopie: the BLE switch, at boot */
 // Muse joins Wi-Fi from its own settings, before or without pairing.
 #define WIFI_WITHOUT_PAIRING 1
 #else
@@ -151,6 +152,7 @@ static uint8_t s_vm_auth_refusals = 0;
 static bool s_vm_auth_refresh_pending = false;
 static atomic_bool s_setup_reset_pending = ATOMIC_VAR_INIT(false);
 static bool s_ble_started = false;
+static bool s_ble_for_switch;   /* Boopie: started at boot because the switch was on */
 static bool s_ota_pending_verify = false;
 static uint32_t s_confirm_generation = 0;
 static uint32_t s_confirm_session_generation = 0;
@@ -2351,6 +2353,9 @@ bool app_hatch_vm_credentials(const char *want_vm, char *vm_id, size_t id_cap,
 #endif  // CONFIG_MUSE_ENABLED || CONFIG_HOMEHUB_VOICE
 
 #if CONFIG_MUSE_ENABLED
+bool app_ble_stack_started(void) { return s_ble_started; }
+bool app_ble_started_for_switch(void) { return s_ble_for_switch; }
+
 void app_ble_companion_set(bool advertise) {
     if (advertise) start_ble_setup_server_if_needed();
     ble_server_set_companion_advertising(advertise);
@@ -2688,10 +2693,13 @@ void app_run(void) {
 #if CONFIG_MUSE_ENABLED && CONFIG_SPIRAM
         // Muse may turn on its BLE companion later. The controller needs a
         // 30 KB internal block that TLS and the VM session leave fragmented,
-        // so bring the stack up now; it stays silent until advertising is on.
-        // Boopie: not with 小智 as the brain, which has no use for it.
-        if (muse_vm_wanted()) {
+        // so it has to come up now or not at all.
+        // Boopie: only when the switch asks for it (turning it on restarts
+        // into this), not always: idle, the stack holds ~42 KB of internal
+        // RAM that the rest of the firmware is short of.
+        if (muse_settings_ble_on()) {
             start_ble_setup_server_if_needed();
+            s_ble_for_switch = true;
         }
 #endif
     }

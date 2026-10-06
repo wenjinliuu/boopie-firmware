@@ -1250,18 +1250,17 @@ static void frame(lv_timer_t *timer)
 
 static lv_obj_t *button(lv_obj_t *parent, int index, boopie_icon_t icon, const char *name, int x)
 {
-    /* The icon alone, big, outlined so it reads over the room; it shrinks a little pressed. */
+    /* The icon alone, big, outlined so it reads over the room; it darkens pressed
+     * (a recolour: a scale would draw it through an ARGB layer, which can't be
+     * had when PSRAM is short, and LVGL then retries it forever). */
     lv_obj_t *b = lv_image_create(parent);
     const lv_image_dsc_t *art = boopie_icon_outlined(icon, 5);
     lv_image_set_src(b, art);
     lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(b, 10);
     lv_obj_align(b, LV_ALIGN_BOTTOM_MID, x, -24);
-    if (art) {
-        lv_obj_set_style_transform_pivot_x(b, art->header.w / 2, 0);
-        lv_obj_set_style_transform_pivot_y(b, art->header.h / 2, 0);
-    }
-    lv_obj_set_style_transform_scale(b, 220, LV_STATE_PRESSED);
+    lv_obj_set_style_image_recolor(b, lv_color_black(), LV_STATE_PRESSED);
+    lv_obj_set_style_image_recolor_opa(b, LV_OPA_40, LV_STATE_PRESSED);
     lv_obj_add_event_cb(b, on_button, LV_EVENT_CLICKED, (void *)(intptr_t)index);
     /* Its name above it, on a dark tab so it reads over anything. */
     lv_obj_t *tab = lv_obj_create(parent);

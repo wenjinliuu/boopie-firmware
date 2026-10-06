@@ -19,6 +19,8 @@ include("${CMAKE_CURRENT_LIST_DIR}/cmake/validate_config.cmake")
 
 # Boopie: the assets partition's image (fonts, sounds), packed from assets/ and
 # flashed with the app, into the merged image too (docs/boopie-storage.md).
+# It also carries the UI font, the pixel font's bitmaps and the small world's
+# backgrounds, which the device reads from flash rather than keeping in PSRAM.
 if(CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions_boopie_32mb.csv")
     idf_build_get_property(boopie_python PYTHON)
     set(boopie_assets_bin "${CMAKE_BINARY_DIR}/boopie_assets.bin")
@@ -26,8 +28,11 @@ if(CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions_boopie_32mb.csv")
     set(boopie_packer "${CMAKE_CURRENT_LIST_DIR}/../tools/boopie/pack_assets.py")
     add_custom_command(OUTPUT "${boopie_assets_bin}"
         COMMAND ${boopie_python} "${boopie_packer}" --dir "${CMAKE_CURRENT_LIST_DIR}/assets"
-                --out "${boopie_assets_bin}" --max 10M
+                --out "${boopie_assets_bin}" --max 0x3C0000 --firmware-data
         DEPENDS ${boopie_asset_files} "${boopie_packer}"
+                "${CMAKE_CURRENT_LIST_DIR}/components/boopie/font/ui.otf"
+                "${CMAKE_CURRENT_LIST_DIR}/components/boopie/font/boopie_pixel_glyphs.c"
+                "${CMAKE_CURRENT_LIST_DIR}/components/boopie/world/boopie_world_art.c"
         VERBATIM)
     add_custom_target(boopie_assets ALL DEPENDS "${boopie_assets_bin}")
     esptool_py_flash_to_partition(flash "assets" "${boopie_assets_bin}")

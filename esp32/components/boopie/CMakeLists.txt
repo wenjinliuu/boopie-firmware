@@ -36,8 +36,11 @@ set(embed)
 if(CONFIG_MUSE_ENABLED)
     # LVGL comes from idf_component.yml, on the same boards as Muse's UI.
     list(APPEND srcs "font/boopie_font.c")
-    # The UI font itself (font/boopie_font.h), 1.5 MB.
-    list(APPEND embed "font/ui.otf")
+    # The UI font itself (font/boopie_font.h), 1.5 MB: in the assets partition
+    # where there is one (BOOPIE_DATA_IN_ASSETS), else linked in.
+    if(NOT CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions_boopie_32mb.csv")
+        list(APPEND embed "font/ui.otf")
+    endif()
     # The clock (NTP) and the IMU, on the device only.
     list(APPEND srcs "device/boopie_clock.c" "device/boopie_imu.c" "device/boopie_crash.c")
     # The user data partition (LittleFS, from idf_component.yml).
@@ -58,4 +61,11 @@ if(CONFIG_MUSE_ENABLED)
     # lwip calls the VPN's resolve hook (CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM);
     # nothing else in the firmware refers to it, so it's asked for here.
     target_link_libraries(${COMPONENT_LIB} INTERFACE "-u lwip_hook_netconn_external_resolve")
+endif()
+
+# Boopie: with the assets partition, the UI font, the pixel font's bitmaps and
+# the small world's backgrounds are read from it (tools/boopie/pack_assets.py
+# --firmware-data) instead of being linked in, where they'd sit in PSRAM.
+if(CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions_boopie_32mb.csv")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE BOOPIE_DATA_IN_ASSETS=1)
 endif()

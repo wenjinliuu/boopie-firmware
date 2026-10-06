@@ -11,6 +11,7 @@
 
 #ifdef ESP_PLATFORM
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "esp_partition.h"
 #define PARTITION_SUBTYPE 0x50   /* partitions_boopie_32mb.csv */
 #define MAX_MAPPED 16
@@ -69,12 +70,14 @@ bool boopie_assets_parse(const uint8_t *pack, size_t n, boopie_assets_header_t *
 
 #ifdef ESP_PLATFORM
 static const esp_partition_t *s_part;
+/* Assets handed out whole by boopie_assets_get: copies in PSRAM. Not mapped:
+ * flash writes don't stop the cache here (the app runs from PSRAM), so a
+ * mapping could be read halfway through one, and above 16 MB it can't be made. */
 static struct {
     uint32_t index;
-    const void *ptr;
-    esp_partition_mmap_handle_t handle;
-} s_mapped[MAX_MAPPED];
-static int s_nmapped;
+    void *ptr;
+} s_copies[MAX_MAPPED];
+static int s_ncopies;
 
 bool boopie_assets_init(void)
 {
@@ -105,41 +108,64 @@ bool boopie_assets_init(void)
     return true;
 }
 
-const void *boopie_assets_get(const char *name, size_t *size)
+static int find(const char *name)
 {
     if (!s_ready && !boopie_assets_init()) {
-        return NULL;
+        return -1;
     }
     for (uint32_t i = 0; i < s_hdr.count; i++) {
-        if (strcmp(s_entries[i].name, name) != 0) {
-            continue;
+        if (strcmp(s_entries[i].name, name) == 0) {
+            return (int)i;
         }
-        if (size) {
-            *size = s_entries[i].size;
-        }
-        for (int k = 0; k < s_nmapped; k++) {
-            if (s_mapped[k].index == i) {
-                return s_mapped[k].ptr;
-            }
-        }
-        if (s_nmapped == MAX_MAPPED) {
-            ESP_LOGW(TAG, "too many assets mapped for %s", name);
-            return NULL;
-        }
-        const void *ptr;
-        esp_partition_mmap_handle_t h;
-        if (esp_partition_mmap(s_part, s_entries[i].offset, s_entries[i].size, ESP_PARTITION_MMAP_DATA, &ptr, &h)
-            != ESP_OK) {
-            ESP_LOGW(TAG, "can't map %s", name);
-            return NULL;
-        }
-        s_mapped[s_nmapped].index = i;
-        s_mapped[s_nmapped].ptr = ptr;
-        s_mapped[s_nmapped].handle = h;
-        s_nmapped++;
-        return ptr;
     }
-    return NULL;
+    return -1;
+}
+
+bool boopie_assets_find(const char *name, uint32_t *offset, uint32_t *size)
+{
+    int i = find(name);
+    if (i < 0) {
+        return false;
+    }
+    *offset = s_entries[i].offset;
+    *size = s_entries[i].size;
+    return true;
+}
+
+bool boopie_assets_read(uint32_t offset, void *buf, size_t n)
+{
+    return s_ready && offset <= s_hdr.size && n <= s_hdr.size - offset
+           && esp_partition_read(s_part, offset, buf, n) == ESP_OK;
+}
+
+const void *boopie_assets_get(const char *name, size_t *size)
+{
+    int i = find(name);
+    if (i < 0) {
+        return NULL;
+    }
+    if (size) {
+        *size = s_entries[i].size;
+    }
+    for (int k = 0; k < s_ncopies; k++) {
+        if (s_copies[k].index == (uint32_t)i) {
+            return s_copies[k].ptr;
+        }
+    }
+    if (s_ncopies == MAX_MAPPED) {
+        ESP_LOGW(TAG, "too many assets held for %s", name);
+        return NULL;
+    }
+    void *ptr = heap_caps_malloc(s_entries[i].size ? s_entries[i].size : 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!ptr || !boopie_assets_read(s_entries[i].offset, ptr, s_entries[i].size)) {
+        ESP_LOGW(TAG, "can't read %s", name);
+        heap_caps_free(ptr);
+        return NULL;
+    }
+    s_copies[s_ncopies].index = (uint32_t)i;
+    s_copies[s_ncopies].ptr = ptr;
+    s_ncopies++;
+    return ptr;
 }
 #else
 bool boopie_assets_init(void)
@@ -183,11 +209,37 @@ const void *boopie_assets_get(const char *name, size_t *size)
     }
     return NULL;
 }
+
+bool boopie_assets_find(const char *name, uint32_t *offset, uint32_t *size)
+{
+    size_t n;
+    const uint8_t *p = boopie_assets_get(name, &n);
+    if (!p) {
+        return false;
+    }
+    *offset = (uint32_t)(p - s_pack);
+    *size = (uint32_t)n;
+    return true;
+}
+
+bool boopie_assets_read(uint32_t offset, void *buf, size_t n)
+{
+    if (!s_ready || offset > s_hdr.size || n > s_hdr.size - offset) {
+        return false;
+    }
+    memcpy(buf, s_pack + offset, n);
+    return true;
+}
 #endif
 
 bool boopie_assets_ready(void)
 {
     return s_ready || boopie_assets_init();
+}
+
+uint32_t boopie_assets_size(void)
+{
+    return boopie_assets_ready() ? s_hdr.size : 0;
 }
 
 uint32_t boopie_assets_version(void)

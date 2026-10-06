@@ -1072,7 +1072,7 @@ static void build_ble_page(lv_obj_t *tile)
     s_ble_sw = switch_row(list, "蓝牙", muse_settings_ble_on(), on_ble_sw);
     s_ble_status = note(list, "");
     button(list, "忘记已配对的手机", COLOR_DANGER, on_ble_forget, NULL);
-    note(list, "Muse App 配对时要用蓝牙，平时可以关掉省电。");
+    note(list, "Muse App 配对时要用蓝牙。打开会重启一下，下次开机自动关上，平时省下内存。");
 }
 
 static void tick_ble(void)

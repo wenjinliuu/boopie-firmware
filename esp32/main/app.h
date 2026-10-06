@@ -54,6 +54,11 @@ bool app_wifi_nap(void);
 // Starts the BLE server if needed and keeps it advertising (or not) for Muse's
 // phone-setup service once setup is complete.
 void app_ble_companion_set(bool advertise);
+// Boopie: true once the BLE stack is up. Registered, it's only brought up at
+// boot when the switch was left on (app_ble_started_for_switch), as it needs
+// a ~30 KB internal block that's gone once TLS and Muse are running.
+bool app_ble_stack_started(void);
+bool app_ble_started_for_switch(void);
 // A talk-button press. Returns true when it confirmed a pending pairing.
 bool app_confirm_pairing_press(void);
 // Full setup reset and reboot, from a worker task.

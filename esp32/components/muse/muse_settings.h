@@ -73,6 +73,8 @@ void muse_settings_set_brightness(int pct);
 void muse_settings_set_sleep_s(int secs);
 void muse_settings_set_wifi_on(bool on);
 void muse_settings_set_ble_on(bool on);
+/* Boopie: keeps the switch on for this run but saves it off for the next boot. */
+void muse_settings_clear_ble_at_boot(void);
 /* A network name is remembered first among the saved ones and joined now;
  * an empty ssid forgets every saved network. */
 void muse_settings_set_wifi(const char *ssid, const char *pass);

@@ -44,9 +44,19 @@ bool boopie_assets_init(void);
 bool boopie_assets_ready(void);
 uint32_t boopie_assets_version(void);
 
-/* An asset's bytes, mapped (read-only, stays valid), and its size; NULL if
- * it isn't there. */
+/* An asset's bytes, read whole into PSRAM once (read-only, stays valid), and
+ * its size; NULL if it isn't there. For small assets: big ones are read in
+ * pieces with boopie_assets_find and boopie_assets_read. */
 const void *boopie_assets_get(const char *name, size_t *size);
+
+/* Where an asset is in the pack (offset from the pack's start) and its size. */
+bool boopie_assets_find(const char *name, uint32_t *offset, uint32_t *size);
+
+/* The whole pack's size; 0 without one. */
+uint32_t boopie_assets_size(void);
+
+/* n bytes of the pack from offset: a flash read, safe from any task. */
+bool boopie_assets_read(uint32_t offset, void *buf, size_t n);
 
 /* For tests and tools: a pack in memory. */
 bool boopie_assets_parse(const uint8_t *pack, size_t n, boopie_assets_header_t *hdr);

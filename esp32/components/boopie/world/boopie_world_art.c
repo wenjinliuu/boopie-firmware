@@ -253,6 +253,7 @@ const uint32_t boopie_art_palette[BOOPIE_ART_COLOURS] = {
     0x88a8c8,
 };
 
+#ifndef BOOPIE_DATA_IN_ASSETS
 static const uint8_t PX_BG_DOWN[24336] = {
     1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2,
     1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2,
@@ -1269,7 +1270,9 @@ static const uint8_t PX_BG_DOWN[24336] = {
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 };
+#endif
 
+#ifndef BOOPIE_DATA_IN_ASSETS
 static const uint8_t PX_BG_DOWN_FANCY[24336] = {
     9, 10, 10, 10, 11, 11, 11, 11, 9, 10, 10, 10, 11, 11, 11, 11, 9, 10, 10, 10, 11, 11, 11, 11,
     9, 10, 10, 10, 11, 11, 11, 11, 9, 10, 10, 10, 11, 11, 11, 11, 9, 10, 10, 10, 11, 11, 11, 11,
@@ -2286,7 +2289,9 @@ static const uint8_t PX_BG_DOWN_FANCY[24336] = {
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 };
+#endif
 
+#ifndef BOOPIE_DATA_IN_ASSETS
 static const uint8_t PX_BG_UP[24336] = {
     13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
     13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
@@ -3303,7 +3308,9 @@ static const uint8_t PX_BG_UP[24336] = {
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 };
+#endif
 
+#ifndef BOOPIE_DATA_IN_ASSETS
 static const uint8_t PX_BG_UP_STARS[24336] = {
     14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 14, 15, 15, 15, 15, 15, 15,
@@ -4320,7 +4327,9 @@ static const uint8_t PX_BG_UP_STARS[24336] = {
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 };
+#endif
 
+#ifndef BOOPIE_DATA_IN_ASSETS
 static const uint8_t PX_BG_OUTSIDE[56160] = {
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
@@ -6663,7 +6672,9 @@ static const uint8_t PX_BG_OUTSIDE[56160] = {
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
 };
+#endif
 
+#ifndef BOOPIE_DATA_IN_ASSETS
 static const uint8_t PX_BG_WOODS[81120] = {
     23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 23, 23, 23, 24, 23, 23, 23,
     23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
@@ -10046,7 +10057,9 @@ static const uint8_t PX_BG_WOODS[81120] = {
     18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18,
     18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18,
 };
+#endif
 
+#ifndef BOOPIE_DATA_IN_ASSETS
 static const uint8_t PX_BG_BEACH[68640] = {
     34, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 34, 35, 35, 35, 35, 35, 35,
     35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 34, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35,
@@ -12909,6 +12922,7 @@ static const uint8_t PX_BG_BEACH[68640] = {
     8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
     8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
 };
+#endif
 
 static const uint8_t PX_TV_OLD[891] = {
     0, 0, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 39, 0, 0, 0,
@@ -16755,14 +16769,23 @@ static const uint8_t PX_HINT_SHELL[240] = {
     160, 21, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0,
 };
 
+/* Backgrounds come from the assets partition when there is one (world/bg_*.px,
+ * tools/boopie/pack_assets.py --firmware-data): their px is NULL, and
+ * boopie_world_draw.c reads the room's in. */
+#ifdef BOOPIE_DATA_IN_ASSETS
+#define BG_PX(p) NULL
+#else
+#define BG_PX(p) p
+#endif
+
 const boopie_art_t boopie_art[BOOPIE_ART_COUNT] = {
-    [BOOPIE_ART_BG_DOWN] = { 156, 156, 0, 0, PX_BG_DOWN },
-    [BOOPIE_ART_BG_DOWN_FANCY] = { 156, 156, 0, 0, PX_BG_DOWN_FANCY },
-    [BOOPIE_ART_BG_UP] = { 156, 156, 0, 0, PX_BG_UP },
-    [BOOPIE_ART_BG_UP_STARS] = { 156, 156, 0, 0, PX_BG_UP_STARS },
-    [BOOPIE_ART_BG_OUTSIDE] = { 360, 156, 0, 0, PX_BG_OUTSIDE },
-    [BOOPIE_ART_BG_WOODS] = { 520, 156, 0, 0, PX_BG_WOODS },
-    [BOOPIE_ART_BG_BEACH] = { 440, 156, 0, 0, PX_BG_BEACH },
+    [BOOPIE_ART_BG_DOWN] = { 156, 156, 0, 0, BG_PX(PX_BG_DOWN) },
+    [BOOPIE_ART_BG_DOWN_FANCY] = { 156, 156, 0, 0, BG_PX(PX_BG_DOWN_FANCY) },
+    [BOOPIE_ART_BG_UP] = { 156, 156, 0, 0, BG_PX(PX_BG_UP) },
+    [BOOPIE_ART_BG_UP_STARS] = { 156, 156, 0, 0, BG_PX(PX_BG_UP_STARS) },
+    [BOOPIE_ART_BG_OUTSIDE] = { 360, 156, 0, 0, BG_PX(PX_BG_OUTSIDE) },
+    [BOOPIE_ART_BG_WOODS] = { 520, 156, 0, 0, BG_PX(PX_BG_WOODS) },
+    [BOOPIE_ART_BG_BEACH] = { 440, 156, 0, 0, BG_PX(PX_BG_BEACH) },
     [BOOPIE_ART_TV_OLD] = { 33, 27, 12, 25, PX_TV_OLD },
     [BOOPIE_ART_TV_FLAT] = { 38, 31, 15, 29, PX_TV_FLAT },
     [BOOPIE_ART_BOOKSHELF] = { 19, 29, 9, 27, PX_BOOKSHELF },

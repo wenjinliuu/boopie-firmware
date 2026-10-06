@@ -101,7 +101,9 @@ static void refresh(void)
         lv_obj_set_style_bg_color(s_chips[i], lv_color_hex(sel ? COLOR_ACCENT : COLOR_CARD), 0);
         lv_obj_set_style_text_color(lv_obj_get_child(s_chips[i], 0), lv_color_hex(sel ? 0x140f26 : COLOR_TEXT), 0);
     }
-    lv_obj_set_style_opa(s_stop, on ? LV_OPA_COVER : LV_OPA_40, 0);
+    /* Dimmed by its parts, not the whole (style opa draws through a layer). */
+    lv_obj_set_style_bg_opa(s_stop, on ? LV_OPA_COVER : LV_OPA_40, 0);
+    lv_obj_set_style_text_opa(s_stop, on ? LV_OPA_COVER : LV_OPA_40, 0);
 }
 
 static void on_tick(lv_timer_t *t)

@@ -2,9 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Boopie on the Waveshare 1.75C (32 MB flash), all of it used
-# (docs/boopie-storage.md). Everything up to prod_bak is where Muse's table
-# has it, with the app slots grown from 4 MB to 8 MB each, so NVS (settings,
-# pairing) carries over. After them:
+# (docs/boopie-storage.md). NVS, otadata and prod_data are where Muse's table
+# has them, so settings and pairing carry over; the app slots are 6 MB each.
+# Everything read through the cache (the app, coredump, assets) sits below
+# 16 MB: with the app run from PSRAM, flash above 16 MB can't be mapped. The
+# assets are read with esp_partition_read, never mapped, all the same: flash
+# writes don't stop the cache here, so a mapping can be read mid-write.
+# The rest:
 #   nvs_keys  the key NVS encryption will use (tokens, subscriptions, Wi-Fi)
 #   coredump  the last crash, for debugging
 #   assets    fonts, sounds, themes: one copy, read-only, updated as a whole
@@ -17,11 +21,11 @@
 nvs,       data, nvs,       0x11000,   0xC000,
 otadata,   data, ota,       0x1D000,   0x2000,
 phy_init,  data, phy,       0x1F000,   0x1000,
-ota_0,     app,  ota_0,     0x20000,   8M,
-ota_1,     app,  ota_1,     0x820000,  8M,
+ota_0,     app,  ota_0,     0x20000,   6M,
+ota_1,     app,  ota_1,     0x620000,  6M,
+coredump,  data, coredump,  0xC20000,  0x20000,
+assets,    data, 0x50,      0xC40000,  0x3C0000,
 prod_data, data, 0x40,      0x1020000, 0x1000,
 prod_bak,  data, 0x41,      0x1021000, 0x1000,
 nvs_keys,  data, nvs_keys,  0x1022000, 0x1000,
-coredump,  data, coredump,  0x1030000, 0x20000,
-assets,    data, 0x50,      0x1050000, 10M,
-userdata,  data, littlefs,  0x1A50000, 0x5B0000,
+userdata,  data, littlefs,  0x1030000, 0xFD0000,

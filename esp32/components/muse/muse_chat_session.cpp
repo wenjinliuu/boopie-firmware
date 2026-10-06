@@ -725,6 +725,22 @@ static bool send_body(int64_t id, const uint8_t *data, size_t len, bool end_body
 
 /* ---- Connect / disconnect ---- */
 
+/*
+ * Boopie: the connection's six big buffers (five SCRATCH and the WebSocket
+ * payload, ~384 KB) are kept from the first connection on rather than freed
+ * with it: after a while PSRAM is too broken up to find six 64 KB blocks
+ * again, and the reconnect failed with "Out of memory" until a restart.
+ */
+static uint8_t *s_kept[6];
+
+static uint8_t *kept(int i, size_t n)
+{
+    if (!s_kept[i]) {
+        s_kept[i] = static_cast<uint8_t *>(psram_alloc(n));
+    }
+    return s_kept[i];
+}
+
 static void disconnect(const char *why)
 {
     if (s_conn.tls) {
@@ -739,11 +755,7 @@ static void disconnect(const char *why)
         s_conn.crypto->~PsaCryptoBackend();
         heap_caps_free(s_conn.crypto);
     }
-    uint8_t *bufs[] = { s_conn.ws, s_conn.rx, s_conn.tf, s_conn.sr, s_conn.svc, s_conn.env };
-    for (uint8_t *b : bufs) {
-        heap_caps_free(b);
-    }
-    s_conn = conn_t{};
+    s_conn = conn_t{};   /* the buffers stay in s_kept */
     for (auto &s : s_streams) {
         s.kind = K_NONE;
     }
@@ -841,12 +853,12 @@ static bool connect_once(char *err, size_t err_cap, int *http_status)
     c.crypto = mem ? new (mem) PsaCryptoBackend() : nullptr;
     mem = c.crypto ? psram_alloc(sizeof(ClientSession)) : nullptr;
     c.session = mem ? new (mem) ClientSession(*c.crypto) : nullptr;
-    c.ws = static_cast<uint8_t *>(psram_alloc(ClientSession::kMaxOutboundWebSocketPayloadSize));
-    c.rx = static_cast<uint8_t *>(psram_alloc(SCRATCH));
-    c.tf = static_cast<uint8_t *>(psram_alloc(SCRATCH));
-    c.sr = static_cast<uint8_t *>(psram_alloc(SCRATCH));
-    c.svc = static_cast<uint8_t *>(psram_alloc(SCRATCH));
-    c.env = static_cast<uint8_t *>(psram_alloc(SCRATCH));
+    c.ws = kept(0, ClientSession::kMaxOutboundWebSocketPayloadSize);
+    c.rx = kept(1, SCRATCH);
+    c.tf = kept(2, SCRATCH);
+    c.sr = kept(3, SCRATCH);
+    c.svc = kept(4, SCRATCH);
+    c.env = kept(5, SCRATCH);
     if (!c.session || !c.ws || !c.rx || !c.tf || !c.sr || !c.svc || !c.env) {
         strlcpy(err, "Out of memory", err_cap);
         return false;

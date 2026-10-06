@@ -18,6 +18,7 @@
 #define BOOPIE_PIXEL_CELL 12
 #define BOOPIE_PIXEL_HALF 6
 #define BOOPIE_PIXEL_BASELINE 10
+#define BOOPIE_PIXEL_CELL_BYTES (BOOPIE_PIXEL_CELL * BOOPIE_PIXEL_CELL / 8)
 
 /* Generated tables (boopie_pixel_glyphs.c). */
 extern const uint32_t boopie_pixel_glyph_count;
@@ -30,6 +31,9 @@ int32_t boopie_pixel_find(uint32_t cp);
 
 /* Width in pixels at 1x: 12 or 6. */
 int boopie_pixel_width(int32_t index);
+
+/* The glyph's 12 x 12 cell, one bit a pixel, rows top down, MSB first. */
+void boopie_pixel_cell(int32_t index, uint8_t out[BOOPIE_PIXEL_CELL_BYTES]);
 
 /* True if pixel (x, y) of the glyph's 12 x 12 cell is ink. */
 bool boopie_pixel_dot(int32_t index, int x, int y);

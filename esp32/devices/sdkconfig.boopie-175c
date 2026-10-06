@@ -11,6 +11,8 @@ CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
 # (font/boopie_font.c); a Chinese UI meets many glyphs, so more are cached.
 CONFIG_LV_USE_TINY_TTF=y
 CONFIG_LV_TINY_TTF_CACHE_GLYPH_CNT=256
+# Boopie: the UI font is read from the assets partition as a file.
+CONFIG_LV_TINY_TTF_FILE_SUPPORT=y
 # Phone setup (ui/boopie_setup.c): QR codes on screen, and room for a phone's
 # headers at the hotspot's web page.
 CONFIG_LV_USE_QRCODE=y

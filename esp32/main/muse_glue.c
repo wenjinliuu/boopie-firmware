@@ -21,6 +21,7 @@
 
 #include "app_task.h"   /* Boopie */
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
@@ -474,7 +475,12 @@ static void keeper_task(void *arg) {
     uint32_t pending = KEEP_BLE;
     bool napped = false;
     bool setup_done = config_setup_complete();
-    if (setup_done && muse_settings_ble_on()) {
+    if (setup_done && muse_settings_ble_on() && app_ble_started_for_switch()) {
+        // Boopie: the switch was turned on, which restarted into this boot
+        // with the stack up. It stays on for this run only, as before.
+        ESP_LOGI(TAG, "registered; phone setup BLE on for this run");
+        muse_settings_clear_ble_at_boot();
+    } else if (setup_done && muse_settings_ble_on()) {
         // Registered devices boot with the phone companion off; the settings
         // switch turns it on until the next restart.
         ESP_LOGI(TAG, "registered; phone setup BLE off at boot");
@@ -504,6 +510,14 @@ static void keeper_task(void *arg) {
                 pending |= KEEP_BLE;
             }
             setup_done = done;
+        }
+        if ((pending & KEEP_BLE) && muse_settings_ble_on() && !app_ble_stack_started() && setup_done) {
+            // Boopie: the stack isn't up (it's left down to save internal RAM)
+            // and can't come up now: restart, and it comes up at boot.
+            ESP_LOGI(TAG, "BLE switched on: restarting to bring the stack up");
+            muse_state_set_caption("打开蓝牙，重启一下……");
+            vTaskDelay(pdMS_TO_TICKS(1500));
+            esp_restart();
         }
         if (pending & KEEP_BLE) {
             app_ble_companion_set(muse_settings_ble_on());

@@ -566,12 +566,10 @@ void muse_menu_build(lv_obj_t *parent, int w, int h)
     lv_obj_align(rule, LV_ALIGN_BOTTOM_MID, 0, -hint_h);
     s_hint_down = label(s_root, font, COLOR_TEXT, "");
     if (aux_side) {
-        /* Reads downwards, the arrow pointing down; centred on the icon's
-         * spot so it stays put as the text changes. */
-        s_down_text = "Down " LV_SYMBOL_RIGHT;
-        lv_obj_set_style_transform_rotation(s_hint_down, 900, 0);
-        lv_obj_set_style_transform_pivot_x(s_hint_down, lv_pct(50), 0);
-        lv_obj_set_style_transform_pivot_y(s_hint_down, lv_pct(50), 0);
+        /* The arrow pointing down; centred on the icon's spot so it stays
+         * put as the text changes. Boopie: not turned on its side, which
+         * draws through a layer that can't be had when PSRAM is short. */
+        s_down_text = LV_SYMBOL_DOWN " Down";
         lv_obj_align(s_hint_down, LV_ALIGN_CENTER, (w - strip) / 2, aux->y);
     } else {
         s_down_text = LV_SYMBOL_DOWN " Down";

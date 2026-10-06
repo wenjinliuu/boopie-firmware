@@ -12,6 +12,64 @@
 
 #define N BOOPIE_WORLD_W
 
+#ifdef BOOPIE_DATA_IN_ASSETS
+/*
+ * The backgrounds stay in the assets partition (world/bg_*.px): the room's is
+ * read into one buffer, the size of the largest, when the room changes. If it
+ * can't be read the room is drawn on black.
+ */
+#include "boopie_assets.h"
+#include "esp_heap_caps.h"
+
+static const uint8_t *bg_px(boopie_art_id_t id)
+{
+    static const char *const names[] = {
+        [BOOPIE_ART_BG_DOWN] = "world/bg_down.px",       [BOOPIE_ART_BG_DOWN_FANCY] = "world/bg_down_fancy.px",
+        [BOOPIE_ART_BG_UP] = "world/bg_up.px",           [BOOPIE_ART_BG_UP_STARS] = "world/bg_up_stars.px",
+        [BOOPIE_ART_BG_OUTSIDE] = "world/bg_outside.px", [BOOPIE_ART_BG_WOODS] = "world/bg_woods.px",
+        [BOOPIE_ART_BG_BEACH] = "world/bg_beach.px",
+    };
+    static uint8_t *s_buf;
+    static size_t s_cap;
+    static int s_have = -1;
+    const boopie_art_t *a = &boopie_art[id];
+    size_t n = (size_t)a->w * a->h;
+    if (a->px) {
+        return a->px;
+    }
+    if (s_have == (int)id) {
+        return s_buf;
+    }
+    if (n > s_cap) {
+        size_t cap = 0;
+        for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+            size_t m = (size_t)boopie_art[i].w * boopie_art[i].h;
+            cap = m > cap ? m : cap;
+        }
+        heap_caps_free(s_buf);
+        s_buf = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_cap = s_buf ? cap : 0;
+        if (!s_buf) {
+            return NULL;
+        }
+    }
+    uint32_t off, size;
+    s_have = -1;
+    if ((size_t)id >= sizeof(names) / sizeof(names[0]) || !names[id] || !boopie_assets_find(names[id], &off, &size)
+        || size != n || !boopie_assets_read(off, s_buf, n)) {
+        memset(s_buf, 0, n);
+        return s_buf;
+    }
+    s_have = (int)id;
+    return s_buf;
+}
+#else
+static const uint8_t *bg_px(boopie_art_id_t id)
+{
+    return boopie_art[id].px;
+}
+#endif
+
 static uint8_t *s_rgb;
 static int s_cam;   /* the view's left edge in the room: what's drawn moves left by it */
 
@@ -618,13 +676,19 @@ void boopie_world_draw(const boopie_world_t *w, const boopie_world_look_t *look,
 {
     s_rgb = rgb;
     s_cam = (int)(w->cam + 0.5f);
-    const boopie_art_t *bg = &boopie_art[boopie_room_background(w->room, look->level)];
+    boopie_art_id_t bg_id = boopie_room_background(w->room, look->level);
+    const boopie_art_t *bg = &boopie_art[bg_id];
+    const uint8_t *bg_pixels = bg_px(bg_id);
+    if (!bg_pixels) {
+        memset(rgb, 0, (size_t)N * N * 3);
+        return;
+    }
     int cam = s_cam + N > bg->w ? bg->w - N : s_cam;
     /* Outdoors, the weather on the ground: white with snow, grey and wet in rain, dull when cloudy. */
     bool out = boopie_world_outdoors(w->room);
     int wx = out ? look->weather : BOOPIE_WEATHER_SUNNY;
     for (int y = 0; y < N; y++) {
-        const uint8_t *src = bg->px + y * bg->w + cam;
+        const uint8_t *src = bg_pixels + y * bg->w + cam;
         uint8_t *dst = rgb + y * N * 3;
         for (int x = 0; x < N; x++) {
             uint32_t c = boopie_art_palette[src[x]];

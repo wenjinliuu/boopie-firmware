@@ -1585,13 +1585,20 @@ def main() -> int:
     for name, im, ax, ay, _ in images:
         data = bytes(palette[remap[(r, g, b)]] if a else 0 for r, g, b, a in pixels(im))
         total += len(data)
-        c.append(f'\nstatic const uint8_t PX_{name.upper()}[{len(data)}] = {{')
+        bg = name.startswith('bg_')
+        c.append(('\n#ifndef BOOPIE_DATA_IN_ASSETS' if bg else '')
+                 + f'\nstatic const uint8_t PX_{name.upper()}[{len(data)}] = {{')
         for k in range(0, len(data), 24):
             c.append('    ' + ', '.join(str(v) for v in data[k:k + 24]) + ',')
-        c.append('};')
+        c.append('};' + ('\n#endif' if bg else ''))
+    c.append('\n/* Backgrounds come from the assets partition when there is one (world/bg_*.px,\n'
+             ' * tools/boopie/pack_assets.py --firmware-data): their px is NULL, and\n'
+             ' * boopie_world_draw.c reads the room\'s in. */\n'
+             '#ifdef BOOPIE_DATA_IN_ASSETS\n#define BG_PX(p) NULL\n#else\n#define BG_PX(p) p\n#endif')
     c.append('\nconst boopie_art_t boopie_art[BOOPIE_ART_COUNT] = {')
     for name, im, ax, ay, _ in images:
-        c.append(f'    [BOOPIE_ART_{name.upper()}] = {{ {im.width}, {im.height}, {ax}, {ay}, PX_{name.upper()} }},')
+        px = f'BG_PX(PX_{name.upper()})' if name.startswith('bg_') else f'PX_{name.upper()}'
+        c.append(f'    [BOOPIE_ART_{name.upper()}] = {{ {im.width}, {im.height}, {ax}, {ay}, {px} }},')
     c.append('};')
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "boopie_world_art.h").write_text("\n".join(h) + "\n")
