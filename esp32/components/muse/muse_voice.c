@@ -897,7 +897,11 @@ static bool can_record(void)
         s_next_send_us = 0;   /* the saved ones go first, right after */
     }
     s_rec = heap_caps_malloc(MAX_FRAMES * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!s_rec) {
+    if (!s_rec && ready) {
+        /* Boopie: online with Muse's buffers in PSRAM there's rarely room for
+         * the 15 s spare copy; the note just goes live without one. */
+        ESP_LOGI(TAG, "no room for a spare copy of this note; sending it live");
+    } else if (!s_rec) {
         ESP_LOGE(TAG, "no memory to keep a note");
     }
 #endif
