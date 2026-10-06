@@ -1674,6 +1674,7 @@ static lv_obj_t *s_xz_code, *s_xz_note;
 static void on_brain_choice(lv_event_t *e)
 {
     boopie_avatar_set_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));
+    boopie_xiaozhi_start();   /* if that was 小智 */
 }
 
 static void on_xz_recheck(lv_event_t *e)

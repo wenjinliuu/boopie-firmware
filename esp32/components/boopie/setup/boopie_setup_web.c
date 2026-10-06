@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "boopie_xiaozhi.h"
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -403,6 +404,7 @@ static esp_err_t on_save(httpd_req_t *req)
     if (!error) {
         if (brain >= 0) {
             boopie_avatar_set_brain((boopie_brain_t)brain);
+            boopie_xiaozhi_start();   /* if that was 小智 */
             saved |= BOOPIE_SETUP_SAVED_BRAIN;
         }
         if (has_sdk) {

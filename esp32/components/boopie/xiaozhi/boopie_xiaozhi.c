@@ -286,8 +286,15 @@ void boopie_xiaozhi_start(void)
     if (s_task) {
         return;
     }
-    s_lock = xSemaphoreCreateMutex();
-    load();
+    if (!s_lock) {
+        s_lock = xSemaphoreCreateMutex();
+        load();
+    }
+    /* Only once it's the brain: internal RAM is scarce with Wi-Fi and BLE up.
+     * Choosing 小智 later calls this again. */
+    if (!wanted()) {
+        return;
+    }
     /* Its stack in internal RAM: it writes to NVS, which a PSRAM stack can't. */
     if (xTaskCreate(xz_task, "boopie_xz", 7168, NULL, 3, &s_task) != pdPASS) {
         ESP_LOGE(TAG, "task not started");

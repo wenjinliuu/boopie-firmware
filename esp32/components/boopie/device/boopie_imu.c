@@ -11,6 +11,7 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -126,7 +127,8 @@ esp_err_t boopie_imu_init(i2c_master_bus_handle_t bus)
     }
     ESP_RETURN_ON_ERROR(write_reg(REG_CTRL1, 0x40), TAG, "auto-increment");
     ESP_RETURN_ON_ERROR(configure(false), TAG, "configure");
-    if (xTaskCreate(imu_task, "boopie_imu", 3072, NULL, 3, NULL) != pdPASS) {
+    /* Its stack in PSRAM: it only reads I2C, and internal RAM is for Wi-Fi and BLE. */
+    if (xTaskCreateWithCaps(imu_task, "boopie_imu", 3072, NULL, 3, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
         return ESP_ERR_NO_MEM;
     }
     ESP_LOGI(TAG, "QMI8658 up");
