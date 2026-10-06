@@ -25,7 +25,7 @@ Boopie 的最底层同时支持中文和英文，不管接 Muse 还是国内大�
 ### 工具界面：思源黑体（平滑）
 
 - 英文、数字照旧用 Montserrat；Montserrat 没有的中文字，自动回退到同字号的思源黑体（`boopie_font_with_cjk`）
-- **编进固件**（`components/boopie/font/ui.otf`，约 1.5 MB），跟着 OTA 更新，不依赖资源区；LVGL 的 TinyTTF 直接从 Flash 读，任意字号、抗锯齿，用过的字形每个字号缓存 256 个
+- **放在资源区**（源文件 `components/boopie/font/ui.otf`，约 1.5 MB，编译时打进资源包，跟着在线更新）：LVGL 的 TinyTTF 经 `lv_fs` 驱动 `B:` 按 1 KB 块从 Flash 读（64 块缓存），任意字号、抗锯齿；两个绘制线程共用一把递归锁
 - 裁剪到 GB2312 全部字符、拉丁字母、中文标点、全角符号和界面用到的 ★☆ 等，共 7812 个字符。GB2312 以外的字（生僻字、繁体）再回退到下面的像素字体，它有全部 GBK
 - 重新生成：`python3 tools/boopie/gen_ui_font.py --source NotoSansSC-Regular.otf`（下载地址见脚本说明）
 

@@ -1,0 +1,38 @@
+Boopie firmware
+https://github.com/wenjinliuu/boopie-firmware
+
+Copyright (c) 2026 Boopie contributors
+
+This product is derived from muse-gadget-sdk
+(https://github.com/facebookincubator/muse-gadget-sdk),
+Copyright (c) Meta Platforms, Inc. and affiliates,
+licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Boopie is an independent hobby project. It is not a Meta product and is not
+affiliated with, sponsored by or endorsed by Meta. "Muse" is a name of Meta's;
+it is used here only to say which service the firmware talks to.
+
+Files changed or added by Boopie carry "Copyright (c) 2026 Boopie
+contributors" in their header; files from muse-gadget-sdk keep Meta's
+copyright line. Both are licensed under the Apache License, Version 2.0.
+
+Not covered by the Apache License, Version 2.0:
+
+- The Jollybot avatar in esp32/avatar/ (Meta's character).
+- The pixel-art characters and skins that pay tribute to other brands and
+  works (GPT, Codex, 小克, DeepSeek 小鲸鱼, 豆包, SpongeBob SquarePants and
+  friends, Rem, and the like). They belong to their respective owners, are
+  included for personal, non-commercial use only, and are removed on request.
+
+This product includes third-party software and fonts under their own
+licenses; see docs/open-source.md. Notably:
+
+- Noto Sans SC (Source Han Sans), Ark Pixel Font and Cubic 11: SIL Open Font
+  License 1.1 (esp32/components/boopie/font/OFL-*.txt).
+- LVGL: MIT License.
+- minimp3: CC0 1.0.
+- Adafruit GFX glcdfont (esp32/main/pixel_font.c): BSD-2-Clause.
+- ESP-IDF and Espressif components: Apache License, Version 2.0.
+- cJSON: MIT License.
+- Pinyin readings from pypinyin and word frequencies from jieba (both MIT),
+  in generated tables (esp32/components/boopie/ime/).

@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
+> **Boopie**：这是官方固件原有的说明，介绍各块板子的通用编译和刷机。Boopie（微雪 1.75C）的上手、编译和发布见仓库根目录的 [README](../README.md) 和 [维护手册](../docs/maintenance.md)。
+
+
 # ESP32 Device SDK
 
 Flash this open source firmware onto any ESP32-compatible board to connect
