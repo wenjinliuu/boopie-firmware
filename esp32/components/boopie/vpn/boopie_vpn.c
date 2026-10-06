@@ -18,6 +18,7 @@
 #include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -415,6 +416,11 @@ static bool from_server(conn_t *c)
 static void relay_task(void *arg)
 {
     (void)arg;
+    /* VPN on from the last run starts this at boot, before Link has brought
+     * lwIP up: a socket before then trips an assert in its core lock. */
+    while (!esp_netif_get_handle_from_ifkey("WIFI_STA_DEF")) {
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
     for (int i = 0; i < CONNS_MAX; i++) {
         s_conns[i].cfd = s_conns[i].sfd = -1;
     }
