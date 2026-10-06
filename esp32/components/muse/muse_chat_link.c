@@ -736,7 +736,7 @@ void muse_hatch_turn_begin(void)
         fail("连不上 Muse");
         return;
     }
-    muse_hatch_wav_header(s_turn.stage, MIC_RATE);
+    muse_hatch_wav_header(s_turn.stage, MIC_RATE, UINT32_MAX);
     s_turn.stage_len = MUSE_HATCH_WAV_HEADER;
     s_turn.phase = T_TALKING;
 }

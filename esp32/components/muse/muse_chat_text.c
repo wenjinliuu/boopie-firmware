@@ -38,10 +38,10 @@ static void put_le(uint8_t *p, uint32_t v, int n)
     }
 }
 
-void muse_hatch_wav_header(uint8_t h[MUSE_HATCH_WAV_HEADER], uint32_t rate)
+void muse_hatch_wav_header(uint8_t h[MUSE_HATCH_WAV_HEADER], uint32_t rate, uint32_t data_bytes)
 {
     memcpy(h, "RIFF", 4);
-    put_le(h + 4, UINT32_MAX, 4);
+    put_le(h + 4, data_bytes == UINT32_MAX ? UINT32_MAX : data_bytes + 36, 4);
     memcpy(h + 8, "WAVEfmt ", 8);
     put_le(h + 16, 16, 4);
     put_le(h + 20, 1, 2);             /* PCM */
@@ -51,7 +51,7 @@ void muse_hatch_wav_header(uint8_t h[MUSE_HATCH_WAV_HEADER], uint32_t rate)
     put_le(h + 32, 2, 2);
     put_le(h + 34, 16, 2);
     memcpy(h + 36, "data", 4);
-    put_le(h + 40, UINT32_MAX, 4);
+    put_le(h + 40, data_bytes, 4);
 }
 
 size_t muse_hatch_base64(const uint8_t *in, size_t n, char *out)

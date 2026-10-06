@@ -124,7 +124,15 @@ static const char *TAG = "muse_chat_session";
  * server transcribes it. Set to 0 to stream to /api/voice/dictation instead.
  */
 #define VOICE_NOTE 1
-#define NOTE_MAX_BYTES (MIC_RATE * 2 * 20) /* 20 s of 16 kHz PCM; Muse stops at 15 */
+#define NOTE_MAX_BYTES (MIC_RATE * 2 * 15) /* Boopie: 15 s of 16 kHz PCM, where Muse stops anyway */
+/*
+ * Boopie: the server answered every note whose WAV header said "unknown
+ * length" with "Sorry, I ran into a problem" (and the phone couldn't show its
+ * duration), so the header carries the real size. A note is held in the mic
+ * backlog until the release; one that outgrows NOTE_HOLD_BYTES goes up as a
+ * NOTE_MAX_BYTES note, padded with silence after the release.
+ */
+#define NOTE_HOLD_BYTES (MIC_RATE * 2 * 3)
 #define NOTE_PART_BYTES (DICT_CHUNK_BYTES / 4 * 3)   /* staged PCM that base64s to one body chunk */
 
 #define MAX_MSGS 8
@@ -227,6 +235,7 @@ struct turn_t {
     uint8_t *note;           /* NOTE_PART_BYTES of 16 kHz PCM waiting for base64 */
     size_t note_len;
     size_t pcm_bytes;        /* the note so far */
+    size_t note_size;        /* Boopie: PCM bytes the WAV header promised */
     size_t body_sent;
     char *texts;             /* MAX_MSGS * TEXT_MAX: each message's text */
     uint32_t pcm_out;        /* reply audio frames handed to the voice task */
@@ -260,7 +269,7 @@ static int64_t s_marks[M_COUNT];
 static char s_reply_shown[EV_TEXT];   /* the pre-speech caption last sent */
 
 static void mark(mark_t m);
-static bool open_note(void);
+static bool open_note(size_t pcm_bytes);
 static void log_marks(void);
 static int16_t *s_pcm;       /* MINIMP3_MAX_SAMPLES_PER_FRAME */
 static int16_t *s_pcm16;     /* resampled output */
@@ -1044,12 +1053,7 @@ static void turn_begin(uint32_t gen)
         return;
     }
     if (VOICE_NOTE) {
-        if (!open_note()) {
-            disconnect("chat open failed");
-            turn_fail("连不上 Muse");
-            return;
-        }
-        s_turn.phase = P_LISTEN;
+        s_turn.phase = P_LISTEN;   /* Boopie: the request opens once the note's size is known */
         return;
     }
     char path[64];
@@ -1138,7 +1142,7 @@ static bool send_note_part(bool last)
  * isn't known until the end, so the WAV header gives the streaming "unknown"
  * size and the server reads to the end of the data.
  */
-static bool open_note(void)
+static bool open_note(size_t pcm_bytes)
 {
     s_turn.chat_id = open_stream(K_CHAT, "POST", "/chat/stream", "application/json", nullptr, nullptr, false);
     if (!s_turn.chat_id) {
@@ -1148,17 +1152,32 @@ static bool open_note(void)
     if (!send_body(s_turn.chat_id, reinterpret_cast<const uint8_t *>(MUSE_HATCH_NOTE_HEAD), sizeof(MUSE_HATCH_NOTE_HEAD) - 1, false)) {
         return false;
     }
-    muse_hatch_wav_header(s_turn.note, MIC_RATE);
+    muse_hatch_wav_header(s_turn.note, MIC_RATE, (uint32_t)pcm_bytes);
     s_turn.note_len = MUSE_HATCH_WAV_HEADER;
+    s_turn.note_size = pcm_bytes;
     return true;
 }
 
 /* Moves the mic into the note request; on release, sends the rest and waits for the reply. */
 static bool record_note(void)
 {
+    if (!s_turn.chat_id) {
+        size_t held = xStreamBufferBytesAvailable(s_in) & ~(size_t)1;
+        if (!s_turn.end_requested && held < NOTE_HOLD_BYTES) {
+            return true;
+        }
+        if (s_turn.end_requested && held < MIC_RATE * 2 * 3 / 10) {
+            turn_fail("DIDN'T CATCH THAT");
+            return true;
+        }
+        if (!open_note(s_turn.end_requested && held < NOTE_MAX_BYTES ? held : NOTE_MAX_BYTES)) {
+            turn_fail("连不上 Muse");
+            return false;
+        }
+    }
     for (;;) {
         size_t room = NOTE_PART_BYTES - s_turn.note_len;
-        size_t left = NOTE_MAX_BYTES - s_turn.pcm_bytes;
+        size_t left = s_turn.note_size - s_turn.pcm_bytes;
         room = (room < left ? room : left) & ~(size_t)1;
         size_t got = room ? xStreamBufferReceive(s_in, s_turn.note + s_turn.note_len, room, 0) : 0;
         if (!got) {
@@ -1170,10 +1189,23 @@ static bool record_note(void)
             return false;
         }
     }
-    if (!s_turn.end_requested && s_turn.pcm_bytes < NOTE_MAX_BYTES) {
+    if (!s_turn.end_requested && s_turn.pcm_bytes < s_turn.note_size) {
         return true;
     }
     mark(M_RELEASE);
+    /* A long note stopped short of its promised size: the rest is silence. */
+    while (s_turn.pcm_bytes < s_turn.note_size) {
+        size_t n = NOTE_PART_BYTES - s_turn.note_len;
+        if (n > s_turn.note_size - s_turn.pcm_bytes) {
+            n = s_turn.note_size - s_turn.pcm_bytes;
+        }
+        memset(s_turn.note + s_turn.note_len, 0, n);
+        s_turn.note_len += n;
+        s_turn.pcm_bytes += n;
+        if (s_turn.note_len == NOTE_PART_BYTES && s_turn.pcm_bytes < s_turn.note_size && !send_note_part(false)) {
+            return false;
+        }
+    }
     double secs = (double)s_turn.pcm_bytes / (MIC_RATE * 2);
     if (secs < 0.3) {
         turn_fail("DIDN'T CATCH THAT");   /* resets the half-sent request */
