@@ -1317,25 +1317,12 @@ void boopie_world_ui_build(lv_obj_t *tile)
     button(tile, 1, BOOPIE_ICON_BAG, "背包", 0);
     button(tile, 2, BOOPIE_ICON_SHOP, "商店", 74);
 
-    /* By the bottom button: it goes back. */
-    s_back_hint = lv_obj_create(tile);
-    lv_obj_remove_style_all(s_back_hint);
-    lv_obj_set_size(s_back_hint, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(s_back_hint, lv_color_hex(INK), 0);
-    lv_obj_set_style_bg_opa(s_back_hint, LV_OPA_70, 0);
-    lv_obj_set_style_radius(s_back_hint, 10, 0);
-    lv_obj_set_style_pad_hor(s_back_hint, 6, 0);
-    lv_obj_set_style_pad_ver(s_back_hint, 2, 0);
-    lv_obj_remove_flag(s_back_hint, LV_OBJ_FLAG_CLICKABLE);
-    label(s_back_hint, &boopie_font_pixel_24, 0xffffff, "返回");
-    lv_obj_t *arrow = label(s_back_hint, &lv_font_montserrat_16, 0xffffff, LV_SYMBOL_DOWN);
-    lv_obj_set_flex_flow(s_back_hint, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(s_back_hint, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(s_back_hint, 4, 0);
-    (void)arrow;
-    /* Just inside the screen's edge from the bottom button, clear of the buttons. */
+    /* On the rim by the button that goes back: a back arrow, no words. */
     const muse_button_hint_t *aux = &muse_board->aux_hint;
-    lv_obj_align(s_back_hint, LV_ALIGN_CENTER, aux->x - 8, aux->y - 36);
+    s_back_hint = boopie_edge_chip(tile, LV_SYMBOL_LEFT, 28);
+    boopie_edge_chip_at(s_back_hint, aux->x, aux->y, 3);
+    /* At the very top, above the clock: swipe down for home. */
+    boopie_edge_chip_at(boopie_edge_chip(tile, LV_SYMBOL_DOWN, 18), 0, -1, 0);
 
     s_last_us = esp_timer_get_time();
     lv_timer_create(frame, FRAME_MS, NULL);

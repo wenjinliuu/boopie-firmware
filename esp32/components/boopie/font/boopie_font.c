@@ -11,6 +11,8 @@
 
 #ifdef BOOPIE_DATA_IN_ASSETS
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #endif
 
 /* The one thing that differs between the two sizes. */
@@ -237,12 +239,61 @@ static bool assets_fs(void)
     return true;
 }
 
+/*
+ * One at a time: LVGL draws with two threads and lays out text on a third,
+ * and tiny_ttf reading a file keeps a position (a seek, then a read) that
+ * two of them at once would move under each other, as they would the block
+ * cache: glyphs came out scrambled ("聊" like a mosaic). In memory there was
+ * no position to share. Every glyph goes through these two, under one lock.
+ */
+static SemaphoreHandle_t s_ttf_lock;
+static bool (*s_ttf_dsc)(const lv_font_t *, lv_font_glyph_dsc_t *, uint32_t, uint32_t);
+static const void *(*s_ttf_bitmap)(lv_font_glyph_dsc_t *, lv_draw_buf_t *);
+static void (*s_ttf_release)(const lv_font_t *, lv_font_glyph_dsc_t *);
+
+static bool locked_dsc(const lv_font_t *f, lv_font_glyph_dsc_t *g, uint32_t letter, uint32_t next)
+{
+    xSemaphoreTakeRecursive(s_ttf_lock, portMAX_DELAY);
+    bool ok = s_ttf_dsc(f, g, letter, next);
+    xSemaphoreGiveRecursive(s_ttf_lock);
+    return ok;
+}
+
+static const void *locked_bitmap(lv_font_glyph_dsc_t *g, lv_draw_buf_t *buf)
+{
+    xSemaphoreTakeRecursive(s_ttf_lock, portMAX_DELAY);
+    const void *r = s_ttf_bitmap(g, buf);
+    xSemaphoreGiveRecursive(s_ttf_lock);
+    return r;
+}
+
+static void locked_release(const lv_font_t *f, lv_font_glyph_dsc_t *g)
+{
+    xSemaphoreTakeRecursive(s_ttf_lock, portMAX_DELAY);
+    s_ttf_release(f, g);
+    xSemaphoreGiveRecursive(s_ttf_lock);
+}
+
 static lv_font_t *make_ui_font(int size)
 {
     if (!assets_fs()) {
         return NULL;   /* no assets flashed: the pixel font stands in */
     }
-    return lv_tiny_ttf_create_file_ex("B:fonts/ui.otf", size, LV_FONT_KERNING_NONE, GLYPH_CACHE);
+    if (!s_ttf_lock && !(s_ttf_lock = xSemaphoreCreateRecursiveMutex())) {
+        return NULL;
+    }
+    lv_font_t *f = lv_tiny_ttf_create_file_ex("B:fonts/ui.otf", size, LV_FONT_KERNING_NONE, GLYPH_CACHE);
+    if (f) {
+        s_ttf_dsc = f->get_glyph_dsc;
+        s_ttf_bitmap = f->get_glyph_bitmap;
+        s_ttf_release = f->release_glyph;
+        f->get_glyph_dsc = locked_dsc;
+        f->get_glyph_bitmap = locked_bitmap;
+        if (s_ttf_release) {
+            f->release_glyph = locked_release;
+        }
+    }
+    return f;
 }
 #else
 /* ui.otf, linked in by the build (EMBED_FILES; the simulator's incbin). */

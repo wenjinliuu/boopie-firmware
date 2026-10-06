@@ -52,6 +52,7 @@
 #include "boopie_avatar.h"
 #include "boopie_font.h"   /* Boopie: Chinese and English reply text */
 #include "boopie_pages.h"  /* Boopie: the pages round the face */
+#include "boopie_icons.h"  /* Boopie: the edge hints */
 #include "boopie_games.h"  /* Boopie: the games, over everything */
 #include "boopie_guide.h"  /* Boopie: the setup guide */
 #include "boopie_setup.h"  /* Boopie: phone setup over the hotspot */
@@ -107,6 +108,7 @@ static lv_obj_t *s_face;
 static lv_obj_t *s_settings;
 /* Boopie: the pages round the face (boopie_pages.c): apps, cards, the pet. */
 static lv_obj_t *s_apps, *s_cards, *s_pet;
+static lv_obj_t *s_home_hint;   /* Boopie: the settings page's way back, hidden further in */
 static lv_obj_t *s_dots[5];   /* Boopie: a cross: apps, face, settings, cards above, 小窝 below */
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_ble_icon;
@@ -539,7 +541,7 @@ static void on_canvas_clicked(lv_event_t *e)
     int gx = w > 0 ? (pt.x - a.x1) * BOOPIE_PX / w : -1;
     int gy = h > 0 ? (pt.y - a.y1) * BOOPIE_PX / h : -1;
     if (!boopie_avatar_tap(gx, gy)) {
-        muse_state_make_happy();
+        boopie_avatar_poke();   /* Boopie: not the same smile every time */
     }
 }
 
@@ -1312,6 +1314,9 @@ static void update_chrome(float now)
                 lv_obj_set_flag(s_dots[i], LV_OBJ_FLAG_HIDDEN, hide);
             }
             s_shown_page = shown;
+            if (s_home_hint) {
+                lv_obj_set_flag(s_home_hint, LV_OBJ_FLAG_HIDDEN, subpage);
+            }
         }
         muse_settings_ui_tick(lv_obj_get_scroll_x(s_tv) > lv_obj_get_x(s_face));
         boopie_pages_tick(active == s_apps || active == s_cards || active == s_pet ? active : NULL);
@@ -1763,6 +1768,10 @@ esp_err_t muse_ui_start(void)
     if (s_settings) {
         muse_settings_ui_build(s_settings);
         boopie_pages_build(s_apps, s_cards, s_pet);
+        /* Boopie: which way is home, on the edge the face is past. */
+        s_home_hint = boopie_edge_chip(s_settings, LV_SYMBOL_RIGHT, 24);
+        boopie_edge_chip_at(s_home_hint, -1, 0, 2);
+        boopie_edge_chip_at(boopie_edge_chip(s_apps, LV_SYMBOL_LEFT, 24), 1, 0, 2);
         boopie_guide_resume();   /* Boopie: the first boot, or back after a restart part way */
     } else {
         muse_menu_build(lv_screen_active(), s_w, s_h);

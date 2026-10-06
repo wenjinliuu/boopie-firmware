@@ -19,12 +19,15 @@
 #include "muse_link.h"
 #include "muse_ui.h"
 #include "muse_wifi.h"
+#include "muse_state.h"
+#include "boopie_xiaozhi.h"
 
 #define COLOR_TEXT 0xf2efff
 #define COLOR_DIM 0x8b84a8
 #define COLOR_CARD 0x1a1530
 #define COLOR_CARD_PRESSED 0x2e2552
 #define COLOR_ACCENT 0xa77dff
+#define COLOR_OK 0x7fe3a0
 #define HEAD_SCALE 5
 
 /* The brain first, as it decides the rest: Muse gets online through the Muse
@@ -40,10 +43,13 @@ static lv_obj_t *s_root;
 static step_t s_step;
 static bool s_away;            /* sent to a settings page; back when they're on the face */
 static int s_pair_shown = -1;  /* the pairing state the Muse step shows, to redraw on change */
+static char s_note[96];        /* a line over the next page: what was skipped, or the restart's why */
+static char s_xz_shown[40];    /* what the 小智 step shows, to redraw on change */
 static uint16_t *s_heads[BOOPIE_AVATAR_COUNT];
 static lv_image_dsc_t s_head_dsc[BOOPIE_AVATAR_COUNT];
 
 static void show_step(step_t step);
+static step_t next_of(step_t step);
 
 /* From a button's own event: the page it's on goes, so after the event. */
 static step_t s_pending;
@@ -99,16 +105,32 @@ static lv_obj_t *page(const char *title, const char *body)
         lv_label_set_long_mode(b, LV_LABEL_LONG_MODE_WRAP);
         lv_obj_align(b, LV_ALIGN_TOP_MID, 0, 122);
     }
-    /* Progress: a dot a step. */
-    for (int i = 0; i < S_COUNT; i++) {
+    /* What happened before this page (a step done already, a restart). */
+    if (s_note[0]) {
+        lv_obj_t *n = text(s_root, &lv_font_montserrat_16, COLOR_OK, s_note);
+        lv_obj_align(n, LV_ALIGN_TOP_MID, 0, 40);
+        s_note[0] = '\0';
+    }
+    /* Progress: a dot a step of this brain's way through, and "n / m". */
+    int steps = 0, at = 0;
+    for (step_t s = S_HELLO; s < S_COUNT && steps < S_COUNT; s = next_of(s)) {
+        if (s == s_step) {
+            at = steps;
+        }
+        steps++;
+    }
+    for (int i = 0; i < steps; i++) {
         lv_obj_t *d = lv_obj_create(s_root);
         lv_obj_remove_style_all(d);
         lv_obj_set_size(d, 8, 8);
         lv_obj_set_style_radius(d, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(d, lv_color_hex(i == (int)s_step ? COLOR_ACCENT : 0x3a3358), 0);
-        lv_obj_align(d, LV_ALIGN_BOTTOM_MID, (i - (S_COUNT - 1) / 2.0f) * 16, -22);
+        lv_obj_set_style_bg_color(d, lv_color_hex(i == at ? COLOR_ACCENT : i < at ? 0x6d5aa8 : 0x3a3358), 0);
+        lv_obj_align(d, LV_ALIGN_BOTTOM_MID, (int)((i - (steps - 1) / 2.0f) * 16), -22);
     }
+    char count[32];
+    snprintf(count, sizeof count, "%d / %d", at + 1, steps);
+    lv_obj_align(text(s_root, &lv_font_montserrat_14, COLOR_DIM, count), LV_ALIGN_BOTTOM_MID, 0, -34);
     lv_obj_t *col = lv_obj_create(s_root);
     lv_obj_remove_style_all(col);
     lv_obj_set_size(col, 300, LV_SIZE_CONTENT);
@@ -308,9 +330,27 @@ static void build_picker(void)
     }
 }
 
+static const char *done_note(step_t step)
+{
+    switch (step) {
+    case S_MUSE_PAIR:
+        return "已和 Muse App 配对，跳过这一步";
+    case S_MUSE_KEY:
+        return "开发者 token 已经填好了";
+    case S_ONLINE:
+        return "已经连上 Wi-Fi 了";
+    default:
+        return NULL;
+    }
+}
+
 static void show_step(step_t step)
 {
     while (step < S_COUNT && done_already(step)) {
+        const char *why = done_note(step);
+        if (why && !s_note[0]) {
+            strlcpy(s_note, why, sizeof s_note);
+        }
         step = next_of(step);
     }
     if (step >= S_COUNT) {
@@ -357,7 +397,7 @@ static void show_step(step_t step)
         break;
     }
     case S_MUSE_KEY:
-        col = page("最后一步", "用手机扫码，粘贴开发者 token\n（gadgets.muse.ai 生成）\n和 VPN 订阅。");
+        col = page("填开发者 token", "用手机扫码打开设置网页，\n粘贴开发者 token（在 gadgets.muse.ai 生成）；\n国内网络再填 VPN 订阅。\n保存后我会重启一下。");
         button(col, 240, "手机扫码填写", true, on_phone, 0);
         button(col, 240, "稍后再说", false, on_next, 0);
         break;
@@ -368,8 +408,22 @@ static void show_step(step_t step)
         button(col, 260, "稍后再说", false, on_next, 0);
         break;
     case S_XZ:
-        col = page("小智", "联网后，设置 › AI 助手 ›\n小智接入 里会显示激活码，\n到 xiaozhi.me 添加设备。");
-        button(col, 220, "好的", true, on_next, 0);
+    {
+        char code[16] = "", said[64] = "";
+        boopie_xz_state_t st = boopie_xiaozhi_status(code, sizeof code, said, sizeof said);
+        snprintf(s_xz_shown, sizeof s_xz_shown, "%d|%s|%d", (int)st, code, muse_wifi_connected());
+        if (st == BOOPIE_XZ_READY) {
+            col = page("小智绑好了", "按住上面的键说话试试。");
+            button(col, 220, "下一步", true, on_next, 0);
+        } else if (st == BOOPIE_XZ_CODE && code[0]) {
+            snprintf(line, sizeof line, "激活码  %s\n手机打开 xiaozhi.me ›\n控制台 › 添加设备，输入它。\n绑好后这里会自动更新。", code);
+            col = page("绑定小智", line);
+            button(col, 220, "稍后再说", false, on_next, 0);
+        } else {
+            col = page("绑定小智", muse_wifi_connected() ? "正在向小智要激活码…" : "要先连上 Wi-Fi，\n才能拿到激活码。");
+            button(col, 220, "稍后再说", false, on_next, 0);
+        }
+    }
         break;
     case S_PET:
         col = page("选一个伙伴", NULL);
@@ -418,6 +472,15 @@ void boopie_guide_start(void)
 
 void boopie_guide_resume(void)
 {
+    if (boopie_avatar_brain_just_changed()) {
+        /* Back from the restart a change of AI made: say what happened. */
+        bool xz = boopie_avatar_brain() == BOOPIE_BRAIN_XIAOZHI;
+        strlcpy(s_note, xz ? "已换成小智，重启好了" : "已换成 Muse，重启好了", sizeof s_note);
+        if (boopie_avatar_guide_at() < 0) {
+            muse_state_set_caption("%s", xz ? "已换成小智，按住上面的键说话吧" : "已换成 Muse，按住上面的键说话吧");
+            s_note[0] = '\0';
+        }
+    }
     int at = boopie_avatar_guide_at();
     if (at >= 0) {
         open_at(at < S_COUNT ? (step_t)at : S_HELLO);
@@ -440,6 +503,15 @@ void boopie_guide_tick(bool on_face)
             show_step(s_step);
         }
         return;
+    }
+    /* The 小智 step shows the code as it comes, and the binding once it's done. */
+    if (s_step == S_XZ) {
+        char code[16] = "", now[40];
+        boopie_xz_state_t st = boopie_xiaozhi_status(code, sizeof code, NULL, 0);
+        snprintf(now, sizeof now, "%d|%s|%d", (int)st, code, muse_wifi_connected());
+        if (strcmp(now, s_xz_shown) != 0) {
+            show_step(s_step);
+        }
     }
     /* The Muse step follows the pairing as it goes, and moves on once it's done. */
     if (s_step == S_MUSE_PAIR && (muse_paired() || (int)muse_link_state() != s_pair_shown)) {

@@ -68,3 +68,12 @@ uint32_t boopie_icon_tile_colour(boopie_icon_t which);
  */
 lv_obj_t *boopie_icon_tile(lv_obj_t *parent, boopie_icon_t which, int size, int scale);
 lv_obj_t *boopie_icon_tile_custom(lv_obj_t *parent, const lv_image_dsc_t *art, uint32_t tile, int size);
+
+/*
+ * A small dark round chip with an LVGL symbol on it, for the hints at the
+ * screen's edge (which way to swipe, which button goes back). Not clickable.
+ * boopie_edge_chip_at puts it on the round screen's rim at the angle of
+ * (dx, dy) from the centre, `inset` px in from the edge.
+ */
+lv_obj_t *boopie_edge_chip(lv_obj_t *parent, const char *symbol, int size);
+void boopie_edge_chip_at(lv_obj_t *chip, int dx, int dy, int inset);

@@ -97,6 +97,7 @@ static uint32_t s_acc[BOOPIE_AVATAR_COUNT];  /* the accessories each wears, BOOP
 static char s_name[BOOPIE_PET_NAME_MAX];  /* the pet's name, or "" for its character's */
 static uint32_t s_best[BOOPIE_GAME_COUNT];   /* each game's best score */
 static uint8_t s_brain = BOOPIE_BRAIN_MUSE;   /* the AI assistant: Muse, recommended, unless 小智 is chosen */
+static uint8_t s_brain_new;   /* the brain was just changed: say so once after the restart */
 static uint8_t s_posture = 1;             /* 姿势感应: on unless turned off */
 static float s_soothed_until = -1;        /* stroked or hugged till then, in pose.t */
 static bool s_soothed_hug;
@@ -365,6 +366,7 @@ static void load(void)
         nvs_get_u32(h, GAME_KEYS[i], &s_best[i]);
     }
     nvs_get_u8(h, "brain", &s_brain);
+    nvs_get_u8(h, "brain_new", &s_brain_new);
     nvs_get_u8(h, "guided", &s_guided);
     nvs_get_u8(h, "posture", &s_posture);
     size_t pn = sizeof s_pet_state;
@@ -416,6 +418,7 @@ static void save(void)
         nvs_set_u32(h, GAME_KEYS[i], s_best[i]);
     }
     nvs_set_u8(h, "brain", s_brain);
+    nvs_set_u8(h, "brain_new", s_brain_new);
     nvs_set_u8(h, "guided", s_guided);
     nvs_set_u8(h, "posture", s_posture);
     nvs_set_blob(h, "pet", &s_pet_state, sizeof s_pet_state);
@@ -1114,6 +1117,58 @@ bool boopie_avatar_feed(void)
     return boopie_avatar_tap((BOOPIE_FOOD_X0 + BOOPIE_FOOD_X1) / 2, (BOOPIE_FOOD_Y0 + BOOPIE_FOOD_Y1) / 2);
 }
 
+/*
+ * A tap on the pet (not on its bowl). It used to be the same smile and hearts
+ * every time; now how it takes it depends on how it's been treated and a
+ * little chance: tapped awake it starts; hungry, it asks for food; tapped
+ * over and over it gets dizzy; otherwise a smile with one of a few touches,
+ * now and then something rarer.
+ */
+void boopie_avatar_poke(void)
+{
+    static float s_pokes[6];   /* when the last few came, newest first */
+    float idle = muse_state_idle_secs();
+    memmove(s_pokes + 1, s_pokes, sizeof(s_pokes) - sizeof(s_pokes[0]));
+    s_pokes[0] = s_now;
+    int recent = 0;
+    for (int i = 0; i < 6; i++) {
+        recent += s_pokes[i] > 0 && s_now - s_pokes[i] < 3.0f;
+    }
+    muse_state_poke();
+    if (recent >= 6) {                /* six in three seconds: enough */
+        boopie_avatar_react(BOOPIE_EXPR_DIZZY, 2.2f);
+        flash_overlay(BOOPIE_OVERLAY_SURPRISE, 0.8f);
+        s_pokes[1] = 0;               /* the next one starts counting again */
+        return;
+    }
+    if (s_pet_state.hungry) {         /* hungry: it says so, and the bowl's there to tap */
+        boopie_avatar_react(BOOPIE_EXPR_HUNGRY, 1.8f);
+        return;
+    }
+    if (idle > 90.0f) {               /* it was dozing */
+        flash_overlay(BOOPIE_OVERLAY_SURPRISE, 1.2f);
+        muse_state_make_happy();
+        return;
+    }
+    uint32_t r = (uint32_t)(s_now * 1000.0f) * 2654435761u >> 16;
+    int roll = (int)(r % 100);
+    muse_state_make_happy();
+    if (roll < 30) {
+        /* just the smile */
+    } else if (roll < 50) {
+        flash_overlay(BOOPIE_OVERLAY_BLUSH, 1.6f);       /* shy */
+    } else if (roll < 66) {
+        flash_overlay(BOOPIE_OVERLAY_HEARTS, 1.8f);      /* loved */
+    } else if (roll < 80) {
+        flash_overlay(BOOPIE_OVERLAY_SURPRISE, 0.9f);    /* "oh!" */
+    } else if (roll < 92) {
+        flash_overlay(BOOPIE_OVERLAY_BLUSH, 1.4f);
+        flash_overlay(BOOPIE_OVERLAY_HEARTS, 1.4f);
+    } else {
+        flash_overlay(BOOPIE_OVERLAY_CONFETTI, 2.2f);    /* rare: delighted */
+    }
+}
+
 void boopie_avatar_stroke(int strokes, bool hug)
 {
     ensure_loaded();
@@ -1608,6 +1663,7 @@ bool boopie_avatar_choose_brain(boopie_brain_t brain)
     if ((int)brain < 0 || brain >= BOOPIE_BRAIN_COUNT || brain == boopie_avatar_brain()) {
         return false;
     }
+    s_brain_new = 1;   /* saved by set_brain: told after the restart */
     boopie_avatar_set_brain(brain);
 #ifdef ESP_PLATFORM
     /* One engine at a time: the one leaving gives its memory back with a
@@ -1619,6 +1675,17 @@ bool boopie_avatar_choose_brain(boopie_brain_t brain)
         esp_restart();
     }
 #endif
+    return true;
+}
+
+bool boopie_avatar_brain_just_changed(void)
+{
+    ensure_loaded();
+    if (!s_brain_new) {
+        return false;
+    }
+    s_brain_new = 0;
+    save();
     return true;
 }
 

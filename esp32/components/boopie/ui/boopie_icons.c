@@ -5,6 +5,8 @@
 
 #include "boopie_icons.h"
 
+#include <math.h>
+
 #include <string.h>
 
 typedef struct {
@@ -302,4 +304,36 @@ lv_obj_t *boopie_icon_tile_custom(lv_obj_t *parent, const lv_image_dsc_t *art, u
 lv_obj_t *boopie_icon_tile(lv_obj_t *parent, boopie_icon_t which, int size, int scale)
 {
     return boopie_icon_tile_custom(parent, boopie_icon(which, scale), boopie_icon_tile_colour(which), size);
+}
+
+lv_obj_t *boopie_edge_chip(lv_obj_t *parent, const char *symbol, int size)
+{
+    lv_obj_t *chip = lv_obj_create(parent);
+    lv_obj_remove_style_all(chip);
+    lv_obj_set_size(chip, size, size);
+    lv_obj_set_style_radius(chip, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(chip, lv_color_hex(0x1c1830), 0);
+    lv_obj_set_style_bg_opa(chip, LV_OPA_80, 0);   /* bg_opa draws directly: no layer */
+    lv_obj_set_style_border_color(chip, lv_color_hex(0xffffff), 0);
+    lv_obj_set_style_border_opa(chip, LV_OPA_50, 0);
+    lv_obj_set_style_border_width(chip, 1, 0);
+    lv_obj_remove_flag(chip, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(chip, LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
+    lv_obj_t *l = lv_label_create(chip);
+    lv_obj_set_style_text_font(l, size >= 26 ? &lv_font_montserrat_16 : &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(l, lv_color_hex(0xffffff), 0);
+    lv_label_set_text(l, symbol);
+    lv_obj_center(l);
+    return chip;
+}
+
+void boopie_edge_chip_at(lv_obj_t *chip, int dx, int dy, int inset)
+{
+    lv_display_t *d = lv_obj_get_display(chip);
+    int half = (int)(d ? lv_display_get_horizontal_resolution(d) : 466) / 2;
+    float len = sqrtf((float)(dx * dx + dy * dy));
+    float r = (float)(half - lv_obj_get_style_width(chip, 0) / 2 - inset);
+    int x = len > 0 ? (int)(dx * r / len) : 0;
+    int y = len > 0 ? (int)(dy * r / len) : 0;
+    lv_obj_align(chip, LV_ALIGN_CENTER, x, y);
 }
