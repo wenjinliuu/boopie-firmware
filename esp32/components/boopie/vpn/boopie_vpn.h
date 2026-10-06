@@ -56,6 +56,9 @@ boopie_vpn_busy_t boopie_vpn_busy(char *msg, size_t cap);
 
 /* In the background: fetch the subscription again; time every node. */
 void boopie_vpn_update(void);
+/* The network came up: with a subscription saved but no nodes yet (it was
+ * imported just before a restart), they're fetched now. */
+void boopie_vpn_net_up(void);
 void boopie_vpn_test(void);
 
 /* Whether the relay carried Muse lately, for the status line. */

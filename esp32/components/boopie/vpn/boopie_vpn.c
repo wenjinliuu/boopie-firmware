@@ -287,6 +287,7 @@ static bool open_tunnel(conn_t *c, const char *host)
     }
     xSemaphoreGive(s_lock);
     if (!have || !node.supported) {
+        ESP_LOGW(TAG, "%s: no usable node chosen; import a subscription", host);
         return false;
     }
     c->cipher = boopie_ss_cipher(node.cipher);
@@ -656,7 +657,8 @@ static void run(boopie_vpn_busy_t what, TaskFunction_t fn, const char *name)
         return;
     }
     set_msg("%s", what == BOOPIE_VPN_UPDATING ? "正在更新订阅…" : "正在测速…");
-    if (xTaskCreateWithCaps(fn, name, 6144, NULL, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+    /* A TLS handshake (the subscription) wants more than 6 KB of stack; PSRAM is plenty. */
+    if (xTaskCreateWithCaps(fn, name, 12 * 1024, NULL, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
         atomic_store(&s_busy, BOOPIE_VPN_IDLE);
         set_msg("内存不够");
     }
@@ -781,6 +783,23 @@ boopie_vpn_busy_t boopie_vpn_busy(char *msg, size_t cap)
 void boopie_vpn_update(void)
 {
     run(BOOPIE_VPN_UPDATING, update_task, "boopie_vpn_sub");
+}
+
+void boopie_vpn_net_up(void)
+{
+    if (!s_lock || boopie_vpn_count() > 0) {
+        return;
+    }
+    nvs_handle_t h;
+    size_t n = 0;
+    bool have = false;
+    if (nvs_open(NVS_NS, NVS_READONLY, &h) == ESP_OK) {
+        have = nvs_get_str(h, NVS_SUB, NULL, &n) == ESP_OK && n > 1;
+        nvs_close(h);
+    }
+    if (have) {
+        boopie_vpn_update();
+    }
 }
 
 void boopie_vpn_test(void)

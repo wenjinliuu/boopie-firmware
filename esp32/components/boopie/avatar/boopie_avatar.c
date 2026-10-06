@@ -99,7 +99,7 @@ static uint8_t s_posture = 1;             /* 姿势感应: on unless turned off 
 static float s_soothed_until = -1;        /* stroked or hugged till then, in pose.t */
 static bool s_soothed_hug;
 #ifdef ESP_PLATFORM
-static uint8_t s_guided;                  /* the setup guide's been through */
+static uint8_t s_guided;                  /* the setup guide: 0 not started, 1 through, 2 + n at step n */
 #else
 static uint8_t s_guided = 1;              /* the simulator: BOOPIE_GUIDE shows it */
 #endif
@@ -1596,14 +1596,26 @@ void boopie_avatar_set_brain(boopie_brain_t brain)
 bool boopie_avatar_guided(void)
 {
     ensure_loaded();
-    return s_guided;
+    return s_guided == 1;
 }
 
 void boopie_avatar_set_guided(bool done)
 {
+    boopie_avatar_set_guide_at(done ? -1 : 0);
+}
+
+int boopie_avatar_guide_at(void)
+{
     ensure_loaded();
-    if (done != (bool)s_guided) {
-        s_guided = done;
+    return s_guided == 1 ? -1 : s_guided >= 2 ? s_guided - 2 : 0;
+}
+
+void boopie_avatar_set_guide_at(int step)
+{
+    ensure_loaded();
+    uint8_t v = step < 0 ? 1 : (uint8_t)(2 + (step > 250 ? 250 : step));
+    if (v != s_guided) {
+        s_guided = v;
         save();
     }
 }

@@ -27,6 +27,7 @@
 
 #include "boopie_avatar.h"
 #include "boopie_sdk_token.h"
+#include "boopie_vpn.h"
 #include "muse_settings.h"
 #include "muse_wifi.h"
 
@@ -417,6 +418,11 @@ static esp_err_t on_save(httpd_req_t *req)
         if (!error && field(body, "sub", val, SUB_MAX + 1)) {
             if (set_subscription(val)) {
                 saved |= BOOPIE_SETUP_SAVED_PROXY;
+                if (*val) {
+                    /* Imported: on, and the nodes fetched now (or after the restart, if one's coming). */
+                    boopie_vpn_set_on(true);
+                    boopie_vpn_update();
+                }
             } else {
                 error = "订阅没存上";
             }

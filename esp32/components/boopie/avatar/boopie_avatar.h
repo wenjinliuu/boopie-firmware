@@ -220,6 +220,10 @@ boopie_brain_t boopie_avatar_brain(void);
 void boopie_avatar_set_brain(boopie_brain_t brain);
 bool boopie_avatar_guided(void);
 void boopie_avatar_set_guided(bool done);
+/* Where the guide got to, so a restart part way (the Muse app's Wi-Fi, a
+ * developer token) picks it up there: -1 once it's been through. */
+int boopie_avatar_guide_at(void);
+void boopie_avatar_set_guide_at(int step);
 
 /* A game round ended with `score`: its reward (xp, stars) goes to the pet, up
  * to the day's caps; *ev says what was given, *best is the best score of that

@@ -1377,7 +1377,8 @@ static void update_chrome(float now)
             lv_label_set_text(s_pair_hint, hint);
         }
     }
-    lv_obj_set_flag(s_pair, LV_OBJ_FLAG_HIDDEN, !b.passkey && !confirm);
+    /* Boopie: the setup guide asks for the press itself, on its own page. */
+    lv_obj_set_flag(s_pair, LV_OBJ_FLAG_HIDDEN, !b.passkey && (!confirm || boopie_guide_active()));
 
     bool speaker = muse_settings_speaker_on();   /* also set from settings, the phone and serial */
     if (s_speaker && (int)speaker != s_shown_speaker) {
@@ -1732,9 +1733,7 @@ esp_err_t muse_ui_start(void)
     if (s_settings) {
         muse_settings_ui_build(s_settings);
         boopie_pages_build(s_apps, s_cards, s_pet);
-        if (!boopie_avatar_guided()) {
-            boopie_guide_start();   /* Boopie: the first boot */
-        }
+        boopie_guide_resume();   /* Boopie: the first boot, or back after a restart part way */
     } else {
         muse_menu_build(lv_screen_active(), s_w, s_h);
     }

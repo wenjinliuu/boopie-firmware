@@ -15,6 +15,8 @@
  * and again from settings. Full screen over everything; in the LVGL task.
  */
 void boopie_guide_start(void);
+/* At boot: where it left off (a restart part way through), if it isn't through. */
+void boopie_guide_resume(void);
 bool boopie_guide_active(void);
 
 /* Each frame or so: brings the guide back when it's sent someone off to

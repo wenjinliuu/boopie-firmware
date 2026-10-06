@@ -4,6 +4,7 @@
  */
 
 #include "boopie_clock.h"
+#include "boopie_vpn.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -109,6 +110,7 @@ static void clock_task(void *arg)
             if (sta && esp_netif_get_ip_info(sta, &ip) == ESP_OK && ip.ip.addr != 0) {
                 esp_sntp_config_t cfg = ESP_NETIF_SNTP_DEFAULT_CONFIG(NTP_SERVER);
                 cfg.sync_cb = on_sync;
+                boopie_vpn_net_up();   /* nodes for a subscription imported before a restart */
                 if (esp_netif_sntp_init(&cfg) == ESP_OK) {
                     started = true;
                     ESP_LOGI(TAG, "NTP started (%s)", NTP_SERVER);

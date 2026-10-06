@@ -1758,6 +1758,13 @@ static void on_vpn_update(lv_event_t *e)
     boopie_vpn_update();
 }
 
+/* Imported on the phone: the setup page turns VPN on and fetches the nodes. */
+static void on_vpn_phone(lv_event_t *e)
+{
+    (void)e;
+    boopie_setup_open(NULL);
+}
+
 static void on_vpn_test(lv_event_t *e)
 {
     (void)e;
@@ -1776,12 +1783,13 @@ static void build_vpn_page(lv_obj_t *tile)
     s_vpn = page(tile, "VPN", true, &list);
     s_vpn_sw = switch_row(list, "VPN", boopie_vpn_on(), on_vpn_sw);
     s_vpn_status = note(list, "");
+    button(list, LV_SYMBOL_IMAGE "  手机扫码导入订阅", COLOR_ACCENT, on_vpn_phone, NULL);
     button(list, LV_SYMBOL_REFRESH "  更新订阅", COLOR_ACCENT, on_vpn_update, NULL);
     button(list, LV_SYMBOL_LOOP "  测速", COLOR_ACCENT, on_vpn_test, NULL);
     s_vpn_msg = note(list, "");
     note(list, "节点");
     s_vpn_list = column(list);
-    note(list, "订阅在 设置 › 手机扫码设置 里导入。只有 Muse 走 VPN，小智、校时直连。支持 Shadowsocks"
+    note(list, "订阅用上面的 手机扫码导入，存好就自动开 VPN 并更新节点。只有 Muse 走 VPN，小智、校时直连。支持 Shadowsocks"
                "（aes-gcm、chacha20）和 SS2022，不支持插件。");
     s_vpn_shown = 0;
 }

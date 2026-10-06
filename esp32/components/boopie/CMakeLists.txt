@@ -39,7 +39,7 @@ if(CONFIG_MUSE_ENABLED)
     # The UI font itself (font/boopie_font.h), 1.5 MB.
     list(APPEND embed "font/ui.otf")
     # The clock (NTP) and the IMU, on the device only.
-    list(APPEND srcs "device/boopie_clock.c" "device/boopie_imu.c")
+    list(APPEND srcs "device/boopie_clock.c" "device/boopie_imu.c" "device/boopie_crash.c")
     # The user data partition (LittleFS, from idf_component.yml).
     list(APPEND srcs "store/boopie_store.c" "store/boopie_history.c")
     # The VPN: the relay, the subscription and the resolve hook.
@@ -51,7 +51,7 @@ idf_component_register(
     EMBED_FILES ${embed}
     INCLUDE_DIRS "." "font" "avatar" "device" "pet" "ui" "game" "ime" "store" "sound" "setup" "vpn" "world" "xiaozhi" "tools"
     REQUIRES esp_driver_i2c
-    PRIV_REQUIRES nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs mbedtls esp_http_client lwip
+    PRIV_REQUIRES espcoredump nvs_flash esp_netif esp_timer esp_partition joltwallet__littlefs mbedtls esp_http_client lwip
 )
 
 if(CONFIG_MUSE_ENABLED)

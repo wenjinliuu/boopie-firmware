@@ -18,6 +18,7 @@
 #include "esp_log.h"
 #include "diagnostic_log.h"
 #if CONFIG_MUSE_ENABLED
+#include "boopie_crash.h"
 #include "muse_glue.h"
 #endif
 
@@ -30,6 +31,7 @@ void app_main(void) {
 #endif
     ESP_LOGI("link.main", CONFIG_GADGET_PRODUCT_NAME " starting");
 #if CONFIG_MUSE_ENABLED
+    boopie_crash_report();   /* Boopie: where the last crash was, for debugging */
     muse_glue_start();
 #endif
     app_run();

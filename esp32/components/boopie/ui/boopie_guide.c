@@ -13,9 +13,13 @@
 #include "boopie_input.h"
 #include "boopie_pixel.h"
 #include "boopie_setup.h"
+#include "boopie_sdk_token.h"
 #include "boopie_setup_web.h"
 #include "boopie_xiaozhi.h"
+#include "muse_ble.h"
+#include "muse_link.h"
 #include "muse_ui.h"
+#include "muse_wifi.h"
 
 #define COLOR_TEXT 0xf2efff
 #define COLOR_DIM 0x8b84a8
@@ -24,11 +28,19 @@
 #define COLOR_ACCENT 0xa77dff
 #define HEAD_SCALE 5
 
-typedef enum { S_HELLO, S_ONLINE, S_BRAIN, S_BRAIN_SETUP, S_PET, S_TALK, S_FEED, S_SWIPE, S_COUNT } step_t;
+/* The brain first, as it decides the rest: Muse gets online through the Muse
+ * app's pairing (which sends the Wi-Fi), then wants its developer token and a
+ * VPN; 小智 needs only Wi-Fi. Both restarts on Muse's way (after the app's
+ * Wi-Fi, after the token) come back to the step they left (boopie_avatar_guide_at),
+ * and a step already done (paired, token saved, online) is passed over. */
+typedef enum {
+    S_HELLO, S_BRAIN, S_MUSE_PAIR, S_MUSE_KEY, S_ONLINE, S_XZ, S_PET, S_TALK, S_FEED, S_SWIPE, S_COUNT
+} step_t;
 
 static lv_obj_t *s_root;
 static step_t s_step;
 static bool s_away;            /* sent to a settings page; back when they're on the face */
+static int s_pair_shown = -1;  /* the pairing state the Muse step shows, to redraw on change */
 static uint16_t *s_heads[BOOPIE_AVATAR_COUNT];
 static lv_image_dsc_t s_head_dsc[BOOPIE_AVATAR_COUNT];
 
@@ -118,32 +130,81 @@ static void finish(void)
     }
 }
 
+/* Where "next" goes from each step: the two brains part after S_BRAIN and
+ * meet again at S_PET. */
+static step_t next_of(step_t step)
+{
+    switch (step) {
+    case S_BRAIN:
+        return boopie_avatar_brain() == BOOPIE_BRAIN_MUSE ? S_MUSE_PAIR : S_ONLINE;
+    case S_MUSE_KEY:
+        return S_PET;
+    default:
+        return step + 1;
+    }
+}
+
+static bool muse_paired(void)
+{
+    return muse_link_hatch_linked();
+}
+
+static bool muse_has_token(void)
+{
+    char t[BOOPIE_SDK_TOKEN_LEN + 1];
+    bool have = boopie_sdk_token(t);
+    memset(t, 0, sizeof t);
+    return have;
+}
+
+/* A step there's nothing left to do on. */
+static bool done_already(step_t step)
+{
+    switch (step) {
+    case S_MUSE_PAIR:
+        return muse_paired();
+    case S_MUSE_KEY:
+        return muse_has_token();
+    case S_ONLINE:
+        return muse_wifi_connected();
+    default:
+        return false;
+    }
+}
+
 static void on_next(lv_event_t *e)
 {
     (void)e;
-    if (s_step + 1 >= S_COUNT) {
+    step_t n = next_of(s_step);
+    if (n >= S_COUNT) {
         finish();
     } else {
-        go(s_step + 1);
+        go(n);
     }
 }
 
 static void on_wifi(lv_event_t *e)
 {
     (void)e;
-    /* Off to the Wi-Fi page; the guide picks up at the brain when they're back on the face. */
+    /* Off to the Wi-Fi page; the guide picks up after it when they're back on the face. */
     s_away = true;
-    s_step = S_BRAIN;
+    s_step = next_of(S_ONLINE);
+    boopie_avatar_set_guide_at(s_step);
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     muse_ui_open_settings("wifi");
 }
 
-/* Phone setup can set the brain and Muse's token too: if it did, on to the
- * pet; if not, the brain is next, as from the Wi-Fi page. */
+/* Back from phone setup: past the step if it did what the step's for (a
+ * token saved restarts the board, and the guide comes back there anyway). */
 static void phone_done(uint32_t saved)
 {
-    if (s_root) {
-        s_step = saved & BOOPIE_SETUP_SAVED_BRAIN ? S_PET : S_BRAIN;
+    if (!s_root) {
+        return;
+    }
+    if (s_step == S_MUSE_KEY) {
+        s_step = saved & BOOPIE_SETUP_SAVED_MUSE ? S_PET : S_MUSE_KEY;
+    } else if (s_step == S_ONLINE) {
+        s_step = saved & BOOPIE_SETUP_SAVED_WIFI ? S_XZ : S_ONLINE;
     }
 }
 
@@ -151,16 +212,24 @@ static void on_phone(lv_event_t *e)
 {
     (void)e;
     s_away = true;
-    s_step = s_step == S_BRAIN_SETUP ? S_PET : S_BRAIN;
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
-    boopie_setup_open(s_step == S_PET ? NULL : phone_done);
+    boopie_setup_open(phone_done);
 }
 
 static void on_brain(lv_event_t *e)
 {
     boopie_avatar_set_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));
     boopie_xiaozhi_start();   /* if that was 小智 */
-    go(S_BRAIN_SETUP);
+    go(next_of(S_BRAIN));
+}
+
+/* Paired before, or set up with Wi-Fi alone: the app can only pair once Link
+ * is back to advertising, which forgets the Wi-Fi and restarts. */
+static void on_pair_again(lv_event_t *e)
+{
+    (void)e;
+    boopie_avatar_set_guide_at(S_MUSE_PAIR);
+    muse_link_reset_setup();
 }
 
 static void on_pick(lv_event_t *e)
@@ -239,35 +308,65 @@ static void build_picker(void)
 
 static void show_step(step_t step)
 {
+    while (step < S_COUNT && done_already(step)) {
+        step = next_of(step);
+    }
+    if (step >= S_COUNT) {
+        finish();
+        return;
+    }
     s_step = step;
+    s_pair_shown = -1;
+    boopie_avatar_set_guide_at(step);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     lv_obj_t *col;
-    char line[96];
+    char line[160];
     switch (step) {
     case S_HELLO:
         col = page("你好呀！", "我是你的新伙伴。\n花一分钟，把我设置好吧。");
         button(col, 220, "开始", true, on_next, 0);
-        break;
-    case S_ONLINE:
-        col = page("先连上网", "用手机扫码，一次填完 Wi-Fi、\nAI 助手和密钥；或者在我这里选。");
-        button(col, 260, "手机扫码设置", true, on_phone, 0);
-        button(col, 260, "在屏幕上选 Wi-Fi", false, on_wifi, 0);
-        button(col, 260, "稍后再说", false, on_next, 0);
         break;
     case S_BRAIN:
         col = page("选 AI 助手", "说话时用哪个 AI 回答？\n以后在设置里也能换。");
         button(col, 300, "Muse（推荐，需海外网络）", true, on_brain, BOOPIE_BRAIN_MUSE);
         button(col, 300, "小智（备用，国内网络）", false, on_brain, BOOPIE_BRAIN_XIAOZHI);
         break;
-    case S_BRAIN_SETUP:
-        if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
-            col = page("Muse", "需要你自己的开发者 token\n（gadgets.muse.ai 生成）\n和 VPN。用手机扫码粘贴。");
-            button(col, 220, "手机扫码填写", true, on_phone, 0);
-            button(col, 220, "稍后再说", false, on_next, 0);
-            break;
+    case S_MUSE_PAIR: {
+        /* The app pairs over BLE, then sends the Wi-Fi; the board restarts
+         * on it and comes back here, paired, to go on. */
+        muse_link_state_t st = muse_link_state();
+        s_pair_shown = st;
+        muse_ble_status_t b;
+        muse_ble_status(&b);
+        if (st == MUSE_LINK_CONFIRM) {
+            col = page("按上面的键", "确认是你在配对。");
+        } else if (st == MUSE_LINK_PAIRING) {
+            col = page("连上 App 了", "稍等，按 App 里的提示走。\n它会让你填 Wi-Fi，\n填完我会重启一下。");
+        } else if (st == MUSE_LINK_UNPAIRED) {
+            snprintf(line, sizeof line, "打开 Muse App，添加设备，\n选「%s」。\n要我确认时，按上面的键。", b.name[0] ? b.name : "MuseGadget");
+            col = page("和 Muse App 配对", line);
+        } else if (st == MUSE_LINK_BOOT || st == MUSE_LINK_CONNECTING) {
+            col = page("和 Muse App 配对", "稍等，蓝牙准备中…");
         } else {
-            col = page("小智", "联网后，设置 › AI 助手 ›\n小智接入 里会显示激活码，\n到 xiaozhi.me 添加设备。");
+            col = page("和 Muse App 配对", "要先回到配对状态：\n会忘掉现在的 Wi-Fi 并重启，\n回来后接着在这一步。");
+            button(col, 260, "开始配对", true, on_pair_again, 0);
         }
+        button(col, 220, "稍后再说", false, on_next, 0);
+        break;
+    }
+    case S_MUSE_KEY:
+        col = page("最后一步", "用手机扫码，粘贴开发者 token\n（gadgets.muse.ai 生成）\n和 VPN 订阅。");
+        button(col, 240, "手机扫码填写", true, on_phone, 0);
+        button(col, 240, "稍后再说", false, on_next, 0);
+        break;
+    case S_ONLINE:
+        col = page("先连上网", "用手机扫码填 Wi-Fi，\n或者在我这里选。");
+        button(col, 260, "手机扫码设置", true, on_phone, 0);
+        button(col, 260, "在屏幕上选 Wi-Fi", false, on_wifi, 0);
+        button(col, 260, "稍后再说", false, on_next, 0);
+        break;
+    case S_XZ:
+        col = page("小智", "联网后，设置 › AI 助手 ›\n小智接入 里会显示激活码，\n到 xiaozhi.me 添加设备。");
         button(col, 220, "好的", true, on_next, 0);
         break;
     case S_PET:
@@ -295,7 +394,7 @@ static void show_step(step_t step)
     }
 }
 
-void boopie_guide_start(void)
+static void open_at(step_t step)
 {
     if (!s_root) {
         s_root = lv_obj_create(lv_layer_top());
@@ -307,7 +406,20 @@ void boopie_guide_start(void)
         lv_obj_remove_flag(s_root, LV_OBJ_FLAG_SCROLLABLE);
     }
     s_away = false;
-    show_step(S_HELLO);
+    show_step(step);
+}
+
+void boopie_guide_start(void)
+{
+    open_at(S_HELLO);
+}
+
+void boopie_guide_resume(void)
+{
+    int at = boopie_avatar_guide_at();
+    if (at >= 0) {
+        open_at(at < S_COUNT ? (step_t)at : S_HELLO);
+    }
 }
 
 bool boopie_guide_active(void)
@@ -317,8 +429,18 @@ bool boopie_guide_active(void)
 
 void boopie_guide_tick(bool on_face)
 {
-    if (s_root && s_away && on_face) {
-        s_away = false;
+    if (!s_root) {
+        return;
+    }
+    if (s_away) {
+        if (on_face) {
+            s_away = false;
+            show_step(s_step);
+        }
+        return;
+    }
+    /* The Muse step follows the pairing as it goes, and moves on once it's done. */
+    if (s_step == S_MUSE_PAIR && (muse_paired() || (int)muse_link_state() != s_pair_shown)) {
         show_step(s_step);
     }
 }
