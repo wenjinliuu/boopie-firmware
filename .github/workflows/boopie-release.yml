@@ -169,7 +169,8 @@ jobs:
             --assets "$BUILD_DIR/boopie_assets.bin" --assets-version "$(cat assets/VERSION)" \
             --notes notes.txt --out "$out/ota"
           mkdir -p "$out/flash"
-          cp "boopie-$VERSION-merged.bin" "boopie-$VERSION-unlocked-merged.bin" "$out/"
+          # (merge-bin writes into its build directory)
+          cp "$BUILD_DIR/boopie-$VERSION-merged.bin" "$BUILD_DIR-unlocked/boopie-$VERSION-unlocked-merged.bin" "$out/"
           (cd "$BUILD_DIR" && cp --parents muse-gadget.bin bootloader/bootloader.bin \
             partition_table/partition-table.bin ota_data_initial.bin boopie_assets.bin flash_args "$out/flash/")
           cp notes.txt "$out/"
