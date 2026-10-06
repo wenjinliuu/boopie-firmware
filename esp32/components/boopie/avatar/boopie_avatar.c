@@ -215,6 +215,9 @@ int boopie_avatar_skin(void)
 bool boopie_avatar_owns(int skin)
 {
     ensure_loaded();
+#ifdef BOOPIE_UNLOCK_ALL
+    return skin >= 0 && skin < boopie_skin_count();   /* a test build: every skin owned */
+#endif
     return skin >= 0 && skin < boopie_skin_count() && (s_owned >> skin & 1u);
 }
 
@@ -1761,6 +1764,12 @@ boopie_expr_t boopie_avatar_reacting(void)
 bool boopie_avatar_unlocked(boopie_unlock_kind_t kind, int index, int *level)
 {
     ensure_loaded();
+#ifdef BOOPIE_UNLOCK_ALL
+    if (level) {
+        *level = 0;
+    }
+    return true;   /* a test build: colours, backgrounds and accessories all open */
+#endif
     if (kind == BOOPIE_UNLOCK_ACCESSORY && boopie_avatar_acc_goal((boopie_acc_t)index) != BOOPIE_GOAL_NONE) {
         if (level) {
             *level = 0;

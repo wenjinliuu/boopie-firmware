@@ -4684,3 +4684,83 @@ void boopie_pixel_head_image(int head, uint16_t *dst, int scale)
     }
     s_head_defaults = false;
 }
+
+/* ---------------------------------------------------------------- previews */
+
+void boopie_pixel_skin_head(int skin, uint16_t *dst, int scale)
+{
+    const skin_t *sk = skin_at(skin);
+    int head = sk ? (int)sk->character : BOOPIE_CHAR_BOOPIE;
+    if (head < 0 || head > BOOPIE_CHAR_COUNT) {
+        head = BOOPIE_CHAR_BOOPIE;
+    }
+    /* Dressed as if it were worn: the skin for a moment, its colour for the body. */
+    int was = s_skin;
+    ramp_t rp = s_rp;
+    s_skin = sk ? skin : -1;
+    if (sk && sk->colour && head < BOOPIE_CHAR_COUNT) {
+        s_rp = ramp(sk->colour);
+    }
+    static dressed_t d;
+    dressed_head(&d, head, false);
+    s_skin = was;
+    s_rp = rp;
+    int w = HEAD_W * scale;
+    for (int j = 0; j < DRESS_H; j++) {
+        for (int i = 0; i < HEAD_W; i++) {
+            rgb_t c = d.c[j][i];
+            uint16_t v = d.on[j][i] ? (to565(c.r, c.g, c.b) ? to565(c.r, c.g, c.b) : 0x0821) : 0;
+            for (int y = 0; y < scale; y++) {
+                for (int x = 0; x < scale; x++) {
+                    dst[(j * scale + y) * w + i * scale + x] = v;
+                }
+            }
+        }
+    }
+}
+
+void boopie_pixel_acc_icon(boopie_acc_t a, uint16_t *dst, int scale)
+{
+    /* The scarf and the medal are drawn on the body, not as sprites: these stand in. */
+    static const char *const SCARF[] = { "..rrrrrrrrr..", ".rRRRRRRRRRr.", "..rrrrrRrr...", ".......Rr....",
+                                         ".......rR....", "............." };
+    static const uint32_t SCARF_COLOURS[] = { 0xdc3c46, 0xa02832 };
+    static const char *const MEDAL[] = { "...b...b...", "....b.b....", ".....b.....", "....yyy....", "...yyYyy...",
+                                         "....yyy...." };
+    static const uint32_t MEDAL_COLOURS[] = { 0x3c78dc, 0xffd246, 0xc49a28 };
+    const char *const *rows;
+    int nrows;
+    const char *keys;
+    const uint32_t *colours;
+    if ((int)a < 0 || a >= BOOPIE_ACC_COUNT) {
+        return;
+    }
+    if (a == BOOPIE_ACC_SCARF) {
+        rows = SCARF, nrows = 6, keys = "rR", colours = SCARF_COLOURS;
+    } else if (a == BOOPIE_ACC_MEDAL) {
+        rows = MEDAL, nrows = 6, keys = "byY", colours = MEDAL_COLOURS;
+    } else {
+        rows = ACCS[a].rows, nrows = ACCS[a].nrows, keys = ACCS[a].keys, colours = ACCS[a].colours;
+    }
+    int w = BOOPIE_ACC_ICON_W * scale;
+    memset(dst, 0, (size_t)w * BOOPIE_ACC_ICON_H * scale * sizeof(uint16_t));
+    int top = (BOOPIE_ACC_ICON_H - nrows) / 2;
+    for (int j = 0; j < nrows && top + j < BOOPIE_ACC_ICON_H; j++) {
+        int len = (int)strlen(rows[j]);
+        int left = (BOOPIE_ACC_ICON_W - len) / 2;
+        for (int i = 0; i < len; i++) {
+            const char *k = strchr(keys, rows[j][i]);
+            if (rows[j][i] == '.' || !k) {
+                continue;
+            }
+            uint32_t rgb = colours[k - keys];
+            uint16_t v = to565((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb);
+            v = v ? v : 0x0821;
+            for (int y = 0; y < scale; y++) {
+                for (int x = 0; x < scale; x++) {
+                    dst[((top + j) * scale + y) * w + (left + i) * scale + x] = v;
+                }
+            }
+        }
+    }
+}

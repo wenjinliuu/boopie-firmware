@@ -301,8 +301,8 @@ static void on_function(int i)
         say("去农场看看～");
         break;
     case 3: books_panel(); break;
-    case 4: muse_ui_open_settings("avatar"); break;
-    default: muse_ui_open_settings(NULL); break;
+    case 4: muse_ui_open_settings_from_nest("avatar"); break;
+    default: muse_ui_open_settings("home"); break;
     }
 }
 
@@ -1111,7 +1111,7 @@ static void act(boopie_do_t what, int arg)
             say("睡醒啦！");
         }
         break;
-    case BOOPIE_DO_WARDROBE: muse_ui_open_settings("avatar"); break;
+    case BOOPIE_DO_WARDROBE: muse_ui_open_settings_from_nest("avatar"); break;
     case BOOPIE_DO_RENAME:
         boopie_input_open("给它起个名字", boopie_avatar_has_own_name() ? boopie_avatar_pet_name() : "",
                           "留空就叫角色名", BOOPIE_PET_NAME_CHARS, named);

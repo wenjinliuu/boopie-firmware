@@ -80,6 +80,7 @@ static void usage(FILE *out, const char *argv0)
             "  paired=true|false  link=boot|unpaired|pairing|confirm|connecting|online|offline|error\n"
             "  speaker=true|false brightness=10..100 advance=MILLISECONDS\n"
             "  tap=X,Y            swipe=left|right|up|down   menu=power|setup\n"
+            "  drag=DY            (a slow drag, no flick: scroll a list by DY px)\n"
             "  room=living|bedroom|outside|woods|beach (小窝, swipe=up first)\n"
             "  antic=tv|dance|mirror|love|swing|butterfly|swim (in 小窝)\n"
             "  game=whack         input=TEXT             settings=PAGE\n"
@@ -379,8 +380,26 @@ static bool swipe(const char *value, bool real_time)
     return false;
 }
 
+/* A slow drag up (negative) or down by dy px, held still before letting go: a
+ * list scrolls by that much without a flick's momentum. */
+static bool drag(const char *value, bool real_time)
+{
+    int dy = atoi(value);
+    int size = lv_display_get_horizontal_resolution(sim_board_display());
+    int c = size / 2, from = c - dy / 2;
+    for (int k = 0; k <= 20; k++) {
+        finger(true, c, from + dy * k / 20, 40, real_time);
+    }
+    finger(true, c, from + dy, 400, real_time);
+    finger(false, c, from + dy, 300, real_time);
+    return true;
+}
+
 static bool apply_setting(const char *key, const char *value, bool real_time)
 {
+    if (!strcmp(key, "drag")) {
+        return drag(value, real_time);
+    }
     if (!strcmp(key, "tap")) {
         return tap(value, real_time);
     }

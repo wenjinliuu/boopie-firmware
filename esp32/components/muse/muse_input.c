@@ -167,6 +167,8 @@ static void aux_single(void)
         muse_board->display_lock(-1);
         boopie_input_cancel();     /* put away the keys */
         muse_board->display_unlock();
+    } else if (muse_ui_settings_back()) {
+        /* a settings page closed, as its arrow would: not left open behind the face */
     } else if (!muse_ui_go_home()) {
         set_asleep(true, muse_board->aux_button);
     }

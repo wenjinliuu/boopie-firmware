@@ -37,3 +37,8 @@ bool muse_settings_ui_in_subpage(void);
 /* Boopie: opens a page by name ("wifi", "muse", "avatar", "bluetooth"),
  * for the setup guide. In the LVGL task. */
 void muse_settings_ui_open(const char *page);
+/* Boopie: the same, and its back (the arrow, a swipe right, the back button)
+ * calls `leave` instead of showing the settings list. */
+void muse_settings_ui_open_from(const char *page, void (*leave)(void));
+/* Boopie: closes the page shown, as its back arrow would; false on the list. */
+bool muse_settings_ui_back(void);

@@ -243,3 +243,12 @@ void boopie_pixel_head_image(int head, uint16_t *dst, int scale);
  * skin's hat or ears in BOOPIE_PET_H - BOOPIE_HEAD_H rows above; 0 is see-through. */
 #define BOOPIE_PET_H (BOOPIE_HEAD_H + 3)
 void boopie_pixel_pet_image(int head, uint16_t *dst);
+
+/* Previews for the settings' lists, `scale` px a cell, RGB565 with 0 round
+ * them (see-through once keyed): a skin as worn, its character's head with
+ * the skin's colour and hat or ears (HEAD_W x BOOPIE_PET_H cells); an
+ * accessory alone, centred in BOOPIE_ACC_ICON_W x BOOPIE_ACC_ICON_H cells. */
+void boopie_pixel_skin_head(int skin, uint16_t *dst, int scale);
+#define BOOPIE_ACC_ICON_W 13
+#define BOOPIE_ACC_ICON_H 9
+void boopie_pixel_acc_icon(boopie_acc_t a, uint16_t *dst, int scale);

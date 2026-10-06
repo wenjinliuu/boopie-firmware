@@ -51,6 +51,7 @@
 #include "boopie_store.h"
 #include "boopie_viewers.h"
 #include "boopie_icons.h"
+#include "boopie_pixel.h"
 
 /* Keep content in a column that stays inside a round panel (and fits a 368 px one). */
 #define LIST_W 330
@@ -484,10 +485,20 @@ static void close_text(void);
  * to that one, not home. */
 static lv_obj_t *s_back_to;
 
+/* Boopie: a page opened from elsewhere (小窝's 换装) goes back there, not to
+ * the settings list: the list is put back quietly and this is called. */
+static void (*s_leave_to)(void);
+
 static void go_back(void)
 {
     if (s_current == s_text) {
         close_text();
+    } else if (s_leave_to && s_current != s_home) {
+        void (*leave)(void) = s_leave_to;
+        s_leave_to = NULL;
+        s_back_to = NULL;
+        show(s_home);
+        leave();
     } else if (s_back_to && s_back_to != s_current) {
         lv_obj_t *to = s_back_to;
         s_back_to = NULL;
@@ -1408,6 +1419,63 @@ static lv_obj_t *s_pet_line;
 #define SKIN_ROWS_MAX 32
 static lv_obj_t *s_skin_box, *s_skin_none_check, *s_skin_rows[SKIN_ROWS_MAX], *s_skin_checks[SKIN_ROWS_MAX];
 static lv_obj_t *s_acc_checks[BOOPIE_ACC_COUNT];
+static bool s_skin_pic[SKIN_ROWS_MAX];   /* the row has its preview: made when first shown */
+
+/* A preview picture (RGB565, 0 round it; freed here) as a see-through image
+ * at the row's start, made ARGB here rather than by boopie_icon_keyed, which
+ * keeps only a few. */
+static void row_picture(lv_obj_t *r, uint16_t *px, int w, int h)
+{
+    lv_image_dsc_t *dsc = lv_malloc(sizeof(*dsc));
+    uint32_t *argb = lv_malloc((size_t)w * h * sizeof(uint32_t));
+    if (!dsc || !argb) {
+        lv_free(dsc);
+        lv_free(argb);
+        lv_free(px);
+        return;
+    }
+    for (int i = 0; i < w * h; i++) {
+        uint16_t c = px[i];
+        uint32_t cr = (c >> 11) * 255 / 31, cg = (c >> 5 & 63) * 255 / 63, cb = (c & 31) * 255 / 31;
+        argb[i] = c ? 0xff000000u | cr << 16 | cg << 8 | cb : 0;
+    }
+    lv_free(px);
+    *dsc = (lv_image_dsc_t){
+        .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_ARGB8888, .w = w, .h = h,
+                    .stride = w * sizeof(uint32_t) },
+        .data_size = (uint32_t)(w * h * sizeof(uint32_t)),
+        .data = (const uint8_t *)argb,
+    };
+    lv_obj_t *img = lv_image_create(r);
+    lv_image_set_src(img, dsc);
+    lv_obj_remove_flag(img, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_move_to_index(img, 0);
+}
+
+/* Boopie: a skin row's preview, its character's head as it would look wearing it. */
+static void skin_picture(int i)
+{
+    if (s_skin_pic[i]) {
+        return;
+    }
+    s_skin_pic[i] = true;
+    int w = BOOPIE_HEAD_W * 3, h = BOOPIE_PET_H * 3;
+    uint16_t *px = lv_malloc((size_t)w * h * sizeof(uint16_t));
+    if (px) {
+        boopie_pixel_skin_head(i, px, 3);
+        row_picture(s_skin_rows[i], px, w, h);
+    }
+}
+
+static void acc_picture(lv_obj_t *r, boopie_acc_t a)
+{
+    int w = BOOPIE_ACC_ICON_W * 3, h = BOOPIE_ACC_ICON_H * 3;
+    uint16_t *px = lv_malloc((size_t)w * h * sizeof(uint16_t));
+    if (px) {
+        boopie_pixel_acc_icon(a, px, 3);
+        row_picture(r, px, w, h);
+    }
+}
 static int s_avatar_shown = -1;
 static lv_obj_t *s_pet_name;   /* the name row's value */
 
@@ -1552,7 +1620,8 @@ static void build_avatar_page(lv_obj_t *tile)
     }
     note(list, "配饰");
     for (int i = 0; i < BOOPIE_ACC_COUNT; i++) {
-        row(list, NULL, boopie_acc_name((boopie_acc_t)i), &s_acc_checks[i], on_acc_choice, (void *)(intptr_t)i);
+        acc_picture(row(list, NULL, boopie_acc_name((boopie_acc_t)i), &s_acc_checks[i], on_acc_choice, (void *)(intptr_t)i),
+                    (boopie_acc_t)i);
     }
     note(list, "背景");
     for (int i = 0; i < BOOPIE_SCENE_COUNT; i++) {
@@ -1598,6 +1667,7 @@ static void tick_avatar(void)
         if (!mine) {
             continue;
         }
+        skin_picture(i);
         char v[64];
         boopie_goal_t goal = boopie_avatar_skin_goal(i);
         if (i == worn) {
@@ -2111,8 +2181,27 @@ bool muse_settings_ui_in_subpage(void)
 }
 
 /* Boopie: the setup guide sends people to a page. */
+bool muse_settings_ui_back(void)
+{
+    if (s_current == s_home) {
+        return false;
+    }
+    go_back();
+    return true;
+}
+
+void muse_settings_ui_open_from(const char *name, void (*leave)(void))
+{
+    muse_settings_ui_open(name);
+    s_leave_to = s_current != s_home ? leave : NULL;
+}
+
 void muse_settings_ui_open(const char *name)
 {
+    s_leave_to = NULL;
+    if (!name) {
+        name = "home";   /* the list itself (it used to read a NULL) */
+    }
     static const struct {
         const char *name;
         const page_t *page;

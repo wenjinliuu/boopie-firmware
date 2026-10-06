@@ -69,3 +69,10 @@ endif()
 if(CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions_boopie_32mb.csv")
     target_compile_definitions(${COMPONENT_LIB} PRIVATE BOOPIE_DATA_IN_ASSETS=1)
 endif()
+
+# Boopie: a test build with every skin, colour, background and accessory open
+# (BOOPIE_UNLOCK_ALL=1 in the environment when configuring). Not for release.
+if("$ENV{BOOPIE_UNLOCK_ALL}" STREQUAL "1")
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE BOOPIE_UNLOCK_ALL=1)
+    message(STATUS "Boopie: everything unlocked (a test build)")
+endif()

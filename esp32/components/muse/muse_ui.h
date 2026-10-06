@@ -41,6 +41,10 @@ bool muse_ui_go_home(void);
 
 /* Boopie: slides to settings and opens one of its pages (muse_settings_ui_open). */
 void muse_ui_open_settings(const char *page);
+/* Boopie: the same from 小窝, its page going back to 小窝. */
+void muse_ui_open_settings_from_nest(const char *page);
+/* Boopie: closes a settings page open in front (the back button); false if none. */
+bool muse_ui_settings_back(void);
 
 /* Boopie: to 小窝, the pet's home below the face. LVGL task. */
 void muse_ui_open_nest(void);

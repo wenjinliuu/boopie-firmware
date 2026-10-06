@@ -1819,11 +1819,19 @@ bool muse_ui_go_home(void)
     return away;
 }
 
+/* Boopie: slide from the face, but jump between two side pages (小窝 and
+ * settings): animated, that scrolls both ways at once across the cross. */
+static void go_tile(lv_obj_t *tile)
+{
+    lv_obj_add_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE);
+    lv_tileview_set_tile(s_tv, tile, lv_tileview_get_tile_active(s_tv) == s_face ? LV_ANIM_ON : LV_ANIM_OFF);
+    s_shown_page = -1;
+}
+
 void muse_ui_open_nest(void)
 {
     if (s_tv && s_pet) {
-        lv_obj_add_flag(s_tv, LV_OBJ_FLAG_SCROLLABLE);
-        lv_tileview_set_tile(s_tv, s_pet, LV_ANIM_ON);
+        go_tile(s_pet);
     }
 }
 
@@ -1832,8 +1840,28 @@ void muse_ui_open_settings(const char *page)
     if (!s_tv || !s_settings) {
         return;
     }
-    lv_tileview_set_tile(s_tv, s_settings, LV_ANIM_ON);
+    go_tile(s_settings);
     muse_settings_ui_open(page);
+}
+
+void muse_ui_open_settings_from_nest(const char *page)
+{
+    if (!s_tv || !s_settings) {
+        return;
+    }
+    go_tile(s_settings);
+    muse_settings_ui_open_from(page, muse_ui_open_nest);
+}
+
+bool muse_ui_settings_back(void)
+{
+    if (!s_tv || lv_tileview_get_tile_active(s_tv) != s_settings) {
+        return false;
+    }
+    muse_board->display_lock(-1);
+    bool closed = muse_settings_ui_back();
+    muse_board->display_unlock();
+    return closed;
 }
 
 void muse_ui_set_swipe_enabled(bool enabled)
