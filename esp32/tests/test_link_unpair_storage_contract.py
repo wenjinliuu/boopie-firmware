@@ -139,7 +139,7 @@ class LinkUnpairStorageContractTest(unittest.TestCase):
         queue = _function_body(self.app, "static cJSON *queue_ws_control(")
         branch = worker[worker.index("case WS_CONTROL_UNPAIR:") :]
         clear = queue.index("if (!clear_setup_credentials())")
-        task = queue.index("xTaskCreate(ws_control_task")
+        task = queue.index("app_task_spawn(ws_control_task")
         accepted = queue.index("return command_ok_accepted()")
         self.assertLess(clear, task)
         self.assertLess(clear, accepted)
@@ -167,7 +167,7 @@ class LinkUnpairStorageContractTest(unittest.TestCase):
         self.assertIn('reset_setup_from_control("server unpair (node.unpaired)")',
                       worker)
         self.assertIn("operation_gate_take(portMAX_DELAY", reset)
-        self.assertIn("if (xTaskCreate(ws_unpaired_task", status)
+        self.assertIn("if (app_task_spawn(ws_unpaired_task", status)
         self.assertIn("!= pdPASS", status)
         self.assertIn(
             "atomic_store_explicit(&s_setup_reset_pending, true",
@@ -189,13 +189,13 @@ class LinkUnpairStorageContractTest(unittest.TestCase):
         if not cc or shutil.which(cc[0]) is None:
             self.skipTest("C compiler not available")
         queue = _function_body(self.app, "static cJSON *queue_ws_control(")
-        failure = _function_body(queue, "if (xTaskCreate(ws_control_task")
+        failure = _function_body(queue, "if (app_task_spawn(ws_control_task")
         restart = _function_body(self.app, "static void restart_after_setup_reset(")
         harness = r"""
 #include <assert.h>
 #include <stdbool.h>
 #define pdPASS 1
-#define xTaskCreate(...) create_restart_task()
+#define app_task_spawn(...) create_restart_task()
 #define stack_monitor_record(...) ((void)0)
 typedef struct { bool setup_credentials_cleared; } ws_control_args_t;
 static bool gate_held;

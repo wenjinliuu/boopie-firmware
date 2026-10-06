@@ -62,7 +62,7 @@ class LinkEncryptedPairingContractTest(unittest.TestCase):
             dispatch.index('decrypted && strcmp(act, "wifi_scan") == 0'),
         )
         scan = _function_body(dispatch, 'decrypted && strcmp(act, "wifi_scan") == 0')
-        self.assertIn('xTaskCreate(scan_task, "scan", 4096, NULL, 5, NULL)', scan)
+        self.assertIn('app_task_spawn(scan_task, "scan", 4096, NULL, 5, NULL)', scan)
         for action in ("wifi_scan", "set_wifi", "set_auth"):
             self.assertNotIn(
                 f'}} else if (strcmp(act, "{action}") == 0)', dispatch
@@ -156,7 +156,7 @@ class LinkEncryptedPairingContractTest(unittest.TestCase):
         self.assertNotIn('cJSON_GetObjectItem(root, "token")', provision_v2_block)
         self.assertLess(
             provision_v2_block.index("link_pairing_mark_provisioning_active()"),
-            provision_v2_block.index("xTaskCreate(provision_task"),
+            provision_v2_block.index("app_task_spawn(provision_task"),
         )
         self.assertIn('!= pdPASS', provision_v2_block)
         self.assertIn("secure_free_str(a->password)", provision_v2_block)
@@ -441,10 +441,10 @@ class LinkEncryptedPairingContractTest(unittest.TestCase):
         self.assertIn('decrypted && strcmp(act, "device.ota") == 0', ota_block)
         self.assertNotIn("verify_client_proof_or_reset", ota_block)
         self.assertNotIn("client_proof", ota_block)
-        self.assertIn('xTaskCreate(ble_ota_task, "ble_ota"', ota_block)
+        self.assertIn('app_task_spawn(ble_ota_task, "ble_ota"', ota_block)
         self.assertNotIn("verify_client_proof_or_reset", unpair_block)
         self.assertNotIn("client_proof", unpair_block)
-        self.assertIn('xTaskCreate(unpair_task, "unpair"', unpair_block)
+        self.assertIn('app_task_spawn(unpair_task, "unpair"', unpair_block)
 
     def test_ble_set_vm_is_not_supported(self) -> None:
         ble = BLE_SERVER_C.read_text()
