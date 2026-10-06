@@ -22,8 +22,3 @@ CONFIG_LWIP_MAX_SOCKETS=16
 CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM=y
 CONFIG_MBEDTLS_CHACHA20_C=y
 CONFIG_MBEDTLS_CHACHAPOLY_C=y
-# Boopie's tasks and pages leave Link even less internal RAM than Muse's 4 KB
-# threshold allows for: on the board, with BLE up, 14 KB was left in 4 KB
-# pieces, and the phone setup's web server couldn't get its 6 KB stack. Every
-# plain malloc tries PSRAM first; what must be internal asks for it by caps.
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0

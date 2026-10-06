@@ -59,6 +59,10 @@ void boopie_vpn_update(void);
 /* The network came up: with a subscription saved but no nodes yet (it was
  * imported just before a restart), they're fetched now. */
 void boopie_vpn_net_up(void);
+/* Nodes pasted rather than fetched (a subscription's content, ss:// links one
+ * a line, or Clash YAML): for when the subscription's site can't be reached
+ * from here. Returns how many Shadowsocks nodes it found and kept. */
+int boopie_vpn_import(const char *text, size_t len);
 void boopie_vpn_test(void);
 
 /* Whether the relay carried Muse lately, for the status line. */

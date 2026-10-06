@@ -38,8 +38,8 @@ extern const char setup_html_end[] asm("_binary_setup_html_end");
 
 #define NVS_NS "boopie_net"
 #define NVS_SUB "sub"
-#define SUB_MAX 1023
-#define BODY_MAX 6144        /* a subscription and the rest, URL-encoded */
+#define SUB_MAX 16383       /* a link, or the nodes themselves pasted */
+#define BODY_MAX 49152       /* a subscription (or its pasted nodes) and the rest, URL-encoded */
 #define MAX_APS 20
 
 static httpd_handle_t s_http;
@@ -377,10 +377,7 @@ static esp_err_t on_save(httpd_req_t *req)
         error = "开发者 token 不对：应是 mgst_ 开头的 48 个字符，重新复制一次";
     }
     if (!error && field(body, "sub", val, SUB_MAX + 1)) {
-        if (*val && strncmp(val, "https://", 8) != 0 && strncmp(val, "http://", 7) != 0
-            && strncmp(val, "ss://", 5) != 0) {
-            error = "订阅要以 https://、http:// 或 ss:// 开头";
-        }
+        /* A link to fetch, or the nodes pasted (checked when they're read). */
     } else if (!error && has(body, "sub")) {
         error = "订阅链接太长";
     }
@@ -416,15 +413,25 @@ static esp_err_t on_save(httpd_req_t *req)
             }
         }
         if (!error && field(body, "sub", val, SUB_MAX + 1)) {
-            if (set_subscription(val)) {
-                saved |= BOOPIE_SETUP_SAVED_PROXY;
-                if (*val) {
-                    /* Imported: on, and the nodes fetched now (or after the restart, if one's coming). */
-                    boopie_vpn_set_on(true);
-                    boopie_vpn_update();
+            bool link = strncmp(val, "https://", 8) == 0 || strncmp(val, "http://", 7) == 0;
+            if (!*val || link) {
+                if (set_subscription(val)) {
+                    saved |= BOOPIE_SETUP_SAVED_PROXY;
+                    if (*val) {
+                        /* A link: on, and the nodes fetched now (or after the restart, if one's coming). */
+                        boopie_vpn_set_on(true);
+                        boopie_vpn_update();
+                    }
+                } else {
+                    error = "订阅没存上";
                 }
+            } else if (boopie_vpn_import(val, strlen(val)) > 0) {
+                /* The nodes themselves: kept as they are, nothing to fetch. */
+                set_subscription("");
+                boopie_vpn_set_on(true);
+                saved |= BOOPIE_SETUP_SAVED_PROXY;
             } else {
-                error = "订阅没存上";
+                error = "没找到 Shadowsocks 节点：粘贴订阅链接、订阅内容或 ss:// 链接";
             }
         }
     }
@@ -528,7 +535,10 @@ bool boopie_setup_web_start(boopie_setup_ap_t *ap)
     esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
     esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
-    cfg.stack_size = 6144;
+    /* In PSRAM: internal RAM is short once Wi-Fi and BLE are up, and on this
+     * board (code and rodata in PSRAM) flash writes don't need an internal stack. */
+    cfg.stack_size = 8192;
+    cfg.task_caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
     cfg.max_open_sockets = 4;
     cfg.lru_purge_enable = true;
     cfg.max_uri_handlers = 6;

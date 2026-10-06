@@ -584,6 +584,38 @@ static char *fetch(const char *url, size_t *len, const char **why)
     return body;
 }
 
+/* New nodes in: the current one kept if it's still there, else the first usable. */
+static void apply_nodes(const boopie_vpn_node_t *got, int n)
+{
+    int usable = 0;
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    char current[BOOPIE_VPN_NAME_MAX] = "";
+    if (s_current >= 0 && s_current < s_count) {
+        strlcpy(current, s_nodes[s_current].name, sizeof current);
+    }
+    memcpy(s_nodes, got, n * sizeof *got);
+    s_count = n;
+    s_current = -1;
+    for (int i = 0; i < n; i++) {
+        s_latency[i] = -1;
+        usable += s_nodes[i].supported;
+        if (s_current < 0 && current[0] && strcmp(s_nodes[i].name, current) == 0) {
+            s_current = i;   /* the same node as before, if it's still there */
+        }
+    }
+    for (int i = 0; s_current < 0 && i < n; i++) {
+        s_current = s_nodes[i].supported ? i : -1;
+    }
+    save_nodes();
+    xSemaphoreGive(s_lock);
+    save_settings();
+    if (usable < n) {
+        set_msg("已更新：%d 个节点，%d 个能用", n, usable);
+    } else {
+        set_msg("已更新：%d 个节点", n);
+    }
+}
+
 static void update_task(void *arg)
 {
     (void)arg;
@@ -626,33 +658,7 @@ static void update_task(void *arg)
         set_msg("%s", why);
     }
     if (n > 0) {
-        int usable = 0;
-        xSemaphoreTake(s_lock, portMAX_DELAY);
-        char current[BOOPIE_VPN_NAME_MAX] = "";
-        if (s_current >= 0 && s_current < s_count) {
-            strlcpy(current, s_nodes[s_current].name, sizeof current);
-        }
-        memcpy(s_nodes, got, n * sizeof *got);
-        s_count = n;
-        s_current = -1;
-        for (int i = 0; i < n; i++) {
-            s_latency[i] = -1;
-            usable += s_nodes[i].supported;
-            if (s_current < 0 && current[0] && strcmp(s_nodes[i].name, current) == 0) {
-                s_current = i;   /* the same node as before, if it's still there */
-            }
-        }
-        for (int i = 0; s_current < 0 && i < n; i++) {
-            s_current = s_nodes[i].supported ? i : -1;
-        }
-        save_nodes();
-        xSemaphoreGive(s_lock);
-        save_settings();
-        if (usable < n) {
-            set_msg("已更新：%d 个节点，%d 个能用", n, usable);
-        } else {
-            set_msg("已更新：%d 个节点", n);
-        }
+        apply_nodes(got, n);
     }
     if (got) {
         memset(got, 0, BOOPIE_VPN_NODES_MAX * sizeof *got);
@@ -830,6 +836,25 @@ boopie_vpn_busy_t boopie_vpn_busy(char *msg, size_t cap)
 void boopie_vpn_update(void)
 {
     run(BOOPIE_VPN_UPDATING, update_task, "boopie_vpn_sub");
+}
+
+int boopie_vpn_import(const char *text, size_t len)
+{
+    if (!s_lock || !text || !len) {
+        return 0;
+    }
+    boopie_vpn_node_t *got = heap_caps_calloc(BOOPIE_VPN_NODES_MAX, sizeof *got, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!got) {
+        return 0;
+    }
+    int n = boopie_vpn_parse(text, len, got, BOOPIE_VPN_NODES_MAX);
+    ESP_LOGI(TAG, "pasted: %d Shadowsocks nodes", n);
+    if (n > 0) {
+        apply_nodes(got, n);
+    }
+    memset(got, 0, BOOPIE_VPN_NODES_MAX * sizeof *got);
+    free(got);
+    return n;
 }
 
 void boopie_vpn_net_up(void)
