@@ -22,3 +22,8 @@ CONFIG_LWIP_MAX_SOCKETS=16
 CONFIG_LWIP_HOOK_NETCONN_EXT_RESOLVE_CUSTOM=y
 CONFIG_MBEDTLS_CHACHA20_C=y
 CONFIG_MBEDTLS_CHACHAPOLY_C=y
+# Certificates: a site that sends a cross-signed intermediate (its issuer an old
+# root since dropped from the bundle) fails the default check, which looks only
+# at the top certificate's issuer; browsers find the other path. The
+# subscription's site did ("No matching trusted root certificate found").
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_CROSS_SIGNED_VERIFY=y

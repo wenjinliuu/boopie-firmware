@@ -25,6 +25,8 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "lwip/api.h"
+#include "mbedtls/ssl.h"
+#include "mbedtls/x509_crt.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "nvs.h"
@@ -508,6 +510,39 @@ static void start_relay(void)
 
 /* ---- the subscription and the speed test, in the background ---- */
 
+/* The bundle's check, with the chain it saw in the log: what a failure needs
+ * to tell a missing intermediate from a root the bundle hasn't got. Only
+ * names, which the certificates make public anyway. */
+static int (*s_bundle_vrfy)(void *, mbedtls_x509_crt *, int, uint32_t *);
+static void *s_bundle_vrfy_arg;
+
+static int logged_verify(void *arg, mbedtls_x509_crt *crt, int depth, uint32_t *flags)
+{
+    (void)arg;
+    int r = s_bundle_vrfy ? s_bundle_vrfy(s_bundle_vrfy_arg, crt, depth, flags) : 0;
+    char subj[96], iss[96];
+    if (mbedtls_x509_dn_gets(subj, sizeof subj, &crt->subject) < 0) {
+        strlcpy(subj, "?", sizeof subj);
+    }
+    if (mbedtls_x509_dn_gets(iss, sizeof iss, &crt->issuer) < 0) {
+        strlcpy(iss, "?", sizeof iss);
+    }
+    ESP_LOGI(TAG, "subscription cert %d: %s, issued by %s%s", depth, subj, iss, *flags ? " (not trusted)" : "");
+    return r;
+}
+
+static esp_err_t bundle_attach_logged(void *conf)
+{
+    esp_err_t err = esp_crt_bundle_attach(conf);
+    if (err == ESP_OK && conf) {
+        mbedtls_ssl_config *c = conf;
+        s_bundle_vrfy = c->MBEDTLS_PRIVATE(f_vrfy);
+        s_bundle_vrfy_arg = c->MBEDTLS_PRIVATE(p_vrfy);
+        mbedtls_ssl_conf_verify(c, logged_verify, NULL);
+    }
+    return err;
+}
+
 /* Just the host, for the log: the rest of a subscription URL is its secret. */
 static void url_host(const char *url, char *out, size_t cap)
 {
@@ -533,7 +568,7 @@ static char *fetch(const char *url, size_t *len, const char **why)
     esp_http_client_config_t cfg = {
         .url = url,
         .timeout_ms = 15000,
-        .crt_bundle_attach = esp_crt_bundle_attach,
+        .crt_bundle_attach = bundle_attach_logged,
         .user_agent = "ClashForAndroid/2.5.12",   /* some subscriptions answer clients they know */
         .max_redirection_count = 5,
     };
