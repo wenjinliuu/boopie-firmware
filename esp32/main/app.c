@@ -2261,6 +2261,16 @@ static const vm_info_t *find_vm_by_id(const vm_info_t *vms, int count, const cha
     return NULL;
 }
 
+/* Boopie: with code and rodata in PSRAM, flash writes leave the cache on, so
+ * this task's 8 KB stack can be PSRAM: internal RAM is often short of 8 KB in
+ * one piece once Wi-Fi, BLE and the tunnel are up, and then every Muse turn
+ * failed as "Can't reach Muse's server". */
+#if CONFIG_SPIRAM_FETCH_INSTRUCTIONS && CONFIG_SPIRAM_RODATA
+#define HATCH_VM_STACK_PSRAM 1
+#else
+#define HATCH_VM_STACK_PSRAM 0
+#endif
+
 // Runs on an internal-RAM stack: the caller's may be in PSRAM, and this reads
 // and (on token refresh) writes NVS.
 static void hatch_vm_task(void *arg) {
@@ -2291,7 +2301,11 @@ static void hatch_vm_task(void *arg) {
     }
     xTaskNotifyGive(req->waiter);
     stack_monitor_record(NULL);
+#if HATCH_VM_STACK_PSRAM
+    vTaskDeleteWithCaps(NULL);
+#else
     vTaskDelete(NULL);
+#endif
 }
 
 bool app_hatch_vm_credentials(const char *want_vm, char *vm_id, size_t id_cap,
@@ -2301,7 +2315,14 @@ bool app_hatch_vm_credentials(const char *want_vm, char *vm_id, size_t id_cap,
         .vm_name = vm_name, .name_cap = name_cap,
         .waiter = xTaskGetCurrentTaskHandle(),
     };
-    if (xTaskCreate(hatch_vm_task, "muse_vm", 8192, &req, 4, NULL) != pdPASS) {
+#if HATCH_VM_STACK_PSRAM
+    BaseType_t made = xTaskCreateWithCaps(hatch_vm_task, "muse_vm", 8192, &req, 4, NULL,
+                                          MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#else
+    BaseType_t made = xTaskCreate(hatch_vm_task, "muse_vm", 8192, &req, 4, NULL);
+#endif
+    if (made != pdPASS) {
+        ESP_LOGE(TAG, "Muse VM lookup: no memory for its task");
         return false;
     }
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);

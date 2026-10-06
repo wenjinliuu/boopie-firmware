@@ -295,9 +295,13 @@ bool tunnel_netif_start(const ip4_addr_t *ip,
         tx_item_t *p = &s_tx_slots[i];
         xQueueSend(s_tx_free_queue, &p, 0);
     }
+    /* Boopie: internal RAM first; PSRAM when that's short (the task never
+     * ends, so how it was made needn't be remembered). */
     if (!s_tx_task
         && xTaskCreate(tx_task, "tun_tx", TX_TASK_STACK, NULL, TX_TASK_PRIO,
-                       &s_tx_task) != pdPASS) {
+                       &s_tx_task) != pdPASS
+        && xTaskCreateWithCaps(tx_task, "tun_tx", TX_TASK_STACK, NULL, TX_TASK_PRIO,
+                               &s_tx_task, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
         ESP_LOGE(TAG, "xTaskCreate failed");
         return false;
     }

@@ -47,9 +47,9 @@ static const char *TAG = "boopie_xz_voice";
 #define FRAME 960                       /* 60 ms at 16 kHz: one Opus packet up */
 #define DEC_MAX (RATE * 120 / 1000)     /* the longest packet down, 120 ms */
 #define PCM_IN_BYTES (RATE * 2 * 3)     /* 3 s of speech not yet encoded */
-#define OUTBOX_BYTES (64 * 1024)        /* ~10 s of packets while connecting */
-#define DOWN_BYTES (96 * 1024)          /* the reply, still Opus */
-#define PCM_OUT_BYTES (RATE * 2 * 4)    /* 4 s of the reply, decoded */
+#define OUTBOX_BYTES (32 * 1024)        /* ~5 s of packets while connecting */
+#define DOWN_BYTES (64 * 1024)          /* the reply, still Opus, ahead of playing */
+#define PCM_OUT_BYTES (RATE * 2 * 2)    /* 2 s of the reply, decoded (as Muse keeps) */
 #define TEXT_MAX 8192                   /* the longest text message read */
 #define PKT_MAX 4096                    /* the longest packet down */
 #define SENTENCES 16

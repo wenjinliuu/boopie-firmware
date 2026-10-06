@@ -437,9 +437,15 @@ static lv_obj_t *fold(lv_obj_t *list, const char *text)
 
 /* ---------- navigation ---------- */
 
+/* Boopie's pages, defined further down; dropped like Muse's. Left out of the
+ * list below, a page was deleted but still pointed at, and opened again it
+ * crashed (lv_obj_get_display: No screen found, or a freed label written). */
+static lv_obj_t *s_brain, *s_xiaozhi, *s_vpn, *s_storage;
+
 static void drop(lv_obj_t *p)
 {
-    lv_obj_t **const pages[] = { &s_wifi, &s_hatch, &s_ble, &s_sound, &s_sleep, &s_battery, &s_power, &s_text };
+    lv_obj_t **const pages[] = { &s_wifi, &s_hatch, &s_ble, &s_sound, &s_sleep, &s_battery, &s_power, &s_text,
+                                 &s_avatar, &s_brain, &s_xiaozhi, &s_vpn, &s_storage };
     for (size_t i = 0; i < sizeof(pages) / sizeof(pages[0]); i++) {
         if (*pages[i] == p) {
             *pages[i] = NULL;
@@ -2115,6 +2121,11 @@ void muse_settings_ui_open(const char *name)
                   { "sound", &SOUND }, { "sleep", &SLEEP }, { "battery", &BATTERY }, { "power", &POWER },
                   { "brain", &BRAIN }, { "xiaozhi", &XIAOZHI }, { "vpn", &VPN },
                   { "storage", &STORAGE } };
+    if (strcmp(name, "home") == 0) {
+        s_back_to = NULL;
+        show(s_home);
+        return;
+    }
     for (size_t i = 0; i < sizeof PAGES / sizeof PAGES[0]; i++) {
         if (strcmp(PAGES[i].name, name) == 0) {
             if (!*PAGES[i].page->obj) {

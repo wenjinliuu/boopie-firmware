@@ -82,6 +82,9 @@ const lv_font_t boopie_font_pixel_12 = {
 
 #define CJK_COPIES 8
 #define SIZES 8
+/* Rendered glyphs kept per size: a screen of Chinese rarely shows more than
+ * this many different ones, and 256 at 28 px held some 200 KB of PSRAM each. */
+#define GLYPH_CACHE 96
 
 /* ui.otf, linked in by the build (EMBED_FILES; the simulator's incbin). */
 extern const uint8_t ui_otf_start[] __asm__("_binary_ui_otf_start");
@@ -101,7 +104,7 @@ const lv_font_t *boopie_font_ui(int size)
     for (int i = 0; i < SIZES; i++) {
         if (!s_made[i].font) {
             lv_font_t *f = lv_tiny_ttf_create_data_ex(ui_otf_start, (size_t)(ui_otf_end - ui_otf_start), size,
-                                                      LV_FONT_KERNING_NONE, 256);
+                                                      LV_FONT_KERNING_NONE, GLYPH_CACHE);
             if (!f) {
                 return NULL;
             }
