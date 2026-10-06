@@ -23,6 +23,9 @@
 
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#ifdef ESP_PLATFORM
+#include "esp_debug_helpers.h"
+#endif
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -1643,8 +1646,35 @@ void muse_ui_request_snapshot(void)
     s_snapshot = true;
 }
 
+/* Boopie: a watch on the UI. If frames stop with the screen awake, the
+ * console gets every task's backtrace once, to show what the LVGL task is
+ * stuck on (the addresses decode against this build's ELF). */
+static volatile int64_t s_frame_us;
+#ifdef ESP_PLATFORM
+static bool s_stall_logged;
+
+static void ui_watch(void *arg)
+{
+    (void)arg;
+    int64_t at = s_frame_us;
+    if (!at || muse_state_asleep()) {
+        s_stall_logged = false;
+        return;
+    }
+    int64_t age = esp_timer_get_time() - at;
+    if (age < 1000000) {
+        s_stall_logged = false;
+    } else if (age > 4000000 && !s_stall_logged) {
+        s_stall_logged = true;
+        ESP_LOGE(TAG, "UI stalled for %d s; all tasks' backtraces follow", (int)(age / 1000000));
+        esp_backtrace_print_all_tasks(16);
+    }
+}
+#endif
+
 static void frame_tick(lv_timer_t *timer)
 {
+    s_frame_us = esp_timer_get_time();   /* Boopie: for ui_watch */
     if (s_snapshot) {
         s_snapshot = false;
         send_snapshot();
@@ -1739,6 +1769,16 @@ esp_err_t muse_ui_start(void)
     }
     build_overlays();
     lv_timer_create(frame_tick, muse_board->frame_ms, NULL);
+#ifdef ESP_PLATFORM
+    {
+        /* Boopie: the stall watch, every second. */
+        const esp_timer_create_args_t watch = { .callback = ui_watch, .name = "ui_watch" };
+        esp_timer_handle_t t;
+        if (esp_timer_create(&watch, &t) == ESP_OK) {
+            esp_timer_start_periodic(t, 1000000);
+        }
+    }
+#endif
     s_ready = true;
     muse_board->display_unlock();
 

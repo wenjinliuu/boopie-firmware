@@ -502,12 +502,28 @@ static void start_relay(void)
 
 /* ---- the subscription and the speed test, in the background ---- */
 
-static char *fetch(const char *url, size_t *len)
+/* Just the host, for the log: the rest of a subscription URL is its secret. */
+static void url_host(const char *url, char *out, size_t cap)
+{
+    const char *p = strstr(url, "://");
+    p = p ? p + 3 : url;
+    size_t n = strcspn(p, "/?#:@");
+    if (p[n] == '@') {   /* user:pass@host: skip the credentials */
+        p += n + 1;
+        n = strcspn(p, "/?#:");
+    }
+    snprintf(out, cap, "%.*s", (int)(n < cap ? n : cap - 1), p);
+}
+
+static char *fetch(const char *url, size_t *len, const char **why)
 {
     char *body = heap_caps_malloc(SUB_MAX + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!body) {
+        *why = "内存不够";
         return NULL;
     }
+    char host[64];
+    url_host(url, host, sizeof host);
     esp_http_client_config_t cfg = {
         .url = url,
         .timeout_ms = 15000,
@@ -517,17 +533,44 @@ static char *fetch(const char *url, size_t *len)
     };
     esp_http_client_handle_t h = esp_http_client_init(&cfg);
     size_t n = 0;
-    if (h && esp_http_client_open(h, 0) == ESP_OK) {
+    int status = 0;
+    *why = "订阅下载失败：检查链接和网络";
+    for (int hop = 0; h && hop <= 5; hop++) {
+        esp_err_t err = esp_http_client_open(h, 0);
+        if (err != ESP_OK) {
+            int tls_err = 0, tls_flags = 0;
+            esp_http_client_get_and_clear_last_tls_error(h, &tls_err, &tls_flags);
+            ESP_LOGW(TAG, "subscription: can't connect to %s (%s, tls 0x%x, cert flags 0x%x)", host,
+                     esp_err_to_name(err), tls_err, tls_flags);
+            if (tls_flags) {
+                *why = "订阅网站的证书验证不过：换备用地址试试";
+            } else {
+                *why = "连不上订阅网站：换备用地址试试";
+            }
+            break;
+        }
         esp_http_client_fetch_headers(h);
-        int status = esp_http_client_get_status_code(h);
+        status = esp_http_client_get_status_code(h);
+        /* open() doesn't follow redirects by itself (perform() does). */
+        if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
+            esp_http_client_set_redirection(h);
+            esp_http_client_close(h);
+            continue;
+        }
         int r;
         while (status == 200 && n < SUB_MAX && (r = esp_http_client_read(h, body + n, SUB_MAX - n)) > 0) {
             n += r;
         }
         if (status != 200) {
-            ESP_LOGW(TAG, "subscription: HTTP %d", status);
+            ESP_LOGW(TAG, "subscription: %s answered HTTP %d", host, status);
+            *why = status == 403 || status == 404 ? "订阅链接失效或被拒绝：重新复制一次" : "订阅网站出错：稍后再试";
             n = 0;
+        } else if (!n) {
+            *why = "订阅是空的";
+        } else {
+            ESP_LOGI(TAG, "subscription: %u bytes from %s", (unsigned)n, host);
         }
+        break;
     }
     if (h) {
         esp_http_client_cleanup(h);
@@ -563,11 +606,15 @@ static void update_task(void *arg)
         n = boopie_vpn_parse(sub, strlen(sub), got, BOOPIE_VPN_NODES_MAX);   /* a node pasted itself */
     } else {
         size_t len = 0;
-        char *body = fetch(sub, &len);
-        if (!body) {
-            why = "订阅下载失败：检查链接和网络";
-        } else {
+        char *body = fetch(sub, &len, &why);
+        if (body) {
+            why = NULL;
             n = boopie_vpn_parse(body, len, got, BOOPIE_VPN_NODES_MAX);
+            ESP_LOGI(TAG, "subscription: %d Shadowsocks nodes", n);
+            if (n == 0 && (memmem(body, len, "vmess", 5) || memmem(body, len, "trojan", 6) || memmem(body, len, "vless", 5)
+                           || memmem(body, len, "hysteria", 8))) {
+                why = "订阅里只有 vmess/trojan 等节点，我只支持 Shadowsocks";
+            }
             memset(body, 0, len);
             free(body);
         }
