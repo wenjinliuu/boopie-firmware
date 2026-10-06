@@ -1679,11 +1679,7 @@ static lv_obj_t *s_xz_code, *s_xz_note;
 
 static void on_brain_choice(lv_event_t *e)
 {
-    boopie_avatar_set_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));
-    boopie_xiaozhi_start();   /* if that was 小智 */
-    if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
-        muse_hatch_start();   /* or Muse */
-    }
+    boopie_avatar_choose_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));   /* restarts on a change */
 }
 
 static void on_xz_recheck(lv_event_t *e)
@@ -1761,7 +1757,7 @@ static void build_brain_page(lv_obj_t *tile)
         row(list, NULL, NAMES[i], &s_brain_checks[i], on_brain_choice, (void *)(intptr_t)i);
         lv_obj_set_style_text_color(s_brain_checks[i], lv_color_hex(COLOR_ACCENT), 0);
     }
-    note(list, "Muse：要海外网络（开 VPN）\n和 Muse App 配对。\n小智：国内网络，不用 VPN，\n在 xiaozhi.me 绑定一次。");
+    note(list, "Muse：要海外网络（开 VPN）\n和 Muse App 配对。\n小智：国内网络，不用 VPN，\n在 xiaozhi.me 绑定一次。\n换一个会自动重启：只加载选中的那个。");
     nav_row(list, "Muse 接入与设置", on_nav, (void *)&HATCH);
     nav_row(list, "小智接入", on_nav, (void *)&XIAOZHI);
 }

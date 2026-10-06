@@ -34,6 +34,8 @@
 #include "boopie_clock.h"
 #include "boopie_imu.h"
 #include "esp_log.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 #include "nvs.h"
 #endif
 
@@ -1591,6 +1593,33 @@ void boopie_avatar_set_brain(boopie_brain_t brain)
         s_brain = (uint8_t)brain;
         save();
     }
+}
+
+#ifdef ESP_PLATFORM
+static void restart_now(void *arg)
+{
+    (void)arg;
+    esp_restart();
+}
+#endif
+
+bool boopie_avatar_choose_brain(boopie_brain_t brain)
+{
+    if ((int)brain < 0 || brain >= BOOPIE_BRAIN_COUNT || brain == boopie_avatar_brain()) {
+        return false;
+    }
+    boopie_avatar_set_brain(brain);
+#ifdef ESP_PLATFORM
+    /* One engine at a time: the one leaving gives its memory back with a
+     * restart, and the one chosen is all that starts. */
+    muse_state_set_caption(brain == BOOPIE_BRAIN_XIAOZHI ? "换成小智，重启一下……" : "换成 Muse，重启一下……");
+    const esp_timer_create_args_t later = { .callback = restart_now, .name = "brain_restart" };
+    esp_timer_handle_t t;
+    if (esp_timer_create(&later, &t) != ESP_OK || esp_timer_start_once(t, 1500 * 1000) != ESP_OK) {
+        esp_restart();
+    }
+#endif
+    return true;
 }
 
 bool boopie_avatar_guided(void)

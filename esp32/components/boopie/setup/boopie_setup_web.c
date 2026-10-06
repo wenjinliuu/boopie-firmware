@@ -11,8 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "boopie_xiaozhi.h"
-#include "muse_chat.h"
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -393,6 +391,7 @@ static esp_err_t on_save(httpd_req_t *req)
     }
 
     uint32_t saved = 0;
+    bool brain_changed = false;
     if (!error && has_name) {
         const char *why;
         if (boopie_avatar_set_pet_name(name, &why)) {
@@ -403,11 +402,8 @@ static esp_err_t on_save(httpd_req_t *req)
     }
     if (!error) {
         if (brain >= 0) {
-            boopie_avatar_set_brain((boopie_brain_t)brain);
-            boopie_xiaozhi_start();   /* if that was 小智 */
-            if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
-                muse_hatch_start();   /* or Muse */
-            }
+            /* A change restarts the board (one engine loaded at a time). */
+            brain_changed = boopie_avatar_choose_brain((boopie_brain_t)brain);
             saved |= BOOPIE_SETUP_SAVED_BRAIN;
         }
         if (has_sdk) {
@@ -473,6 +469,9 @@ static esp_err_t on_save(httpd_req_t *req)
     }
     if (saved & BOOPIE_SETUP_SAVED_MUSE) {
         return answer(req, true, "已保存。Boopie 马上重启一下，开发者 token 就生效了");
+    }
+    if (brain_changed) {
+        return answer(req, true, "已保存。换了 AI 助手，Boopie 马上重启一下");
     }
     return answer(req, true, has_ssid ? "已保存。Boopie 正在连 Wi-Fi，热点可能会断开一下" : "已保存");
 }

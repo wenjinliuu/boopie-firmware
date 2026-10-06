@@ -15,8 +15,6 @@
 #include "boopie_setup.h"
 #include "boopie_sdk_token.h"
 #include "boopie_setup_web.h"
-#include "boopie_xiaozhi.h"
-#include "muse_chat.h"
 #include "muse_ble.h"
 #include "muse_link.h"
 #include "muse_ui.h"
@@ -219,10 +217,10 @@ static void on_phone(lv_event_t *e)
 
 static void on_brain(lv_event_t *e)
 {
-    boopie_avatar_set_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));
-    boopie_xiaozhi_start();   /* if that was 小智 */
-    if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
-        muse_hatch_start();   /* or Muse */
+    bool restarting = boopie_avatar_choose_brain((boopie_brain_t)(intptr_t)lv_event_get_user_data(e));
+    if (restarting) {
+        /* Back after the restart at the step this brain goes on to. */
+        boopie_avatar_set_guide_at(next_of(S_BRAIN));
     }
     go(next_of(S_BRAIN));
 }

@@ -61,6 +61,9 @@
 #include "ota.h"
 #include "link_pairing.h"
 #include "bug_report.h"
+#if CONFIG_MUSE_ENABLED
+#include "boopie_avatar.h"   /* Boopie: which AI is the brain */
+#endif
 #include "diagnostic_log.h"
 #if CONFIG_HOMEHUB_VOICE
 #include "voice.h"
@@ -81,6 +84,18 @@
 #endif
 
 static const char *TAG = "link.app";
+
+/* Boopie: Muse's VM session (control channel, tunnel, their TLS and buffers)
+ * only while Muse is the brain; with 小智 it isn't opened at all. Switching
+ * the brain restarts the board, so this is read once a boot in effect. */
+static bool muse_vm_wanted(void) {
+#if CONFIG_MUSE_ENABLED
+    return boopie_avatar_brain() == BOOPIE_BRAIN_MUSE;
+#else
+    return true;
+#endif
+}
+
 static const char *HEARTBEAT_TAG = "link.heartbeat";
 
 #define WIFI_CONNECT_TIMEOUT_MS 60000
@@ -2158,6 +2173,9 @@ bool app_wifi_forget(const char *ssid) {
 // at boot), retrying until the session runs; from then on the session
 // reconnects by itself.
 static void muse_keep_vm_session(void) {
+    if (!muse_vm_wanted()) {
+        return;
+    }
     static int64_t next_try;
     static int64_t backoff = MUSE_VM_RETRY_MIN_US;
     if (!wifi_mgr_is_connected() || !config_is_provisioned() || noise_ctrl_is_running()) {
@@ -2720,7 +2738,9 @@ void app_run(void) {
             if (!ovr_ssid[0]) {
                 persist_connected_wifi_channel();
             }
-            if (config_is_provisioned()) {
+            if (config_is_provisioned() && !muse_vm_wanted()) {
+                ESP_LOGI(TAG, "paired, but 小智 is the brain: no Muse VM session");
+            } else if (config_is_provisioned()) {
                 ESP_LOGI(TAG, "found device credentials in NVS, fetching leased VM");
                 bool connected = false;
                 if (operation_gate_take(portMAX_DELAY, "boot VM connect")) {

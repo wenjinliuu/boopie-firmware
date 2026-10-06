@@ -218,6 +218,9 @@ int boopie_avatar_tired(void);
 typedef enum { BOOPIE_BRAIN_XIAOZHI = 0, BOOPIE_BRAIN_MUSE, BOOPIE_BRAIN_COUNT } boopie_brain_t;
 boopie_brain_t boopie_avatar_brain(void);
 void boopie_avatar_set_brain(boopie_brain_t brain);
+/* The brain chosen on the screen or the phone: if it's a change, saved and the
+ * board restarts in a moment (true), so only the chosen engine is ever loaded. */
+bool boopie_avatar_choose_brain(boopie_brain_t brain);
 bool boopie_avatar_guided(void);
 void boopie_avatar_set_guided(bool done);
 /* Where the guide got to, so a restart part way (the Muse app's Wi-Fi, a
