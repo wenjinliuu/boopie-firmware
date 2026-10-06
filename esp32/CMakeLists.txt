@@ -14,6 +14,14 @@
 
 cmake_minimum_required(VERSION 3.16)
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/project.cmake")
+# Boopie: a test build with every skin, colour, background and accessory open
+# (BOOPIE_UNLOCK_ALL=1 in the environment when configuring). Not for release.
+# Build-wide: boopie_avatar.c, where it's read, is compiled in the muse component.
+if("$ENV{BOOPIE_UNLOCK_ALL}" STREQUAL "1")
+    idf_build_set_property(COMPILE_DEFINITIONS "BOOPIE_UNLOCK_ALL=1" APPEND)
+    message(STATUS "Boopie: everything unlocked (a test build)")
+endif()
+
 project(muse-gadget)
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/validate_config.cmake")
 
