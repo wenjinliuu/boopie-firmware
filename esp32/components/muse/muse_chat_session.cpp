@@ -2063,6 +2063,9 @@ static void post(cmd_type_t type, uint32_t gen)
 static void drain_out(void)
 {
     static int16_t junk[256];
+    if (!s_out) {
+        return;   /* Boopie: not started (小智 is the brain) */
+    }
     while (xStreamBufferReceive(s_out, junk, sizeof(junk), 0)) {
     }
 }
@@ -2114,6 +2117,9 @@ extern "C" bool muse_hatch_ready(void)
 
 extern "C" void muse_hatch_turn_begin(void)
 {
+    if (!s_in) {
+        return;   /* Boopie: not started (小智 is the brain) */
+    }
     uint32_t gen = ++s_gen;
     xStreamBufferReset(s_in);
     drain_out();
@@ -2123,6 +2129,9 @@ extern "C" void muse_hatch_turn_begin(void)
 extern "C" void muse_hatch_turn_audio(const int16_t *pcm, size_t frames)
 {
     size_t bytes = frames * sizeof(int16_t);
+    if (!s_in) {
+        return;
+    }
     if (xStreamBufferSend(s_in, pcm, bytes, 0) != bytes) {
         ESP_LOGW(TAG, "mic backlog full, dropped audio");
     }
@@ -2131,6 +2140,9 @@ extern "C" void muse_hatch_turn_audio(const int16_t *pcm, size_t frames)
 /* Both ends move whole frames, so the buffer never splits one. */
 extern "C" size_t muse_hatch_turn_audio_wait(const int16_t *pcm, size_t frames, int wait_ms)
 {
+    if (!s_in) {
+        return 0;
+    }
     return xStreamBufferSend(s_in, pcm, frames * sizeof(int16_t), pdMS_TO_TICKS(wait_ms)) / sizeof(int16_t);
 }
 
@@ -2174,6 +2186,9 @@ extern "C" void muse_hatch_text_cancel(void)
 extern "C" muse_hatch_ev_t muse_hatch_turn_event(char *text, size_t cap)
 {
     ev_t ev;
+    if (!s_events) {
+        return MUSE_HATCH_EV_NONE;
+    }
     while (xQueueReceive(s_events, &ev, 0) == pdTRUE) {
         if (ev.gen == s_gen.load()) {
             strlcpy(text, ev.text, cap);
@@ -2216,6 +2231,10 @@ extern "C" bool muse_hatch_turn_caption(size_t played, char *out, size_t cap)
 
 extern "C" size_t muse_hatch_turn_read(int16_t *pcm, size_t frames, int wait_ms)
 {
+    if (!s_out) {
+        vTaskDelay(pdMS_TO_TICKS(wait_ms > 0 ? wait_ms : 1));
+        return 0;
+    }
     return xStreamBufferReceive(s_out, pcm, frames * sizeof(int16_t), pdMS_TO_TICKS(wait_ms)) / sizeof(int16_t);
 }
 

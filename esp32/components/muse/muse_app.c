@@ -21,6 +21,7 @@
 #include "freertos/task.h"
 
 #include "boopie_assets.h"  /* Boopie */
+#include "boopie_avatar.h"  /* Boopie */
 #include "boopie_clock.h"   /* Boopie */
 #include "boopie_sound.h"   /* Boopie */
 #include "boopie_store.h"   /* Boopie */
@@ -101,7 +102,11 @@ void muse_app_run(const muse_board_t *board)
         muse_state_set_caption("%s", "");   /* the button icons say how to talk */
     }
 
-    muse_hatch_start();
+    /* Boopie: Muse's chat (some 500 KB of PSRAM, and a reconnect every few
+     * seconds) only when it's the brain; choosing it later starts it. */
+    if (boopie_avatar_brain() == BOOPIE_BRAIN_MUSE) {
+        muse_hatch_start();
+    }
     boopie_xiaozhi_start();   /* Boopie: 小智, when it's the brain: its activation code, then where to talk */
     /* Home Link owns the radios; these just hand it the saved settings. */
     muse_wifi_apply();

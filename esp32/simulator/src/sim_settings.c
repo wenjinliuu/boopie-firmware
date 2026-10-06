@@ -190,6 +190,7 @@ bool boopie_vpn_on(void) { return getenv("BOOPIE_VPN") != NULL; }
 void boopie_xiaozhi_start(void) {}
 void boopie_xiaozhi_recheck(void) {}
 void boopie_xiaozhi_rebind(void) {}
+void muse_hatch_start(void) {}
 bool boopie_xiaozhi_endpoint(char *url, size_t url_cap, char *token, size_t token_cap)
 {
     snprintf(url, url_cap, "%s", "");
