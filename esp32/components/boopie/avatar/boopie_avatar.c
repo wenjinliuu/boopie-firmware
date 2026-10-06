@@ -1064,6 +1064,82 @@ static void show_event(const boopie_pet_event_t *ev)
     }
 }
 
+/*
+ * Now and then, left alone on the face, the pet says a word or two of its
+ * own, with a little chirp: about the time of day, the weather, a festival,
+ * being hungry or sleepy, or just wanting company. Every four to nine
+ * minutes at most, never mid-talk, and without a sound late at night.
+ */
+static float s_chat_next = 300.0f;   /* the first a few minutes after starting */
+
+static uint32_t chat_roll(void)
+{
+    static uint32_t s;
+    s = s * 1664525u + 1013904223u + (uint32_t)(s_now * 1000.0f);
+    return s >> 8;
+}
+
+static void chatter(bool known, int minute)
+{
+    float in_mode = 0;
+    if (s_now < s_chat_next || muse_state_asleep() || muse_state_mode(&in_mode) != MUSE_MODE_IDLE || in_mode < 30.0f
+        || muse_state_idle_secs() < 45.0f || s_happy_since >= 0 || s_reacting != BOOPIE_EXPR_IDLE) {
+        return;
+    }
+    s_chat_next = s_now + 240.0f + (float)(chat_roll() % 300);
+    bool night = known && (minute >= 23 * 60 || minute < 7 * 60);
+    const char *name = boopie_avatar_pet_name();
+    char line[96];
+    boopie_expr_t face = BOOPIE_EXPR_HAPPY;
+    uint32_t r = chat_roll();
+    boopie_fest_t fest = boopie_avatar_festival();
+    int weather = boopie_avatar_weather();
+    if (s_pet_state.hungry) {
+        static const char *const L[] = { "肚子咕咕叫了……", "有点饿，想吃点东西", "饭饭……" };
+        strlcpy(line, L[r % 3], sizeof line);
+        face = BOOPIE_EXPR_HUNGRY;
+    } else if (night) {
+        static const char *const L[] = { "好困呀……", "呼……晚安", "该睡觉啦" };
+        strlcpy(line, L[r % 3], sizeof line);
+        face = BOOPIE_EXPR_SLEEPY;
+    } else if (fest != BOOPIE_FEST_NONE && r % 3 == 0) {
+        static const char *const F[BOOPIE_FEST_COUNT] = {
+            [BOOPIE_FEST_SPRING] = "新年快乐！", [BOOPIE_FEST_MOON] = "中秋节快乐，吃月饼啦",
+            [BOOPIE_FEST_HALLOWEEN] = "不给糖就捣蛋！", [BOOPIE_FEST_XMAS] = "圣诞快乐～",
+            [BOOPIE_FEST_NEW_YEAR] = "新的一年也要开心", [BOOPIE_FEST_VALENTINE] = "情人节快乐 ♥",
+            [BOOPIE_FEST_DRAGON] = "端午安康，吃粽子啦", [BOOPIE_FEST_CHILDREN] = "儿童节快乐！",
+            [BOOPIE_FEST_BIRTHDAY] = "今天是我的生日！", [BOOPIE_FEST_LANTERN] = "元宵节快乐，吃汤圆啦",
+        };
+        strlcpy(line, (int)fest < BOOPIE_FEST_COUNT && F[fest] ? F[fest] : "今天是好日子", sizeof line);
+    } else if (known && r % 3 == 1 && (weather == BOOPIE_WEATHER_RAIN || weather == BOOPIE_WEATHER_SNOW)) {
+        strlcpy(line, weather == BOOPIE_WEATHER_RAIN ? "下雨了，出门记得带伞" : "下雪啦！好冷呀", sizeof line);
+    } else if (known && r % 3 == 1 && minute < 10 * 60) {
+        strlcpy(line, r % 2 ? "早上好～" : "今天也要加油哦", sizeof line);
+    } else if (known && r % 3 == 1 && minute >= 11 * 60 + 30 && minute < 13 * 60) {
+        strlcpy(line, "该吃午饭啦", sizeof line);
+    } else if (known && r % 3 == 1 && minute >= 18 * 60) {
+        strlcpy(line, "今天过得怎么样？", sizeof line);
+    } else {
+        static const char *const L[] = { "嗨～", "陪我玩一会儿嘛", "摸摸我～", "嘿嘿", "想你啦", "♪ 啦啦啦～",
+                                         "我在这儿呢", "无聊……", "要不要去小窝看看？" };
+        r %= 10;
+        if (r == 9) {
+            snprintf(line, sizeof line, "%s在这儿哦", name);
+        } else {
+            strlcpy(line, L[r], sizeof line);
+        }
+    }
+    muse_state_set_caption("%s", line);
+    boopie_avatar_react(face == BOOPIE_EXPR_HAPPY ? BOOPIE_EXPR_IDLE : face, 2.5f);
+    if (face == BOOPIE_EXPR_HAPPY) {
+        muse_state_make_happy();
+        muse_state_poke();   /* not counted as the user, though: idle again from here */
+    }
+    if (!night) {
+        boopie_sound_play(BOOPIE_SOUND_HELLO);
+    }
+}
+
 static void pet_tick(void)
 {
     int64_t now;
@@ -1080,6 +1156,7 @@ static void pet_tick(void)
         visit(day);
     }
     show_event(&ev);
+    chatter(known, minute);
     if (s_pet_dirty || s_now - s_pet_saved > 600) {   /* now and then, and after a change */
         s_pet_dirty = false;
         s_pet_saved = s_now;
