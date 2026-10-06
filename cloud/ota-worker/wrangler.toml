@@ -1,0 +1,11 @@
+# Boopie's OTA: the latest release's manifest and files, from the R2 bucket
+# the release workflow (.github/workflows/boopie-release.yml) uploads to.
+# Deployed by that workflow; by hand: npx wrangler deploy (in this directory).
+name = "boopie-ota"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "OTA"
+bucket_name = "boopie-ota"

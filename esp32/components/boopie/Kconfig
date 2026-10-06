@@ -1,0 +1,19 @@
+menu "Boopie"
+
+    config BOOPIE_OTA_URL
+        string "OTA server (its /v1, no trailing slash)"
+        default ""
+        help
+            Where the board looks for updates, e.g.
+            https://boopie-ota.<subdomain>.workers.dev/v1 (cloud/ota-worker).
+            The release workflow sets it; empty turns updates off.
+
+    config BOOPIE_OTA_PUBKEY
+        string "OTA public key (P-256 point, 130 hex digits)"
+        default ""
+        help
+            The uncompressed public key (04 || X || Y) of the release key that
+            signs each update's manifest. The release workflow works it out
+            from the BOOPIE_OTA_KEY secret; empty turns updates off.
+
+endmenu

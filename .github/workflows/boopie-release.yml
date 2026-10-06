@@ -1,0 +1,203 @@
+# Copyright (c) 2026 Boopie contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Boopie's over-the-air releases. Pushing a tag vX.Y.Z builds that version,
+# signs its manifest with the release key, puts it in R2 behind the OTA worker
+# (cloud/ota-worker), and makes a GitHub release with the full flash image.
+# Boards check once a day (or from Settings > 系统更新) and install on a tap.
+#
+#   git tag -a v1.0.0 -m "这次更新：……"   # the message is the release notes
+#   git push origin v1.0.0
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   BOOPIE_OTA_KEY         the release key, from tools/boopie/ota_keygen.py
+#   CLOUDFLARE_API_TOKEN   Workers Scripts: Edit, Workers R2 Storage: Edit
+#   CLOUDFLARE_ACCOUNT_ID  the Cloudflare account
+# Optional variable BOOPIE_OTA_URL pins the server's address; otherwise it's
+# https://boopie-ota.<the account's workers.dev subdomain>/v1.
+
+name: Boopie release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boopie-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Version, server and key
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      url: ${{ steps.url.outputs.url }}
+      pubkey: ${{ steps.key.outputs.pubkey }}
+    steps:
+      - id: v
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::tag $GITHUB_REF_NAME isn't vX.Y.Z"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - id: key
+        env:
+          KEY: ${{ secrets.BOOPIE_OTA_KEY }}
+        run: |
+          [ -n "$KEY" ] || { echo "::error::secret BOOPIE_OTA_KEY is missing (tools/boopie/ota_keygen.py)"; exit 1; }
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/key.pem"
+          pub=$(openssl pkey -in "$RUNNER_TEMP/key.pem" -pubout -outform DER | tail -c 65 | od -An -tx1 -v | tr -d ' \n')
+          rm -f "$RUNNER_TEMP/key.pem"
+          [ ${#pub} -eq 130 ] || { echo "::error::BOOPIE_OTA_KEY isn't a P-256 key"; exit 1; }
+          echo "public key: $pub"
+          echo "pubkey=$pub" >> "$GITHUB_OUTPUT"
+
+      - id: url
+        env:
+          PINNED: ${{ vars.BOOPIE_OTA_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$PINNED" ]; then
+            url="${PINNED%/}"
+          else
+            sub=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain // empty')
+            [ -n "$sub" ] || { echo "::error::no workers.dev subdomain; set the variable BOOPIE_OTA_URL"; exit 1; }
+            url="https://boopie-ota.$sub.workers.dev/v1"
+          fi
+          echo "server: $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  firmware:
+    name: Firmware ${{ needs.prepare.outputs.version }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.0.1
+    defaults:
+      run:
+        shell: bash
+        working-directory: esp32
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      BUILD_DIR: build-release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build
+        env:
+          OTA_URL: ${{ needs.prepare.outputs.url }}
+          OTA_PUBKEY: ${{ needs.prepare.outputs.pubkey }}
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          echo "$VERSION" > version.txt
+          mkdir -p "$BUILD_DIR"
+          printf 'CONFIG_BOOPIE_OTA_URL="%s"\nCONFIG_BOOPIE_OTA_PUBKEY="%s"\n' "$OTA_URL" "$OTA_PUBKEY" > "$PWD/$BUILD_DIR/ota.defaults"
+          DEFAULTS="sdkconfig.defaults;devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c;devices/sdkconfig.boopie-175c;$PWD/$BUILD_DIR/ota.defaults"
+          args=(-B "$BUILD_DIR" -DIDF_TARGET=esp32s3 -DSDKCONFIG="$BUILD_DIR/sdkconfig" -DSDKCONFIG_DEFAULTS="$DEFAULTS")
+          idf.py "${args[@]}" build
+          idf.py "${args[@]}" merge-bin -o "boopie-$VERSION-merged.bin"
+          grep -q "CONFIG_BOOPIE_OTA_PUBKEY=\"$OTA_PUBKEY\"" "$BUILD_DIR/sdkconfig"
+
+      - name: Release files
+        run: |
+          out="$GITHUB_WORKSPACE/out"
+          git -C "$GITHUB_WORKSPACE" config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" fetch --depth=1 origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME" || true
+          notes=$(git -C "$GITHUB_WORKSPACE" tag -l --format='%(contents:subject)%0a%(contents:body)' "$GITHUB_REF_NAME" | sed '/^-----BEGIN PGP/,$d')
+          [ -n "${notes//[$'\n ']/}" ] || notes=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%B)
+          printf '%s\n' "$notes" > notes.txt
+          python3 ../tools/boopie/ota_release.py --version "$VERSION" --app "$BUILD_DIR/muse-gadget.bin" \
+            --assets "$BUILD_DIR/boopie_assets.bin" --assets-version "$(cat assets/VERSION)" \
+            --notes notes.txt --out "$out/ota"
+          mkdir -p "$out/flash"
+          cp "boopie-$VERSION-merged.bin" "$out/"
+          (cd "$BUILD_DIR" && cp --parents muse-gadget.bin bootloader/bootloader.bin \
+            partition_table/partition-table.bin ota_data_initial.bin boopie_assets.bin flash_args "$out/flash/")
+          cp notes.txt "$out/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boopie-release
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    name: Sign and publish
+    needs: [prepare, firmware]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: boopie-release
+          path: out
+
+      - name: Sign
+        env:
+          KEY: ${{ secrets.BOOPIE_OTA_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/key.pem"
+          openssl dgst -sha256 -sign "$RUNNER_TEMP/key.pem" -out "$RUNNER_TEMP/sig.der" out/ota/manifest.json
+          openssl pkey -in "$RUNNER_TEMP/key.pem" -pubout -out "$RUNNER_TEMP/pub.pem"
+          rm -f "$RUNNER_TEMP/key.pem"
+          openssl dgst -sha256 -verify "$RUNNER_TEMP/pub.pem" -signature "$RUNNER_TEMP/sig.der" out/ota/manifest.json
+          python3 tools/boopie/ota_release.py rawsig "$RUNNER_TEMP/sig.der" out/ota/manifest.sig
+          cat out/ota/manifest.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Deploy the worker
+        working-directory: cloud/ota-worker
+        run: |
+          node test/worker.test.mjs
+          npx --yes wrangler@4 deploy
+
+      # The files first, then the signature and the manifest that name them.
+      - name: Upload to R2
+        run: |
+          put() { npx --yes wrangler@4 r2 object put "boopie-ota/$1" --file "$2" --content-type "$3" --remote; }
+          for f in out/ota/files/*; do
+            put "files/$(basename "$f")" "$f" application/octet-stream
+          done
+          put manifest.sig out/ota/manifest.sig application/octet-stream
+          put manifest.json out/ota/manifest.json application/json
+
+      - name: Check the server
+        env:
+          OTA_URL: ${{ needs.prepare.outputs.url }}
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS "$OTA_URL/manifest.json" | grep -q "\"version\": \"$VERSION\""; then
+              echo "live: $OTA_URL/manifest.json"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$OTA_URL/manifest.json doesn't show $VERSION"; exit 1
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd out && zip -qr "boopie-$VERSION-flash.zip" flash)
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Boopie $VERSION" \
+            --notes-file out/notes.txt "out/boopie-$VERSION-merged.bin" "out/boopie-$VERSION-flash.zip"
