@@ -45,9 +45,9 @@ void muse_hatch_chat_forget(void);
 #define MUSE_HATCH_NOTE_TAIL "\"}]}"
 #define MUSE_HATCH_WAV_HEADER 44
 
-/* Voice note helpers (muse_chat_text.c). `data_bytes` is the PCM length, or
- * UINT32_MAX for the streaming "unknown" size. */
-void muse_hatch_wav_header(uint8_t h[MUSE_HATCH_WAV_HEADER], uint32_t rate, uint32_t data_bytes);
+/* Voice note helpers (muse_chat_text.c). The note's length isn't known until
+ * the release, so the WAV header gives the streaming "unknown" size. */
+void muse_hatch_wav_header(uint8_t h[MUSE_HATCH_WAV_HEADER], uint32_t rate);
 /* Writes 4 characters per 3 bytes of `in`, padded; returns the length. */
 size_t muse_hatch_base64(const uint8_t *in, size_t n, char *out);
 
