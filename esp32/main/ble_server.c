@@ -24,6 +24,7 @@
 #include <stdbool.h>
 #include <stdatomic.h>
 
+#include "app_task.h"   /* Boopie */
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_bt.h"
@@ -174,13 +175,13 @@ static void provision_task(void *arg) {
     secure_free_str(a->noise_host);
     free(a);
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static void scan_task(void *arg) {
     if (s_cb.on_wifi_scan) s_cb.on_wifi_scan();
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 typedef struct {
@@ -196,7 +197,7 @@ static void ble_ota_task(void *arg) {
     free(a->url);
     free(a);
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static const char *optional_ota_url(cJSON *root) {
@@ -218,20 +219,20 @@ static bool optional_ota_force(cJSON *root) {
 static void unpair_task(void *arg) {
     if (s_cb.on_unpair) s_cb.on_unpair();
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static void device_info_task(void *arg) {
     if (s_cb.on_get_device_info) s_cb.on_get_device_info();
     atomic_store(&s_device_info_pending, false);
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static void client_connected_task(void *arg) {
     if (s_cb.on_client_connected) s_cb.on_client_connected();
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static void pairing_client_finished_task(void *arg) {
@@ -240,7 +241,7 @@ static void pairing_client_finished_task(void *arg) {
         s_cb.on_pairing_client_finished(generation);
     }
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static void delayed_disconnect_task(void *arg) {
@@ -251,11 +252,11 @@ static void delayed_disconnect_task(void *arg) {
         ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
     }
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 void ble_server_delayed_disconnect(uint32_t ms) {
-    xTaskCreate(delayed_disconnect_task, "ble_dc",
+    app_task_spawn(delayed_disconnect_task, "ble_dc",
                 2048, (void *)(uintptr_t)ms, 4, NULL);
 }
 
@@ -349,7 +350,7 @@ static void dispatch_command_ex(const uint8_t *data, size_t len, bool decrypted)
         uint32_t generation = is_exact_client_finished(root)
             ? link_pairing_handle_client_finished() : 0;
         if (generation) {
-            if (xTaskCreate(pairing_client_finished_task, "pair_confirm", 4096,
+            if (app_task_spawn(pairing_client_finished_task, "pair_confirm", 4096,
                             (void *)(uintptr_t)generation, 5, NULL) != pdPASS) {
                 ESP_LOGE(TAG, "failed to dispatch pairing-confirm callback");
                 ble_server_send_pairing_status("error_pairing_unavailable", generation);
@@ -364,7 +365,7 @@ static void dispatch_command_ex(const uint8_t *data, size_t len, bool decrypted)
                && !link_pairing_session_confirmed()) {
         ble_server_send_status("error_pairing_confirm_required");
     } else if (decrypted && strcmp(act, "wifi_scan") == 0) {
-        xTaskCreate(scan_task, "scan", 4096, NULL, 5, NULL);
+        app_task_spawn(scan_task, "scan", 4096, NULL, 5, NULL);
     } else if (decrypted && strcmp(act, "device.ota") == 0) {
         {
             cJSON *u = cJSON_GetObjectItem(root, "url");
@@ -387,11 +388,11 @@ static void dispatch_command_ex(const uint8_t *data, size_t len, bool decrypted)
                     delete_command_json(root, decrypted);
                     return;
                 }
-                xTaskCreate(ble_ota_task, "ble_ota", 4096, a, 5, NULL);
+                app_task_spawn(ble_ota_task, "ble_ota", 4096, a, 5, NULL);
             }
         }
     } else if (decrypted && strcmp(act, "unpair") == 0) {
-        xTaskCreate(unpair_task, "unpair", 4096, NULL, 5, NULL);
+        app_task_spawn(unpair_task, "unpair", 4096, NULL, 5, NULL);
     } else if (decrypted && strcmp(act, "provision_v2") != 0) {
         ble_server_send_status("error_unknown_action");
     } else if (decrypted && strcmp(act, "provision_v2") == 0) {
@@ -457,7 +458,7 @@ static void dispatch_command_ex(const uint8_t *data, size_t len, bool decrypted)
             // stack during TLS handshake than v5's 3.x (~2 KB more peak).
             a->session_generation = link_pairing_mark_provisioning_active();
             if (a->session_generation == 0
-                || xTaskCreate(provision_task, "prov", 8192, a, 5, NULL) != pdPASS) {
+                || app_task_spawn(provision_task, "prov", 8192, a, 5, NULL) != pdPASS) {
                 uint32_t generation = a->session_generation;
                 secure_free_str(a->ssid);
                 secure_free_str(a->password);
@@ -475,7 +476,7 @@ static void dispatch_command_ex(const uint8_t *data, size_t len, bool decrypted)
         }
     } else if (strcmp(act, "get_device_info") == 0) {
         if (!atomic_exchange(&s_device_info_pending, true)) {
-            if (xTaskCreate(device_info_task, "devinfo", 4096, NULL, 5, NULL) != pdPASS) {
+            if (app_task_spawn(device_info_task, "devinfo", 4096, NULL, 5, NULL) != pdPASS) {
                 atomic_store(&s_device_info_pending, false);
                 ble_server_send_status("error_operation_in_progress");
             }
@@ -831,7 +832,7 @@ static int gap_event_cb(struct ble_gap_event *event, void *arg) {
                 s_subscribed = event->subscribe.cur_notify;
                 ESP_LOGI(TAG, "subscribe notify=%d", s_subscribed);
                 if (s_subscribed) {
-                    xTaskCreate(client_connected_task, "ble_conn", 4096, NULL, 5, NULL);
+                    app_task_spawn(client_connected_task, "ble_conn", 4096, NULL, 5, NULL);
                 }
             }
             break;

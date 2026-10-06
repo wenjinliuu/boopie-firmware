@@ -309,7 +309,7 @@ static void join_task(void *arg)
     muse_settings_set_wifi_on(true);
     muse_settings_set_wifi(s_join_ssid, s_join_pass);
     memset(s_join_pass, 0, sizeof s_join_pass);
-    vTaskDelete(NULL);
+    vTaskDeleteWithCaps(NULL);
 }
 
 static esp_err_t answer(httpd_req_t *req, bool ok, const char *msg)
@@ -445,7 +445,8 @@ static esp_err_t on_save(httpd_req_t *req)
     if (!error && has_ssid) {
         strlcpy(s_join_ssid, ssid, sizeof s_join_ssid);
         strlcpy(s_join_pass, pass, sizeof s_join_pass);
-        if (xTaskCreate(join_task, "boopie_join", 3072, NULL, 4, NULL) == pdPASS) {
+        /* PSRAM stacks: internal RAM is in small pieces by now (this board writes flash with the cache on). */
+        if (xTaskCreateWithCaps(join_task, "boopie_join", 3072, NULL, 4, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS) {
             saved |= BOOPIE_SETUP_SAVED_WIFI;
         } else {
             error = "Wi-Fi 没存上";
@@ -456,7 +457,7 @@ static esp_err_t on_save(httpd_req_t *req)
     if (saved & BOOPIE_SETUP_SAVED_MUSE) {
         /* Pairing reads the developer token once, at start: restart once the
          * answer is out (and the Wi-Fi, if any, saved). */
-        xTaskCreate(restart_task, "boopie_restart", 2048, (void *)(uintptr_t)4000, 3, NULL);
+        xTaskCreateWithCaps(restart_task, "boopie_restart", 2048, (void *)(uintptr_t)4000, 3, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     }
     if (saved) {
         atomic_fetch_or(&s_saved, saved);
@@ -592,7 +593,7 @@ bool boopie_setup_web_stop(void)
      * SPI bus never finishing another transfer on this board, so the board
      * restarts instead, and comes back with Wi-Fi alone. */
     ESP_LOGI(TAG, "hotspot off: restarting");
-    if (xTaskCreate(restart_task, "boopie_restart", 2048, (void *)(uintptr_t)800, 3, NULL) != pdPASS) {
+    if (xTaskCreateWithCaps(restart_task, "boopie_restart", 2048, (void *)(uintptr_t)800, 3, NULL, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
         esp_restart();
     }
     return true;

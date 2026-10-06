@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "app_task.h"   /* Boopie */
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -324,14 +325,14 @@ static void scan_task(void *arg) {
     }
     s_scanning = false;
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static esp_err_t op_wifi_scan(void) {
     if (!(xEventGroupGetBits(s_ready) & BIT_LINK) || s_joining) return ESP_ERR_INVALID_STATE;
     if (s_scanning) return ESP_OK;
     s_scanning = true;
-    if (xTaskCreate(scan_task, "muse_scan", 4096, NULL, 4, NULL) != pdPASS) {
+    if (app_task_spawn(scan_task, "muse_scan", 4096, NULL, 4, NULL) != pdPASS) {
         s_scanning = false;
         return ESP_ERR_NO_MEM;
     }

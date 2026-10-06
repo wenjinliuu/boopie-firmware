@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdatomic.h>
 
+#include "app_task.h"   /* Boopie */
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -670,7 +671,7 @@ static void shutdown_ble_task(void *arg) {
     ble_server_full_shutdown();
 #endif
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static bool complete_setup_and_stop_ble(const char *reason, uint32_t session_generation) {
@@ -686,7 +687,7 @@ static bool complete_setup_and_stop_ble(const char *reason, uint32_t session_gen
     setup_window_lock_give();
     if (!s_ble_started) return true;
     ESP_LOGI(TAG, "setup complete via %s; stopping BLE", reason);
-    if (xTaskCreate(shutdown_ble_task, "ble_stop", 4096, NULL, 4, NULL) != pdPASS) {
+    if (app_task_spawn(shutdown_ble_task, "ble_stop", 4096, NULL, 4, NULL) != pdPASS) {
         ESP_LOGW(TAG, "failed to start BLE stop task");
         vTaskDelay(pdMS_TO_TICKS(1000));
         ui_set_ble("off");
@@ -1075,7 +1076,7 @@ static void vm_auth_refresh_task(void *arg) {
             ESP_LOGI(TAG, "skipping VM credential refresh; another operation is active");
             finish_vm_auth_refresh_task();
             stack_monitor_record(NULL);
-            vTaskDelete(NULL);
+            app_task_exit();
             return;
         }
     }
@@ -1094,7 +1095,7 @@ static void vm_auth_refresh_task(void *arg) {
     }
     finish_vm_auth_refresh_task();
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static void schedule_vm_auth_refresh(void) {
@@ -1114,7 +1115,7 @@ static void schedule_vm_auth_refresh(void) {
     s_last_vm_auth_refresh_attempt_us = now;
     auth_lock_give();
 
-    if (xTaskCreate(vm_auth_refresh_task, "vm_auth_rfsh", 8192, NULL, 4, NULL) != pdPASS) {
+    if (app_task_spawn(vm_auth_refresh_task, "vm_auth_rfsh", 8192, NULL, 4, NULL) != pdPASS) {
         auth_lock_take();
         s_vm_auth_refresh_pending = false;
         auth_lock_give();
@@ -1240,7 +1241,7 @@ static void on_provision(const char *ssid, const char *password,
 #if PAIR_THEN_RESTART
     ESP_LOGI(TAG, "paired; restarting to connect without BLE");
     vTaskDelay(pdMS_TO_TICKS(2000));  // let auth_ok reach the phone
-    if (xTaskCreate(restart_task, "restart", 2048, NULL, 3, NULL) != pdPASS) {
+    if (app_task_spawn(restart_task, "restart", 2048, NULL, 3, NULL) != pdPASS) {
         esp_restart();
     }
 #endif
@@ -1298,7 +1299,7 @@ static void scan_refresh_task(void *arg) {
     }
     heap_snapshot("after wifi_scan");
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static bool schedule_scan_refresh(bool reply_requested, bool *joined) {
@@ -1316,7 +1317,7 @@ static bool schedule_scan_refresh(bool reply_requested, bool *joined) {
         return true;
     }
 
-    if (xTaskCreate(scan_refresh_task, "scan_rfsh", 4096, NULL, 4, NULL)
+    if (app_task_spawn(scan_refresh_task, "scan_rfsh", 4096, NULL, 4, NULL)
         != pdPASS) {
         atomic_store_explicit(&s_scan_refresh_flags, 0, memory_order_release);
         ESP_LOGE(TAG, "failed to start wifi scan task");
@@ -1527,7 +1528,7 @@ static void discover_task(void *arg) {
     if (args->params) cJSON_Delete(args->params);
     free(args);
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 #endif
 
@@ -1653,7 +1654,7 @@ static void finish_precleared_setup_reset_with_gate_held(const char *source) {
 }
 
 static void restart_after_setup_reset(void) {
-    if (xTaskCreate(restart_task, "restart", 2048, NULL, 3, NULL) != pdPASS) {
+    if (app_task_spawn(restart_task, "restart", 2048, NULL, 3, NULL) != pdPASS) {
         stack_monitor_record(NULL);
         esp_restart();
     }
@@ -1719,7 +1720,7 @@ static void ws_control_task(void *arg) {
     if (release_operation_gate) operation_gate_give();
     free_ws_control_args(args);
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static cJSON *queue_ws_control(ws_control_action_t action, char *url) {
@@ -1751,7 +1752,7 @@ static cJSON *queue_ws_control(ws_control_action_t action, char *url) {
         args->setup_credentials_cleared = true;
     }
 
-    if (xTaskCreate(ws_control_task, "ws_control", 8192, args, 4, NULL)
+    if (app_task_spawn(ws_control_task, "ws_control", 8192, args, 4, NULL)
         != pdPASS) {
         if (args->setup_credentials_cleared) {
             // Keep the gate reserved until reboot after verified deletion.
@@ -1930,7 +1931,7 @@ static cJSON *on_ws_command(
         args->session_generation = session_generation;
         strncpy(args->request_id, request_id, sizeof(args->request_id) - 1);
         args->params = params ? cJSON_Duplicate(params, 1) : NULL;
-        if (xTaskCreate(discover_task, "discover", 8192, args, 4, NULL)
+        if (app_task_spawn(discover_task, "discover", 8192, args, 4, NULL)
             != pdPASS) {
             if (args->params) cJSON_Delete(args->params);
             free(args);
@@ -2373,11 +2374,11 @@ static void reset_setup_task(void *arg) {
     (void)arg;
     reset_setup_from_control("Muse menu reset");
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 void app_reset_setup_async(void) {
-    if (xTaskCreate(reset_setup_task, "muse_reset", 4096, NULL, 4, NULL) != pdPASS) {
+    if (app_task_spawn(reset_setup_task, "muse_reset", 4096, NULL, 4, NULL) != pdPASS) {
         atomic_store_explicit(&s_setup_reset_pending, true, memory_order_release);
     }
 }
@@ -2390,7 +2391,7 @@ static void ws_unpaired_task(void *arg) {
     vTaskDelay(pdMS_TO_TICKS(300));
     reset_setup_from_control("server unpair (node.unpaired)");
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 static void on_ws_control_status(const char *status) {
@@ -2421,7 +2422,7 @@ static void on_ws_control_status(const char *status) {
     } else if (strcmp(status, "ws_unpaired") == 0) {
         strcpy(s_ui_ws, "down");
         ESP_LOGW(TAG, "server sent node.unpaired — clearing credentials and restarting");
-        if (xTaskCreate(ws_unpaired_task, "ws_unpair", 4096, NULL, 4, NULL)
+        if (app_task_spawn(ws_unpaired_task, "ws_unpair", 4096, NULL, 4, NULL)
             != pdPASS) {
             // This callback runs on the Noise control task. Resetting inline
             // would make noise_ctrl_disconnect() wait for its own task to exit.
@@ -2458,7 +2459,7 @@ static void ota_verify_task(void *arg) {
                 ESP_LOGE(TAG, "esp_ota_mark_app_valid_cancel_rollback failed");
             }
             stack_monitor_record(NULL);
-            vTaskDelete(NULL);
+            app_task_exit();
             return;
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -2473,7 +2474,7 @@ static void ota_verify_task(void *arg) {
         ESP_LOGW(TAG, "running image not validated (control WS never came up)");
     }
     stack_monitor_record(NULL);
-    vTaskDelete(NULL);
+    app_task_exit();
 }
 
 // ---- Heap snapshot helper ---------------------------------------------------
@@ -2569,7 +2570,7 @@ void app_run(void) {
         s_ota_pending_verify = true;
         ESP_LOGW(TAG, "running a PENDING_VERIFY OTA image; awaiting health check");
     }
-    xTaskCreate(ota_verify_task, "ota_verify", 4096, NULL, 4, NULL);
+    app_task_spawn(ota_verify_task, "ota_verify", 4096, NULL, 4, NULL);
 
     bool setup_complete = config_setup_complete();
     bool provisioned = config_is_provisioned();
@@ -2666,7 +2667,13 @@ void app_run(void) {
     sensecap_sensors_init();
 #endif
 
-    if (!setup_complete) {
+    if (!setup_complete && !muse_vm_wanted()) {
+        // Boopie: 小智 is the brain, and BLE is only for the Muse app's pairing:
+        // its controller's ~40 KB of internal RAM stays free. Choosing Muse
+        // restarts the board, which advertises then.
+        ui_set_ble("off");
+        ESP_LOGI(TAG, "unpaired, but 小智 is the brain: no BLE setup");
+    } else if (!setup_complete) {
         // Unpaired devices advertise automatically — no button press is needed
         // to become discoverable. Pairing enforces the configured confirmation policy.
         open_setup_window("boot: unpaired");
@@ -2682,7 +2689,10 @@ void app_run(void) {
         // Muse may turn on its BLE companion later. The controller needs a
         // 30 KB internal block that TLS and the VM session leave fragmented,
         // so bring the stack up now; it stays silent until advertising is on.
-        start_ble_setup_server_if_needed();
+        // Boopie: not with 小智 as the brain, which has no use for it.
+        if (muse_vm_wanted()) {
+            start_ble_setup_server_if_needed();
+        }
 #endif
     }
 
