@@ -100,7 +100,7 @@ out:
         close(fd);
     }
     s_dns_task = NULL;
-    vTaskDelete(NULL);
+    vTaskDeleteWithCaps(NULL);
 }
 
 /* ---- small helpers ---- */
@@ -526,7 +526,12 @@ bool boopie_setup_web_start(boopie_setup_ap_t *ap)
     cfg.max_open_sockets = 4;
     cfg.lru_purge_enable = true;
     cfg.max_uri_handlers = 6;
-    if (httpd_start(&s_http, &cfg) != ESP_OK) {
+    esp_err_t err = httpd_start(&s_http, &cfg);
+    if (err != ESP_OK) {
+        /* After a failed start the server's port can stay taken until a restart. */
+        ESP_LOGE(TAG, "web server not started: %s (internal free %u, largest %u)", esp_err_to_name(err),
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
         esp_wifi_set_mode(WIFI_MODE_STA);
         return false;
     }
@@ -545,7 +550,8 @@ bool boopie_setup_web_start(boopie_setup_ap_t *ap)
     atomic_store(&s_saves, 0);
     atomic_store(&s_saved, 0);
     touch();
-    if (xTaskCreate(dns_task, "boopie_dns", 3072, NULL, 4, &s_dns_task) != pdPASS) {
+    /* Its stack in PSRAM: it only answers on a UDP socket. */
+    if (xTaskCreateWithCaps(dns_task, "boopie_dns", 3072, NULL, 4, &s_dns_task, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
         ESP_LOGW(TAG, "no DNS: phones won't pop the page up by themselves");
     }
     muse_wifi_scan();   /* fresh networks for the page */
