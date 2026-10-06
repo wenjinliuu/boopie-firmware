@@ -123,9 +123,7 @@ static const char *TAG = "muse_chat_session";
  * goes to the chat as a voice note, the way the phone app sends them, and the
  * server transcribes it. Set to 0 to stream to /api/voice/dictation instead.
  */
-/* Boopie: the agent fails every voice note ("static_response", task errored)
- * while typed messages work, so try the SDK's other path: dictation first. */
-#define VOICE_NOTE 0
+#define VOICE_NOTE 1
 #define NOTE_MAX_BYTES (MIC_RATE * 2 * 15) /* Boopie: 15 s of 16 kHz PCM, where Muse stops anyway */
 /*
  * Boopie: the server answered every note whose WAV header said "unknown
@@ -1293,11 +1291,6 @@ static void text_begin(const char *text)
 
 static void on_dictation_line(cJSON *line)
 {
-    {   /* Boopie: what dictation says, while finding out whether it works. */
-        char *s = cJSON_PrintUnformatted(line);
-        ESP_LOGI(TAG, "dictation: %.300s", s ? s : "-");
-        cJSON_free(s);
-    }
     const char *type = cJSON_GetStringValue(cJSON_GetObjectItem(line, "type"));
     const char *text = cJSON_GetStringValue(cJSON_GetObjectItem(line, "text"));
     if (!type) {
@@ -1487,7 +1480,7 @@ static void on_event(cJSON *line)
     if (strcmp(event, "delta.text_append") != 0) {
         /* Boopie: what the server says during a turn, to see why a reply fails. */
         char *s = cJSON_PrintUnformatted(payload);
-        ESP_LOGI(TAG, "event %s: %.*s", event, strcmp(event, "delta.message_done") ? 400 : 1500, s ? s : "-");
+        ESP_LOGI(TAG, "event %s: %.400s", event, s ? s : "-");
         cJSON_free(s);
     }
 
