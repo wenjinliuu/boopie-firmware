@@ -1477,6 +1477,12 @@ static void on_event(cJSON *line)
     }
     const char *event = cJSON_GetStringValue(cJSON_GetObjectItem(line, "event")) ?: "";
     cJSON *payload = cJSON_GetObjectItem(line, "payload");
+    if (strcmp(event, "delta.text_append") != 0) {
+        /* Boopie: what the server says during a turn, to see why a reply fails. */
+        char *s = cJSON_PrintUnformatted(payload);
+        ESP_LOGI(TAG, "event %s: %.400s", event, s ? s : "-");
+        cJSON_free(s);
+    }
 
     if (!strcmp(event, "agent.status") || !strcmp(event, "task.status")) {
         const char *code = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "activity_code"));
@@ -1523,6 +1529,9 @@ static void on_event(cJSON *line)
         if (!text) {
             text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "content"));
         }
+        if (!text) {
+            text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "text"));   /* Boopie */
+        }
         cJSON *ready = cJSON_GetObjectItem(payload, "display_text_ready");
         if (done || !cJSON_IsFalse(ready)) {
             message_done(i, text);
@@ -1533,6 +1542,7 @@ static void on_event(cJSON *line)
 static void on_chat_ack(stream_t *s)
 {
     s->line[s->len] = '\0';
+    ESP_LOGI(TAG, "chat/stream answered: %.300s", s->line);   /* Boopie */
     cJSON *root = cJSON_Parse(s->line);
     cJSON *result = cJSON_GetObjectItem(root, "result");
     cJSON *obj = cJSON_IsObject(result) ? result : root;
@@ -1739,6 +1749,15 @@ static void check_turn(void)
         }
     }
     if (t - s_turn.last_event_us < SETTLE_US) {
+        return;
+    }
+    /* Boopie: every message ended empty (the agent failed): say so, don't sit on "sending". */
+    bool said = false;
+    for (int i = 0; i < s_turn.nmsgs; i++) {
+        said |= s_turn.msgs[i].len > 0;
+    }
+    if (!text && !said) {
+        turn_fail("Muse 出错了，没有回答");
         return;
     }
     if (s_turn.agent_busy && t - s_turn.last_content_us < (text ? TEXT_BUSY_HOLD_US : BUSY_HOLD_US)) {
