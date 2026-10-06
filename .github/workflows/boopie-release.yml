@@ -161,7 +161,7 @@ jobs:
           out="$GITHUB_WORKSPACE/out"
           git -C "$GITHUB_WORKSPACE" config --global --add safe.directory "$GITHUB_WORKSPACE"
           git -C "$GITHUB_WORKSPACE" fetch --depth=1 origin "+refs/tags/$TAG:refs/tags/$TAG" || true
-          notes=$(git -C "$GITHUB_WORKSPACE" tag -l --format='%(contents:subject)%0a%(contents:body)' "$TAG" | sed '/^-----BEGIN PGP/,$d')
+          notes=$(git -C "$GITHUB_WORKSPACE" tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP/,$d')
           [ -n "${notes//[$'\n ']/}" ] || notes=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%B)
           printf '%s\n' "$notes" > notes.txt
           python3 ../tools/boopie/ota_release.py --version "$VERSION" --app "$BUILD_DIR/muse-gadget.bin" \
