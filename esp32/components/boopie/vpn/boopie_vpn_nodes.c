@@ -128,6 +128,23 @@ static bool set_hostport(boopie_vpn_node_t *node, const char *s, size_t n)
     return true;
 }
 
+bool boopie_vpn_is_info(const boopie_vpn_node_t *node)
+{
+    /* Subscriptions often lead with entries that only carry a line of text
+     * for the client to show (traffic left, expiry, the site), pointed at
+     * nowhere real: by their names, or a host that can't be one. */
+    static const char *const WORDS[] = { "剩余", "流量", "到期", "过期", "重置", "官网", "网址", "套餐", "公告",
+                                         "客服", "群组", "频道", "订阅", "更新", "续费", "Expire", "expire",
+                                         "Traffic", "traffic", "Remaining", "remaining", "官方", "TG", "Telegram" };
+    for (size_t i = 0; i < sizeof WORDS / sizeof WORDS[0]; i++) {
+        if (strstr(node->name, WORDS[i])) {
+            return true;
+        }
+    }
+    return !node->host[0] || !strncmp(node->host, "127.", 4) || !strcmp(node->host, "0.0.0.0")
+           || !strcmp(node->host, "localhost") || node->port <= 1;
+}
+
 static void finish(boopie_vpn_node_t *node)
 {
     boopie_ss_cipher_t c = boopie_ss_cipher(node->cipher);
@@ -142,6 +159,9 @@ static void finish(boopie_vpn_node_t *node)
     }
     if (!node->name[0]) {
         snprintf(node->name, sizeof node->name, "%.40s:%u", node->host, node->port);
+    }
+    if (boopie_vpn_is_info(node)) {
+        node->supported = false;   /* never picked, by itself or by hand */
     }
 }
 

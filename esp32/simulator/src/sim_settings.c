@@ -174,13 +174,14 @@ bool boopie_sdk_token_valid(const char *t) { return t && strlen(t) == BOOPIE_SDK
 bool boopie_sdk_token_set(const char *t) { (void)t; return true; }
 
 static const boopie_vpn_node_t SIM_NODES[] = {
+    { .name = "剩余流量：120 GB", .host = "127.0.0.1", .cipher = "aes-256-gcm", .port = 1, .supported = false },
     { .name = "节点一", .host = "hk.example", .cipher = "aes-256-gcm", .port = 443, .supported = true },
     { .name = "节点二", .host = "jp.example", .cipher = "chacha20-ietf-poly1305", .port = 443, .supported = true },
     { .name = "节点三", .host = "us.example", .cipher = "aes-128-gcm", .port = 8388, .supported = true },
     { .name = "节点四", .host = "sg.example", .cipher = "2022-blake3-aes-128-gcm", .port = 443, .supported = false },
 };
-static const int SIM_LATENCY[] = { 86, 142, -2, -1 };
-static int s_sim_node;
+static const int SIM_LATENCY[] = { -1, 86, 142, -2, -1 };
+static int s_sim_node = 1;   /* not the info line at the top */
 
 void boopie_vpn_init(const char *extra_host) { (void)extra_host; }
 bool boopie_vpn_on(void) { return getenv("BOOPIE_VPN") != NULL; }
@@ -211,6 +212,8 @@ boopie_xz_state_t boopie_xiaozhi_status(char *code, size_t code_cap, char *note,
     return st;
 }
 void boopie_vpn_set_on(bool on) { (void)on; }
+const char *boopie_vpn_trouble(void) { return getenv("BOOPIE_VPN_TROUBLE"); }
+bool boopie_vpn_is_info(const boopie_vpn_node_t *node) { return strstr(node->name, "剩余") || strstr(node->name, "到期"); }
 int boopie_vpn_count(void) { return getenv("BOOPIE_VPN") ? (int)(sizeof SIM_NODES / sizeof SIM_NODES[0]) : 0; }
 bool boopie_vpn_node(int i, boopie_vpn_node_t *out)
 {

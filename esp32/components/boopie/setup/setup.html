@@ -99,9 +99,9 @@ code{background:#120f24;padding:1px 5px;border-radius:5px}
 
 <section>
 <h2>VPN</h2>
-<label for="sub">订阅链接（Shadowsocks）；打不开时粘贴订阅内容或 ss:// 链接</label>
+<label for="sub">订阅链接，或订阅内容、ss:// 链接</label>
 <textarea id="sub" maxlength="16000" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
-<p class="note">订阅网站在国内常被拦，板子下载不了。那就：手机开着 VPN，用浏览器打开订阅链接，全选复制页面里的内容，粘贴到上面。</p>
+<p class="note">支持 Shadowsocks（ss）节点：在机场后台复制订阅时，选「通用 / V2rayN」或「Clash」格式都可以；vmess、vless、trojan 节点用不了。保存后板子自动更新、测速，并选一个能连上的节点。如果板子下载订阅失败，可以用手机浏览器打开订阅链接，全选复制页面内容，粘贴到上面。</p>
 <div class="row" id="subclear" hidden><label style="margin:6px 0 0"><input type="checkbox" id="subdel" style="width:auto"> 删除已保存的订阅</label></div>
 <p class="note">存好会自动打开 VPN；在板子 设置 › VPN 里可以换节点。只有 Muse 走 VPN，小智直连。</p>
 </section>

@@ -34,6 +34,10 @@ typedef struct {
     bool supported;                       /* a cipher Boopie has */
 } boopie_vpn_node_t;
 
+/* An entry that only carries a line of text (traffic left, expiry), not a
+ * server: never usable. */
+bool boopie_vpn_is_info(const boopie_vpn_node_t *node);
+
 /* Parses one ss:// link into *node; false if it isn't one Boopie can use
  * (not ss://, broken, or with a plugin). */
 bool boopie_vpn_parse_link(const char *link, size_t n, boopie_vpn_node_t *node);

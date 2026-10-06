@@ -1497,9 +1497,22 @@ static void update_power(float now)
                                     lv_color_hex(p.battery_pct >= 0 && p.battery_pct <= 20 && !p.charging ? 0xff6b6b
                                                  : COLOR_DIM), 0);
     }
-    const char *vpn = boopie_vpn_on() ? "VPN" : "";
+    /* Boopie: the VPN mark; red with a "!" while the tunnel keeps failing, and
+     * the pet says so now and then (every ten minutes at most). */
+    const char *trouble = boopie_vpn_trouble();
+    const char *vpn = boopie_vpn_on() ? (trouble ? "VPN!" : "VPN") : "";
     if (strcmp(vpn, lv_label_get_text(s_vpn_lbl)) != 0) {
         lv_label_set_text(s_vpn_lbl, vpn);
+        lv_obj_set_style_text_color(s_vpn_lbl, lv_color_hex(trouble ? 0xff6b6b : COLOR_ACCENT), 0);
+    }
+    {
+        static int64_t s_said_us;
+        int64_t now_us = esp_timer_get_time();
+        if (trouble && (!s_said_us || now_us - s_said_us > 10LL * 60 * 1000000)) {
+            s_said_us = now_us;
+            muse_state_set_caption("VPN 连不上了，去设置换个节点吧");
+            boopie_avatar_react(BOOPIE_EXPR_SAD, 3.0f);
+        }
     }
     const char *clock = boopie_pages_clock();
     if (strcmp(clock ? clock : "", lv_label_get_text(s_time_lbl)) != 0) {

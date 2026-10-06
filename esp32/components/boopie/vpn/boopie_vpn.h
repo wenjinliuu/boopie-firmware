@@ -67,3 +67,6 @@ void boopie_vpn_test(void);
 
 /* Whether the relay carried Muse lately, for the status line. */
 bool boopie_vpn_active(void);
+/* Boopie: a line saying why the tunnel keeps failing (three in a row, the last
+ * few minutes), for the pet to pass on; NULL while it works or is off. */
+const char *boopie_vpn_trouble(void);

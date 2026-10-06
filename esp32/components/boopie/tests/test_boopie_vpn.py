@@ -364,6 +364,13 @@ class BoopieVpnTest(unittest.TestCase):
         self.assertEqual([n["name"] for n in nodes], [f"Node{i}" for i in range(5)])
         self.assertEqual(nodes[3]["port"], 803)
 
+    def test_info_lines_are_never_usable(self) -> None:
+        user = base64.urlsafe_b64encode(b"aes-256-gcm:pw").decode().rstrip("=")
+        nodes = self.parse(f"ss://{user}@127.0.0.1:1#%E5%89%A9%E4%BD%99%E6%B5%81%E9%87%8F%EF%BC%9A120GB\n"   # 剩余流量：120GB
+                           f"ss://{user}@a.example:443#%E5%A5%97%E9%A4%90%E5%88%B0%E6%9C%9F%EF%BC%9A2026-12-01\n"   # 套餐到期
+                           f"ss://{user}@b.example:443#Hong%20Kong%2001\n")
+        self.assertEqual([n["supported"] for n in nodes], [False, False, True])
+
     def test_clash_yaml(self) -> None:
         yaml = """port: 7890
 proxies:

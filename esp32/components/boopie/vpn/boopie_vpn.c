@@ -280,6 +280,31 @@ static int dial(const char *host, uint16_t port, int timeout_ms)
 }
 
 /* The hello is in: open the tunnel and send it the address and the hello. */
+/*
+ * Boopie: when the tunnel keeps failing, a line the pet can pass on (the
+ * VPN page has the details). Three failures in a row count; one that gets
+ * through clears it.
+ */
+static atomic_int s_fails;
+static const char *volatile s_trouble;
+static int64_t s_trouble_us;
+
+static void trouble(const char *why)
+{
+    if (atomic_fetch_add(&s_fails, 1) + 1 >= 3) {
+        s_trouble = why;
+        s_trouble_us = esp_timer_get_time();
+    }
+}
+
+const char *boopie_vpn_trouble(void)
+{
+    if (!atomic_load(&s_on) || atomic_load(&s_fails) < 3) {
+        return NULL;
+    }
+    return esp_timer_get_time() - s_trouble_us < 5LL * 60 * 1000000 ? s_trouble : NULL;
+}
+
 static bool open_tunnel(conn_t *c, const char *host)
 {
     boopie_vpn_node_t node;
@@ -291,6 +316,7 @@ static bool open_tunnel(conn_t *c, const char *host)
     xSemaphoreGive(s_lock);
     if (!have || !node.supported) {
         ESP_LOGW(TAG, "%s: no usable node chosen; import a subscription", host);
+        trouble(have ? "选中的节点用不了" : "还没有能用的节点");
         return false;
     }
     c->cipher = boopie_ss_cipher(node.cipher);
@@ -314,8 +340,10 @@ static bool open_tunnel(conn_t *c, const char *host)
     c->sfd = dial(node.host, node.port, CONNECT_TIMEOUT_MS);
     if (c->sfd < 0) {
         ESP_LOGW(TAG, "can't reach the node %s", node.name);
+        trouble("节点连不上（超时）");
         return false;
     }
+    atomic_store(&s_fails, 0);
     /* The address and the hello together: what the node sees first. */
     uint8_t *first = c->buf;   /* plaintext here, sealed after it */
     size_t an = boopie_ss_address(host, RELAY_PORT, first);
@@ -628,7 +656,7 @@ static char *fetch(const char *url, size_t *len, const char **why)
 /* New nodes in: the current one kept if it's still there, else the first usable. */
 static void apply_nodes(const boopie_vpn_node_t *got, int n)
 {
-    int usable = 0;
+    int usable = 0, info = 0;
     xSemaphoreTake(s_lock, portMAX_DELAY);
     char current[BOOPIE_VPN_NAME_MAX] = "";
     if (s_current >= 0 && s_current < s_count) {
@@ -640,6 +668,7 @@ static void apply_nodes(const boopie_vpn_node_t *got, int n)
     for (int i = 0; i < n; i++) {
         s_latency[i] = -1;
         usable += s_nodes[i].supported;
+        info += boopie_vpn_is_info(&s_nodes[i]);
         if (s_current < 0 && current[0] && strcmp(s_nodes[i].name, current) == 0) {
             s_current = i;   /* the same node as before, if it's still there */
         }
@@ -650,7 +679,10 @@ static void apply_nodes(const boopie_vpn_node_t *got, int n)
     save_nodes();
     xSemaphoreGive(s_lock);
     save_settings();
-    if (usable < n) {
+    atomic_store(&s_fails, 0);
+    if (info) {
+        set_msg("已更新：%d 个节点能用（另有 %d 条是订阅信息）", usable, info);
+    } else if (usable < n) {
         set_msg("已更新：%d 个节点，%d 个能用", n, usable);
     } else {
         set_msg("已更新：%d 个节点", n);
@@ -707,6 +739,9 @@ static void update_task(void *arg)
     }
     free(sub);
     atomic_store(&s_busy, BOOPIE_VPN_IDLE);
+    if (n > 0) {
+        boopie_vpn_test();   /* new nodes: test them, and move off the chosen one if it's dead */
+    }
     vTaskDeleteWithCaps(NULL);
 }
 
@@ -735,7 +770,14 @@ static void test_task(void *arg)
         }
         xSemaphoreGive(s_lock);
     }
-    if (fastest >= 0) {
+    int cur = boopie_vpn_current();
+    if (fastest >= 0 && (cur < 0 || boopie_vpn_latency(cur) == -2)) {
+        /* The chosen one didn't answer (or none was): the fastest that did. */
+        boopie_vpn_node_t node;
+        boopie_vpn_select(fastest);
+        atomic_store(&s_fails, 0);
+        set_msg("已换到能连上的节点：%s（%d ms）", boopie_vpn_node(fastest, &node) ? node.name : "", best);
+    } else if (fastest >= 0) {
         set_msg("测速完成：最快 %d ms", best);
     } else {
         set_msg("所有节点都连不上");

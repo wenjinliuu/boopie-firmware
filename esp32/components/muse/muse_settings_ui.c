@@ -1889,8 +1889,9 @@ static void build_vpn_page(lv_obj_t *tile)
     s_vpn_msg = note(list, "");
     note(list, "节点");
     s_vpn_list = column(list);
-    note(list, "订阅用上面的 手机扫码导入，存好就自动开 VPN 并更新节点。只有 Muse 走 VPN，小智、校时直连。支持 Shadowsocks"
-               "（aes-gcm、chacha20）和 SS2022，不支持插件。");
+    note(list, "支持 Shadowsocks（ss）节点：在机场后台复制订阅时，选「通用 / V2rayN」或「Clash」都可以；"
+               "vmess、vless、trojan 节点用不了。存好就自动开 VPN、更新并测速，选一个能连上的节点。"
+               "订阅开头那几条「剩余流量」「到期时间」只是信息，不是节点。只有 Muse 走 VPN，小智、校时直连。");
     s_vpn_shown = 0;
 }
 
@@ -1905,13 +1906,16 @@ static void tick_vpn(void)
     char buf[96];
     if (!on) {
         strlcpy(buf, "已关", sizeof buf);
+    } else if (cur >= 0 && boopie_vpn_node(cur, &node) && boopie_vpn_trouble()) {
+        snprintf(buf, sizeof buf, "已开：%s\n%s，点「测速」换个能连上的", node.name, boopie_vpn_trouble());
     } else if (cur >= 0 && boopie_vpn_node(cur, &node)) {
         snprintf(buf, sizeof buf, "已开：%s%s", node.name, boopie_vpn_active() ? "\nMuse 正在走 VPN" : "");
     } else {
         strlcpy(buf, n ? "已开：先选一个节点" : "已开：还没有节点，先导入订阅", sizeof buf);
     }
     set_text(s_vpn_status, buf);
-    lv_obj_set_style_text_color(s_vpn_status, lv_color_hex(on && cur >= 0 ? COLOR_OK : COLOR_DIM), 0);
+    lv_obj_set_style_text_color(s_vpn_status, lv_color_hex(on && boopie_vpn_trouble() ? COLOR_WARN
+                                                           : on && cur >= 0 ? COLOR_OK : COLOR_DIM), 0);
     boopie_vpn_busy(buf, sizeof buf);
     set_text(s_vpn_msg, buf);
 
@@ -1939,7 +1943,9 @@ static void tick_vpn(void)
         lv_obj_t *r = row(s_vpn_list, i == cur ? LV_SYMBOL_OK : NULL, node.name, &value, on_vpn_node, (void *)(intptr_t)i);
         (void)r;
         int ms = boopie_vpn_latency(i);
-        if (!node.supported) {
+        if (boopie_vpn_is_info(&node)) {
+            strlcpy(buf, "信息", sizeof buf);   /* a line of the subscription's, not a server */
+        } else if (!node.supported) {
             strlcpy(buf, "不支持", sizeof buf);
         } else if (ms == -2) {
             strlcpy(buf, "连不上", sizeof buf);
@@ -1949,7 +1955,8 @@ static void tick_vpn(void)
             buf[0] = '\0';
         }
         set_text(value, buf);
-        lv_obj_set_style_text_color(value, lv_color_hex(!node.supported || ms == -2 ? COLOR_WARN
+        lv_obj_set_style_text_color(value, lv_color_hex(boopie_vpn_is_info(&node) ? COLOR_DIM
+                                                        : !node.supported || ms == -2 ? COLOR_WARN
                                                         : ms >= 0 && ms < 300 ? COLOR_OK : COLOR_DIM), 0);
     }
 }

@@ -21,6 +21,7 @@
 #include "muse_wifi.h"
 #include "muse_state.h"
 #include "boopie_xiaozhi.h"
+#include "boopie_vpn.h"
 
 #define COLOR_TEXT 0xf2efff
 #define COLOR_DIM 0x8b84a8
@@ -362,7 +363,7 @@ static void show_step(step_t step)
     boopie_avatar_set_guide_at(step);
     lv_obj_remove_flag(s_root, LV_OBJ_FLAG_HIDDEN);
     lv_obj_t *col;
-    char line[160];
+    char line[400];
     switch (step) {
     case S_HELLO:
         col = page("你好呀！", "我是你的新伙伴。\n花一分钟，把我设置好吧。");
@@ -370,7 +371,7 @@ static void show_step(step_t step)
         break;
     case S_BRAIN:
         col = page("选 AI 助手", "说话时用哪个 AI 回答？\n以后在设置里也能换。");
-        button(col, 300, "Muse（推荐，需海外网络）", true, on_brain, BOOPIE_BRAIN_MUSE);
+        button(col, 300, "Muse（推荐，需海外网络或 VPN）", true, on_brain, BOOPIE_BRAIN_MUSE);
         button(col, 300, "小智（备用，国内网络）", false, on_brain, BOOPIE_BRAIN_XIAOZHI);
         break;
     case S_MUSE_PAIR: {
@@ -397,7 +398,23 @@ static void show_step(step_t step)
         break;
     }
     case S_MUSE_KEY:
-        col = page("填开发者 token", "用手机扫码打开设置网页，\n粘贴开发者 token（在 gadgets.muse.ai 生成）；\n国内网络再填 VPN 订阅。\n保存后我会重启一下。");
+    {
+        /* Muse is abroad: in China it needs the VPN, which this page sets up too. */
+        const char *vpn;
+        char vline[96];
+        boopie_vpn_node_t vn;
+        int cur = boopie_vpn_current();
+        if (!boopie_vpn_count()) {
+            vpn = "VPN：还没导入订阅";
+        } else if (cur >= 0 && boopie_vpn_node(cur, &vn)) {
+            snprintf(vline, sizeof vline, "VPN：%s %s", boopie_vpn_on() ? "已开" : "已关", vn.name);
+            vpn = vline;
+        } else {
+            vpn = "VPN：还没选节点";
+        }
+        snprintf(line, sizeof line, "手机扫码打开设置网页：\n粘贴开发者 token（gadgets.muse.ai 生成）；\n在国内再填 VPN 订阅（ss 节点，通用或 Clash 格式）。\n%s", vpn);
+        col = page("填 token 和 VPN", line);
+    }
         button(col, 240, "手机扫码填写", true, on_phone, 0);
         button(col, 240, "稍后再说", false, on_next, 0);
         break;
