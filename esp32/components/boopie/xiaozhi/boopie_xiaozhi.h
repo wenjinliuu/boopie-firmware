@@ -33,6 +33,9 @@ boopie_xz_state_t boopie_xiaozhi_status(char *code, size_t code_cap, char *note,
 
 /* Check in again now (the settings page's button). */
 void boopie_xiaozhi_recheck(void);
+/* Forgets the binding (where to talk, its token, this client's UUID) and
+ * checks in afresh, for a new activation code. */
+void boopie_xiaozhi_rebind(void);
 
 /* Where to talk once bound: false before. */
 bool boopie_xiaozhi_endpoint(char *url, size_t url_cap, char *token, size_t token_cap);

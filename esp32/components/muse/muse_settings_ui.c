@@ -1683,6 +1683,24 @@ static void on_xz_recheck(lv_event_t *e)
     boopie_xiaozhi_recheck();
 }
 
+/* Two taps within a few seconds: a fresh activation code, the old binding forgotten. */
+static lv_obj_t *s_xz_rebind_lbl;
+static int64_t s_xz_rebind_armed_us;
+
+static void on_xz_rebind(lv_event_t *e)
+{
+    (void)e;
+    int64_t now = esp_timer_get_time();
+    if (s_xz_rebind_armed_us && now - s_xz_rebind_armed_us < 5000000) {
+        s_xz_rebind_armed_us = 0;
+        set_text(s_xz_rebind_lbl, "重新绑定（换新激活码）");
+        boopie_xiaozhi_rebind();
+        return;
+    }
+    s_xz_rebind_armed_us = now;
+    set_text(s_xz_rebind_lbl, "再点一下确认");
+}
+
 static void build_xiaozhi_page(lv_obj_t *tile)
 {
     lv_obj_t *list;
@@ -1693,6 +1711,9 @@ static void build_xiaozhi_page(lv_obj_t *tile)
     lv_obj_set_style_text_letter_space(s_xz_code, 6, 0);
     s_xz_note = note(list, "");
     button(list, LV_SYMBOL_REFRESH "  重新连接", COLOR_ACCENT, on_xz_recheck, NULL);
+    button(list, "重新绑定（换新激活码）", COLOR_DANGER, on_xz_rebind, &s_xz_rebind_lbl);
+    note(list, "还是没出激活码：先在 xiaozhi.me 控制台\n删掉这台设备，再点重新绑定。");
+    s_xz_rebind_armed_us = 0;
     static const char *const HOWTO[] = {
         "在 AI 助手 里选\"小智\"，连上网",
         "这里会显示 6 位激活码",
@@ -1709,6 +1730,10 @@ static void tick_xiaozhi(void)
     boopie_xz_state_t st = boopie_xiaozhi_status(code, sizeof code, said, sizeof said);
     set_text(s_xz_code, st == BOOPIE_XZ_CODE ? code : st == BOOPIE_XZ_READY ? LV_SYMBOL_OK : "");
     set_text(s_xz_note, st == BOOPIE_XZ_OFF ? "现在用的是 Muse。\n在 AI 助手 里选小智\n就开始连接。" : said);
+    if (s_xz_rebind_armed_us && esp_timer_get_time() - s_xz_rebind_armed_us >= 5000000) {
+        s_xz_rebind_armed_us = 0;
+        set_text(s_xz_rebind_lbl, "重新绑定（换新激活码）");
+    }
 }
 
 static const page_t XIAOZHI = { &s_xiaozhi, build_xiaozhi_page };

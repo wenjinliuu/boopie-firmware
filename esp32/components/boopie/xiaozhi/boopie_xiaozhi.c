@@ -227,7 +227,12 @@ static void xz_task(void *arg)
     boopie_xz_ota_t *ota = heap_caps_malloc(sizeof *ota, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!buf || !ota) {
         ESP_LOGE(TAG, "no memory");
+        s_task = NULL;
+#if CONFIG_SPIRAM_FETCH_INSTRUCTIONS && CONFIG_SPIRAM_RODATA
+        vTaskDeleteWithCaps(NULL);
+#else
         vTaskDelete(NULL);
+#endif
         return;
     }
     reply_t r = { buf, 0 };
@@ -295,8 +300,16 @@ void boopie_xiaozhi_start(void)
     if (!wanted()) {
         return;
     }
+#if CONFIG_SPIRAM_FETCH_INSTRUCTIONS && CONFIG_SPIRAM_RODATA
+    /* Code and rodata in PSRAM: flash writes (NVS) leave the cache on, so a
+     * PSRAM stack will do, and internal RAM is often short of 7 KB here. */
+    BaseType_t ok = xTaskCreateWithCaps(xz_task, "boopie_xz", 7168, NULL, 3, &s_task, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#else
     /* Its stack in internal RAM: it writes to NVS, which a PSRAM stack can't. */
-    if (xTaskCreate(xz_task, "boopie_xz", 7168, NULL, 3, &s_task) != pdPASS) {
+    BaseType_t ok = xTaskCreate(xz_task, "boopie_xz", 7168, NULL, 3, &s_task);
+#endif
+    if (ok != pdPASS) {
+        s_task = NULL;
         ESP_LOGE(TAG, "task not started");
     }
 }
@@ -327,6 +340,34 @@ boopie_xz_state_t boopie_xiaozhi_status(char *code, size_t code_cap, char *note,
 void boopie_xiaozhi_recheck(void)
 {
     s_recheck = true;
+}
+
+void boopie_xiaozhi_rebind(void)
+{
+    if (!s_lock) {
+        return;
+    }
+    /* Forget where to talk and who this device said it was: the next check-in
+     * is a new client's, which gets a code unless the server still holds the
+     * board (by its MAC) as bound; deleting it at xiaozhi.me ends that. */
+    uint8_t rnd[16];
+    esp_fill_random(rnd, sizeof rnd);
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_url[0] = s_token[0] = '\0';
+    boopie_xz_uuid(rnd, s_uuid);
+    xSemaphoreGive(s_lock);
+    nvs_handle_t h;
+    if (nvs_open(NS, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_erase_key(h, "ws_url");
+        nvs_erase_key(h, "ws_token");
+        nvs_set_str(h, "uuid", s_uuid);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    ESP_LOGI(TAG, "binding forgotten; checking in as a new client");
+    set_state(BOOPIE_XZ_CHECKING, NULL, "正在重新绑定……");
+    s_recheck = true;
+    boopie_xiaozhi_start();   /* in case it never got going */
 }
 
 bool boopie_xiaozhi_endpoint(char *url, size_t url_cap, char *token, size_t token_cap)
