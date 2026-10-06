@@ -2459,7 +2459,7 @@ static void ota_verify_task(void *arg) {
                 ESP_LOGE(TAG, "esp_ota_mark_app_valid_cancel_rollback failed");
             }
             stack_monitor_record(NULL);
-            app_task_exit();
+            vTaskDelete(NULL);
             return;
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -2474,7 +2474,7 @@ static void ota_verify_task(void *arg) {
         ESP_LOGW(TAG, "running image not validated (control WS never came up)");
     }
     stack_monitor_record(NULL);
-    app_task_exit();
+    vTaskDelete(NULL);
 }
 
 // ---- Heap snapshot helper ---------------------------------------------------
@@ -2570,7 +2570,7 @@ void app_run(void) {
         s_ota_pending_verify = true;
         ESP_LOGW(TAG, "running a PENDING_VERIFY OTA image; awaiting health check");
     }
-    app_task_spawn(ota_verify_task, "ota_verify", 4096, NULL, 4, NULL);
+    xTaskCreate(ota_verify_task, "ota_verify", 4096, NULL, 4, NULL);
 
     bool setup_complete = config_setup_complete();
     bool provisioned = config_is_provisioned();

@@ -11,8 +11,10 @@
  * internal stack for, say, provisioning failed: the Muse app's Wi-Fi was
  * answered "error_operation_in_progress". On boards whose code and rodata run
  * from PSRAM, flash writes leave the cache on, so a PSRAM stack can do all
- * these tasks do (NVS, TLS, BLE). A task made with app_task_spawn() must end
- * with app_task_exit(), and only that.
+ * these tasks do (NVS, TLS, BLE). Not one that maps flash (esp_partition_mmap,
+ * and so esp_ota_* on the running image): mapping freezes the cache, which
+ * asserts on a PSRAM stack whatever the board. A task made with
+ * app_task_spawn() must end with app_task_exit(), and only that.
  */
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"

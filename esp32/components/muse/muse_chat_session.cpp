@@ -94,10 +94,10 @@ static const char *TAG = "muse_chat_session";
 #define NDJSON_LINE_MAX (16 * 1024)               /* one NDJSON line / the chat ack */
 #define SUB_LINE_MAX (256 * 1024)          /* an event line grows its buffer up to this */
 #define CHAT_PART (16 * 1024)              /* one body chunk of a long typed message */
-#define MP3_BUF (512 * 1024)
+#define MP3_BUF (256 * 1024)   /* Boopie: was 512 KB; ~1 min of speech at Muse's rate, PSRAM is short here */
 #define MP3_HOLD (1441 + 4)               /* the largest MP3 frame and the next header */
 #define MP3_POLL_ROOM (SCRATCH + 8192)     /* stop reading the socket below this much MP3 room */
-#define IN_BYTES (MIC_RATE * 2 * 8)        /* 8 s of mic backlog while connecting */
+#define IN_BYTES (MIC_RATE * 2 * 4)        /* Boopie: 4 s (was 8) of mic backlog while connecting */
 #define OUT_BYTES (MIC_RATE * 2 * 2)       /* 2 s of decoded reply */
 #define EV_TEXT 72
 #define TEXT_MAX 1024                      /* a message's text, for captions timed to its speech */
