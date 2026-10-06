@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Boopie's over-the-air releases. Pushing a tag vX.Y.Z builds that version,
-# signs its manifest with the release key, puts it in R2 behind the OTA worker
+# in two builds, 正常版 and 解锁版 (everything open; boards can switch between
+# them on the 系统更新 page), signs its manifest with the release key, puts it in R2 behind the OTA worker
 # (cloud/ota-worker), and makes a GitHub release with the full flash image.
 # Boards check once a day (or from Settings > 系统更新) and install on a tap.
 #
@@ -105,6 +106,11 @@ jobs:
           idf.py "${args[@]}" build
           idf.py "${args[@]}" merge-bin -o "boopie-$VERSION-merged.bin"
           grep -q "CONFIG_BOOPIE_OTA_PUBKEY=\"$OTA_PUBKEY\"" "$BUILD_DIR/sdkconfig"
+          # The 解锁版: everything open, the same version; boards can switch between the two.
+          uargs=(-B "$BUILD_DIR-unlocked" -DIDF_TARGET=esp32s3 -DSDKCONFIG="$BUILD_DIR-unlocked/sdkconfig" -DSDKCONFIG_DEFAULTS="$DEFAULTS")
+          BOOPIE_UNLOCK_ALL=1 idf.py "${uargs[@]}" build
+          BOOPIE_UNLOCK_ALL=1 idf.py "${uargs[@]}" merge-bin -o "boopie-$VERSION-unlocked-merged.bin"
+          grep -q BOOPIE_UNLOCK_ALL=1 "$BUILD_DIR-unlocked/compile_commands.json"
 
       - name: Release files
         run: |
@@ -115,10 +121,11 @@ jobs:
           [ -n "${notes//[$'\n ']/}" ] || notes=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%B)
           printf '%s\n' "$notes" > notes.txt
           python3 ../tools/boopie/ota_release.py --version "$VERSION" --app "$BUILD_DIR/muse-gadget.bin" \
+            --app-unlocked "$BUILD_DIR-unlocked/muse-gadget.bin" \
             --assets "$BUILD_DIR/boopie_assets.bin" --assets-version "$(cat assets/VERSION)" \
             --notes notes.txt --out "$out/ota"
           mkdir -p "$out/flash"
-          cp "boopie-$VERSION-merged.bin" "$out/"
+          cp "boopie-$VERSION-merged.bin" "boopie-$VERSION-unlocked-merged.bin" "$out/"
           (cd "$BUILD_DIR" && cp --parents muse-gadget.bin bootloader/bootloader.bin \
             partition_table/partition-table.bin ota_data_initial.bin boopie_assets.bin flash_args "$out/flash/")
           cp notes.txt "$out/"
@@ -200,4 +207,5 @@ jobs:
         run: |
           (cd out && zip -qr "boopie-$VERSION-flash.zip" flash)
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Boopie $VERSION" \
-            --notes-file out/notes.txt "out/boopie-$VERSION-merged.bin" "out/boopie-$VERSION-flash.zip"
+            --notes-file out/notes.txt "out/boopie-$VERSION-merged.bin" "out/boopie-$VERSION-unlocked-merged.bin" \
+            "out/boopie-$VERSION-flash.zip"

@@ -1967,8 +1967,9 @@ static const page_t VPN = { &s_vpn, build_vpn_page };
 /* ---------- 系统更新 (Boopie) ---------- */
 
 static lv_obj_t *s_update, *s_home_update, *s_upd_status, *s_upd_check, *s_upd_box, *s_upd_title, *s_upd_notes,
-                *s_upd_bar, *s_upd_go, *s_upd_go_lbl;
+                *s_upd_bar, *s_upd_go, *s_upd_go_lbl, *s_upd_kind, *s_upd_switch, *s_upd_switch_lbl, *s_upd_switch_note;
 static uint32_t s_upd_armed;   /* the first tap on 立即更新, waiting for the second */
+static uint32_t s_upd_switch_armed;   /* the same for 换成…版 */
 
 static void on_upd_check(lv_event_t *e)
 {
@@ -1988,13 +1989,22 @@ static void on_upd_go(lv_event_t *e)
     }
 }
 
+static void on_upd_switch(lv_event_t *e)
+{
+    (void)e;
+    if (s_upd_switch_armed && lv_tick_elaps(s_upd_switch_armed) < 6000) {
+        s_upd_switch_armed = 0;
+        boopie_ota_switch();
+    } else {
+        s_upd_switch_armed = lv_tick_get();
+    }
+}
+
 static void build_update_page(lv_obj_t *tile)
 {
     lv_obj_t *list;
     s_update = page(tile, "系统更新", true, &list);
-    char now[48];
-    snprintf(now, sizeof now, "当前版本  %s", esp_app_get_description()->version);
-    note(list, now);
+    s_upd_kind = note(list, "");
     s_upd_status = note(list, "");
     s_upd_check = button(list, LV_SYMBOL_REFRESH "  检查更新", COLOR_ACCENT, on_upd_check, NULL);
     s_upd_box = column(list);
@@ -2015,10 +2025,12 @@ static void build_update_page(lv_obj_t *tile)
     lv_obj_set_style_bg_color(s_upd_bar, lv_color_hex(COLOR_OK), LV_PART_INDICATOR);
     s_upd_go = button(s_upd_box, LV_SYMBOL_DOWNLOAD "  立即更新", COLOR_OK, on_upd_go, &s_upd_go_lbl);
     lv_obj_add_flag(s_upd_box, LV_OBJ_FLAG_HIDDEN);
+    s_upd_switch = button(list, "", COLOR_ACCENT, on_upd_switch, &s_upd_switch_lbl);
+    s_upd_switch_note = note(list, "");
     note(list, "每天自动检查一次，有新版本会让宠物告诉你，点了「立即更新」才会装。"
                "更新包带签名，只装 Boopie 自己发布的版本；VPN 开着时走 VPN 下载。"
                "更新时别断电，装好会自动重启；新版本跑不起来会自动回到旧版本。");
-    s_upd_armed = 0;
+    s_upd_armed = s_upd_switch_armed = 0;
 }
 
 static void show_if(lv_obj_t *o, bool show)
@@ -2042,6 +2054,22 @@ static void tick_update(void)
     lv_obj_set_style_text_color(s_upd_status, lv_color_hex(info.state == BOOPIE_OTA_FAILED ? COLOR_WARN
                                                            : info.state == BOOPIE_OTA_LATEST ? COLOR_OK : COLOR_DIM), 0);
     show_if(s_upd_check, info.state != BOOPIE_OTA_OFF && !busy);
+    char kind[64];
+    snprintf(kind, sizeof kind, "当前版本  %s  %s", esp_app_get_description()->version,
+             info.unlocked ? "解锁版" : "正常版");
+    set_text(s_upd_kind, kind);
+    /* 正常版 <-> 解锁版: the other build of the latest version. */
+    bool can_switch = info.can_switch && !busy && info.state != BOOPIE_OTA_OFF;
+    show_if(s_upd_switch, can_switch);
+    show_if(s_upd_switch_note, can_switch);
+    if (can_switch) {
+        bool armed = s_upd_switch_armed && lv_tick_elaps(s_upd_switch_armed) < 6000;
+        set_text(s_upd_switch_lbl, armed ? "再点一下开始（几分钟，别断电）"
+                                   : info.unlocked ? LV_SYMBOL_LOOP "  换成正常版" : LV_SYMBOL_LOOP "  换成解锁版");
+        set_text(s_upd_switch_note, info.unlocked
+                 ? "正常版：皮肤、配饰、背景要用星星买或升级解锁。用星星买过的都还在；没买过、正穿着的会换下来。"
+                 : "解锁版：所有皮肤、配饰、颜色和背景直接能用。宠物、星星、等级和聊天记录都不变。想换回来随时可以。");
+    }
     show_if(s_upd_box, found);
     if (!found) {
         return;

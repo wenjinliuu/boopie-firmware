@@ -17,7 +17,9 @@
  * against its SHA-256 in the manifest; the assets pack (fonts, the pixel
  * font, the small world) waits in the user data partition and is written over
  * the assets partition at the next boot, before anything reads it. A broken
- * assets pack is put right without asking. Downloads go through the VPN when
+ * assets pack is put right without asking. Each release has two builds, 正常版
+ * and 解锁版 (BOOPIE_UNLOCK_ALL); a board follows its own, and can be switched to
+ * the other. Downloads go through the VPN when
  * it's on. Muse's own update commands are ignored (CONFIG_HOMEHUB_OTA_ENABLED).
  */
 
@@ -38,6 +40,8 @@ typedef struct {
     char version[16];         /* the newer version, when found */
     char notes[640];          /* what's new in it */
     char msg[96];             /* a line for the page: what's happening, or why it failed */
+    bool unlocked;            /* this build is the 解锁版 (everything open) */
+    bool can_switch;          /* the other build of the latest version can be installed */
 } boopie_ota_info_t;
 
 /* At boot, with the user data partition mounted and before the assets are
@@ -50,6 +54,8 @@ void boopie_ota_start(void);
 bool boopie_ota_enabled(void);
 void boopie_ota_check(void);
 void boopie_ota_install(void);   /* after a yes, with FOUND */
+/* Installs the other build (正常版 <-> 解锁版) of the latest version, after a yes. */
+void boopie_ota_switch(void);
 void boopie_ota_info(boopie_ota_info_t *out);
 
 /* The newer version found, once per version, for the pet to mention; NULL

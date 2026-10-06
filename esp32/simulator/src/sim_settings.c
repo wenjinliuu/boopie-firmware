@@ -244,6 +244,7 @@ void muse_voice_clear_notes(void) {}
 bool boopie_ota_enabled(void) { return true; }
 void boopie_ota_check(void) {}
 void boopie_ota_install(void) {}
+void boopie_ota_switch(void) {}
 void boopie_ota_ui_alive(void) {}
 const char *boopie_ota_news(void) { return NULL; }
 
@@ -255,6 +256,8 @@ void boopie_ota_info(boopie_ota_info_t *out)
     if (!s) {
         return;
     }
+    out->can_switch = true;
+    out->unlocked = getenv("BOOPIE_OTA_UNLOCKED") != NULL;
     if (strcmp(s, "latest") == 0) {
         out->state = BOOPIE_OTA_LATEST;
         strcpy(out->msg, "已经是最新版");

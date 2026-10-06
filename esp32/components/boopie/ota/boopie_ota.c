@@ -57,8 +57,8 @@ typedef struct {
 static SemaphoreHandle_t s_lock;
 static TaskHandle_t s_task;
 static boopie_ota_info_t s_info;
-static release_file_t s_app, s_assets;
-static bool s_need_app, s_need_assets;
+static release_file_t s_app, s_other, s_assets;   /* this build's app, the other build's */
+static bool s_need_app, s_need_assets, s_have_other;
 static char s_news_for[16];
 static atomic_int s_want;              /* 1: check, 2: install */
 static atomic_llong s_ui_since_us, s_ui_last_us;
@@ -66,6 +66,13 @@ static uint8_t *s_buf;                 /* CHUNK, in PSRAM */
 
 #define WANT_CHECK 1
 #define WANT_INSTALL 2
+#define WANT_SWITCH 3
+
+#ifdef BOOPIE_UNLOCK_ALL
+#define UNLOCKED true
+#else
+#define UNLOCKED false
+#endif
 
 /* ---- small things ---- */
 
@@ -340,25 +347,38 @@ static void check(void)
     free(json);
     const cJSON *board = cJSON_GetObjectItem(m, "board"), *ver = cJSON_GetObjectItem(m, "version"),
                 *notes = cJSON_GetObjectItem(m, "notes");
-    release_file_t app = { 0 }, assets = { 0 };
+    release_file_t normal = { 0 }, unlocked = { 0 }, assets = { 0 };
     if (!m || !cJSON_IsString(board) || strcmp(board->valuestring, BOARD) != 0 || !cJSON_IsString(ver)
-        || strlen(ver->valuestring) >= sizeof s_info.version || !file_entry(cJSON_GetObjectItem(m, "app"), &app)
+        || strlen(ver->valuestring) >= sizeof s_info.version || !file_entry(cJSON_GetObjectItem(m, "app"), &normal)
         || !file_entry(cJSON_GetObjectItem(m, "assets"), &assets)) {
         cJSON_Delete(m);
         set_state(BOOPIE_OTA_FAILED, 0, "更新信息看不懂");
         return;
     }
+    bool has_unlocked = file_entry(cJSON_GetObjectItem(m, "app_unlocked"), &unlocked);
+    /* This build follows its own kind; the other is there to switch to. */
+    const release_file_t *mine = UNLOCKED ? (has_unlocked ? &unlocked : NULL) : &normal;
+    const release_file_t *other = UNLOCKED ? &normal : (has_unlocked ? &unlocked : NULL);
     const char *running = esp_app_get_description()->version;
-    bool need_app = newer(ver->valuestring, running);
+    bool need_app = mine && newer(ver->valuestring, running);
+    bool can_switch = other && !newer(running, ver->valuestring);
     bool broken = !boopie_assets_ready();
-    bool need_assets = (need_app || broken) && !assets_match(&assets);
+    bool differ = !assets_match(&assets);
+    bool need_assets = differ && (need_app || broken);
     ESP_LOGI(TAG, "latest %s, running %s%s%s", ver->valuestring, running, need_app ? ": newer" : "",
-             need_assets ? ", assets differ" : "");
+             differ ? ", assets differ" : "");
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    s_app = app;
+    if (mine) {
+        s_app = *mine;
+    }
+    if (other) {
+        s_other = *other;
+    }
+    s_have_other = other != NULL;
     s_assets = assets;
     s_need_app = need_app;
-    s_need_assets = need_assets;
+    s_need_assets = differ;   /* (installed with an app; on its own only when broken) */
+    s_info.can_switch = can_switch;
     strlcpy(s_info.version, ver->valuestring, sizeof s_info.version);
     strlcpy(s_info.notes, cJSON_IsString(notes) ? notes->valuestring : "", sizeof s_info.notes);
     xSemaphoreGive(s_lock);
@@ -497,17 +517,24 @@ static bool fetch_app(const release_file_t *f, int lo, int hi, const char **why)
     return true;
 }
 
-static void install(void)
+/* The update (switch: the other build of the latest version instead), or
+ * with no newer app, a repair of the assets pack. */
+static void install(bool switch_build)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    release_file_t app = s_app, assets = s_assets;
-    bool need_app = s_need_app, need_assets = s_need_assets;
+    release_file_t app = switch_build ? s_other : s_app, assets = s_assets;
+    bool need_app = switch_build ? s_have_other : s_need_app, need_assets = s_need_assets;
     char version[16];
     strlcpy(version, need_app ? s_info.version : esp_app_get_description()->version, sizeof version);
     xSemaphoreGive(s_lock);
+    if (switch_build && !need_app) {
+        set_state(BOOPIE_OTA_FAILED, 0, "这个版本没有另一种");
+        return;
+    }
     const char *why = "";
     int split = need_app && need_assets ? 45 : need_assets ? 100 : 0;
-    set_state(BOOPIE_OTA_DOWNLOADING, 0, need_app ? "正在下载新版本……" : "正在下载资源包……");
+    set_state(BOOPIE_OTA_DOWNLOADING, 0, switch_build ? (UNLOCKED ? "正在下载正常版……" : "正在下载解锁版……")
+                                         : need_app ? "正在下载新版本……" : "正在下载资源包……");
     ESP_LOGI(TAG, "installing%s%s", need_app ? " app" : "", need_assets ? " assets" : "");
     if (need_assets && !fetch_assets(&assets, version, 0, split, &why)) {
         set_state(BOOPIE_OTA_FAILED, 0, why);
@@ -545,7 +572,9 @@ static void ota_task(void *arg)
         int want = atomic_exchange(&s_want, 0);
         boopie_ota_state_t st = s_info.state;
         if (want == WANT_INSTALL && (st == BOOPIE_OTA_FOUND || st == BOOPIE_OTA_FAILED) && s_info.version[0]) {
-            install();
+            install(false);
+        } else if (want == WANT_SWITCH && s_info.can_switch) {
+            install(true);
         } else if (want == WANT_CHECK || (up && next && now >= next && st != BOOPIE_OTA_FOUND)) {
             if (!up) {
                 set_state(BOOPIE_OTA_FAILED, 0, "还没联网");
@@ -563,6 +592,7 @@ void boopie_ota_start(void)
         return;
     }
     s_lock = xSemaphoreCreateMutex();
+    s_info.unlocked = UNLOCKED;
     if (!boopie_ota_enabled()) {
         s_info.state = BOOPIE_OTA_OFF;
         strlcpy(s_info.msg, "这个版本没有开在线更新", sizeof s_info.msg);
@@ -609,6 +639,14 @@ void boopie_ota_install(void)
     }
 }
 
+void boopie_ota_switch(void)
+{
+    if (s_task && s_info.can_switch && s_info.state != BOOPIE_OTA_DOWNLOADING && s_info.state != BOOPIE_OTA_RESTARTING) {
+        set_state(BOOPIE_OTA_DOWNLOADING, 0, "准备下载……");
+        poke(WANT_SWITCH);
+    }
+}
+
 void boopie_ota_info(boopie_ota_info_t *out)
 {
     if (!s_lock) {
@@ -617,8 +655,8 @@ void boopie_ota_info(boopie_ota_info_t *out)
     }
     xSemaphoreTake(s_lock, portMAX_DELAY);
     *out = s_info;
-    if (out->state == BOOPIE_OTA_FAILED && !s_need_app && !s_need_assets) {
-        out->version[0] = '\0';   /* a failed check: nothing to retry installing */
+    if (out->state == BOOPIE_OTA_FAILED && !s_need_app && !(s_need_assets && !boopie_assets_ready())) {
+        out->version[0] = '\0';   /* a failed check or switch: no update to retry */
     }
     xSemaphoreGive(s_lock);
 }

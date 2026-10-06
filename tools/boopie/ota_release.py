@@ -7,7 +7,8 @@
   python3 tools/boopie/ota_release.py --version 1.2.0 --app build/muse-gadget.bin \\
       --assets build/boopie_assets.bin --assets-version 3 --notes notes.txt --out ota/
 
-writes ota/files/boopie-<version>.bin, ota/files/assets-<n>-<sha8>.bin and
+(--app-unlocked adds the 解锁版 build as app_unlocked; boards follow their own
+build and can switch to the other) writes ota/files/boopie-<version>.bin, ota/files/assets-<n>-<sha8>.bin and
 ota/manifest.json. Signing is done after, with openssl and the release key,
 which this script never sees, then the signature is made raw (r || s, 64 bytes),
 which is what the board checks:
@@ -72,7 +73,8 @@ def main() -> None:
         return
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", required=True, help="x.y.z, the app's PROJECT_VER")
-    ap.add_argument("--app", type=Path, required=True)
+    ap.add_argument("--app", type=Path, required=True, help="正常版")
+    ap.add_argument("--app-unlocked", type=Path, help="解锁版 (BOOPIE_UNLOCK_ALL=1), same version")
     ap.add_argument("--assets", type=Path, required=True)
     ap.add_argument("--assets-version", type=int, required=True)
     ap.add_argument("--notes", type=Path, help="what's new, a few lines (UTF-8)")
@@ -83,6 +85,7 @@ def main() -> None:
     notes = args.notes.read_text(encoding="utf-8").strip() if args.notes and args.notes.exists() else ""
     files = args.out / "files"
     app = entry(args.app, files / f"boopie-{args.version}.bin")
+    unlocked = entry(args.app_unlocked, files / f"boopie-{args.version}-unlocked.bin") if args.app_unlocked else None
     sha = hashlib.sha256(args.assets.read_bytes()).hexdigest()
     assets = entry(args.assets, files / f"assets-{args.assets_version}-{sha[:8]}.bin")
     assets["version"] = args.assets_version
@@ -95,6 +98,8 @@ def main() -> None:
         "app": app,
         "assets": assets,
     }
+    if unlocked:
+        manifest["app_unlocked"] = unlocked
     (args.out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(json.dumps(manifest, ensure_ascii=False, indent=1))
 

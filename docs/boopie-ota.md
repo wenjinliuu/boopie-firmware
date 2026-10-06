@@ -16,6 +16,9 @@ control channel) are turned away: `CONFIG_HOMEHUB_OTA_ENABLED=n`.
   resume a dropped download) and written over the assets partition at the
   first boot of the app it came with, header last, before anything reads it.
 - A broken assets pack is put right without asking.
+- Each release has two builds: 正常版 and 解锁版 (`BOOPIE_UNLOCK_ALL`, every
+  skin, accessory, colour and background open). A board follows its own and
+  can switch to the other on the 系统更新 page; saved data is kept either way.
 - The server's name goes through the VPN when it's on; TLS is checked end to
   end as for any other site.
 - A new app is kept once the UI has run for 45 s with Wi-Fi up (or not set
