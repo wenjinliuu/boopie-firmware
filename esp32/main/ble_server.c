@@ -945,7 +945,13 @@ void ble_server_start(const char *device_name, const ble_callbacks_t *cb) {
     s_advertising_enabled = false;
     s_advertising_active = false;
 
-    nimble_port_init();
+    /* Out of internal RAM the controller fails to start, and the GAP service
+     * would then dereference a host that never came up. */
+    esp_err_t err = nimble_port_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nimble init failed: %s", esp_err_to_name(err));
+        return;
+    }
     ble_svc_gap_init();
     ble_svc_gatt_init();
 

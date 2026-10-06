@@ -25,6 +25,7 @@
 #include "boopie_tools.h"
 #include "boopie_xiaozhi.h"
 #include "boopie_xz_proto.h"
+#include "esp_attr.h"
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -88,7 +89,7 @@ static volatile bool s_hello;
 static volatile int s_frame_ms = 60;
 static volatile boopie_xz_mood_t s_mood;
 
-static sentence_t s_sent[SENTENCES];
+EXT_RAM_BSS_ATTR static sentence_t s_sent[SENTENCES];   /* PSRAM: internal RAM is for Wi-Fi and BLE */
 static int s_sent_n;
 static size_t s_out_total;   /* reply frames decoded this turn */
 
@@ -107,7 +108,7 @@ static void push_event(muse_hatch_ev_t ev, const char *text)
 /* Into s_down, tagged; dropped if there's no room (the reply runs ahead of playing). */
 static void down_put(char tag, const void *data, size_t len)
 {
-    static uint8_t buf[1 + PKT_MAX];
+    EXT_RAM_BSS_ATTR static uint8_t buf[1 + PKT_MAX];
     if (len > PKT_MAX) {
         return;
     }
@@ -259,8 +260,9 @@ static bool ensure_ws(void)
         return true;
     }
     close_ws();
-    static char url[BOOPIE_XZ_URL_MAX], token[BOOPIE_XZ_TOKEN_MAX];
-    static char headers[BOOPIE_XZ_TOKEN_MAX + 160];
+    EXT_RAM_BSS_ATTR static char url[BOOPIE_XZ_URL_MAX];
+    EXT_RAM_BSS_ATTR static char token[BOOPIE_XZ_TOKEN_MAX];
+    EXT_RAM_BSS_ATTR static char headers[BOOPIE_XZ_TOKEN_MAX + 160];
     if (!boopie_xiaozhi_endpoint(url, sizeof url, token, sizeof token)) {
         return false;
     }
@@ -315,7 +317,7 @@ static void session(char *out, size_t cap)
 /* Sends what's waiting once the server has said hello: listen start, speech, listen stop. */
 static void flush_outbox(void)
 {
-    static uint8_t item[1 + PKT_MAX];
+    EXT_RAM_BSS_ATTR static uint8_t item[1 + PKT_MAX];
     char sid[BOOPIE_XZ_SESSION_MAX], json[160];
     while (s_hello && s_connected) {
         size_t n = xMessageBufferReceive(s_outbox, item, sizeof item, 0);
@@ -338,7 +340,7 @@ static void flush_outbox(void)
 
 static void outbox_put(char tag, const void *data, size_t len)
 {
-    static uint8_t buf[1 + PKT_MAX];
+    EXT_RAM_BSS_ATTR static uint8_t buf[1 + PKT_MAX];
     buf[0] = (uint8_t)tag;
     memcpy(buf + 1, data, len);
     if (xMessageBufferSend(s_outbox, buf, len + 1, 0) == 0) {
@@ -403,7 +405,7 @@ static bool s_stuck;   /* s_pcm still to go */
 
 static void decode(void)
 {
-    static uint8_t item[1 + PKT_MAX];
+    EXT_RAM_BSS_ATTR static uint8_t item[1 + PKT_MAX];
     if (!s_dec) {
         int ms = s_frame_ms;
         esp_opus_dec_cfg_t cfg = {

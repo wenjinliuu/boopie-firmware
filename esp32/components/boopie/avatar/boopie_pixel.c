@@ -18,6 +18,13 @@
 #include "boopie_hop.h"
 
 #include <math.h>
+#ifdef ESP_PLATFORM
+#include "esp_attr.h"
+/* Big scratch buffers live in PSRAM: internal RAM is what Wi-Fi, BLE and DMA need. */
+#define PIXEL_PSRAM EXT_RAM_BSS_ATTR
+#else
+#define PIXEL_PSRAM
+#endif
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -765,7 +772,7 @@ static void overlay(pose_t *p, boopie_overlay_t name, double t, double length)
 
 /* ---------------------------------------------------------------- canvas */
 
-static rgb_t s_img[N][N];
+PIXEL_PSRAM static rgb_t s_img[N][N];
 static mask_t s_body;           /* everything shaded so far: the rings stay off it */
 static rgb_t s_eye;
 static bool s_has_shine;
@@ -862,7 +869,8 @@ static void outline(const mask_t m, rgb_t c)
 /* Fill the mask with the ramp, lit from the top left by the slope of its blur, dithered. */
 static void shaded(const mask_t m, const ramp_t *rp)
 {
-    static float h[N][N], tmp[N][N];
+    PIXEL_PSRAM static float h[N][N];
+    PIXEL_PSRAM static float tmp[N][N];
     if (!m_any(m)) {
         return;
     }
@@ -3588,8 +3596,8 @@ float boopie_overlay_loop(boopie_overlay_t o)
     return (int)o >= 0 && o < BOOPIE_OVERLAY_COUNT ? (float)OVERLAY_LOOP[o] : 1.0f;
 }
 
-static uint16_t s_565[N * N];
-static uint16_t s_565_dim[N * N];   /* the block edge shade gives the enlarged pixels a faint grid texture */
+PIXEL_PSRAM static uint16_t s_565[N * N];
+PIXEL_PSRAM static uint16_t s_565_dim[N * N];   /* the block edge shade gives the enlarged pixels a faint grid texture */
 static void to_565_all(void);
 
 static inline uint16_t to565(float r, float g, float b)
@@ -3691,7 +3699,7 @@ void boopie_pixel_scale(uint16_t *dst, int stride_px, int x0, int x1, int y0, in
 
 /* ---------------------------------------------------------------- compose */
 
-static rgb_t s_layer[N][N];
+PIXEL_PSRAM static rgb_t s_layer[N][N];
 static mask_t s_layer_mask;
 
 static void to_565_all(void)
