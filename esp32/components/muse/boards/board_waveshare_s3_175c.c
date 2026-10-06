@@ -232,6 +232,7 @@ static const muse_board_t s_board = {
     .set_brightness = set_brightness,
     .panel_sleep = panel_sleep,
     .display_pause = display_pause,
+    .display_quiet = muse_lcd_bands_quiet,
     .audio_init = audio_init,
     .mic_slot = -1,
     .set_mic_gain = set_mic_gain,

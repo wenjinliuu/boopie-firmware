@@ -28,6 +28,7 @@
 #include "boopie_avatar.h"
 #include "boopie_sdk_token.h"
 #include "boopie_vpn.h"
+#include "muse_board.h"
 #include "muse_settings.h"
 #include "muse_wifi.h"
 
@@ -486,6 +487,29 @@ static esp_err_t on_other(httpd_req_t *req, httpd_err_code_t err)
 
 /* ---- start and stop ---- */
 
+/* Wi-Fi's mode changed with the panel quiet (muse_board_t.display_quiet). */
+typedef struct {
+    wifi_mode_t mode;
+    esp_err_t err;
+} mode_change_t;
+
+static void set_mode_now(void *arg)
+{
+    mode_change_t *c = arg;
+    c->err = esp_wifi_set_mode(c->mode);
+}
+
+static esp_err_t set_mode(wifi_mode_t mode)
+{
+    mode_change_t c = { mode, ESP_FAIL };
+    if (muse_board && muse_board->display_quiet) {
+        muse_board->display_quiet(set_mode_now, &c);
+    } else {
+        set_mode_now(&c);
+    }
+    return c.err;
+}
+
 static void make_ap(boopie_setup_ap_t *ap)
 {
     uint8_t mac[6] = {0};
@@ -514,7 +538,7 @@ bool boopie_setup_web_start(boopie_setup_ap_t *ap)
         esp_netif_dhcps_option(s_ap_netif, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, (void *)URI, strlen(URI));
         esp_netif_dhcps_start(s_ap_netif);
     }
-    if (esp_wifi_set_mode(WIFI_MODE_APSTA) != ESP_OK) {
+    if (set_mode(WIFI_MODE_APSTA) != ESP_OK) {
         return false;
     }
     make_ap(ap);
@@ -526,7 +550,7 @@ bool boopie_setup_web_start(boopie_setup_ap_t *ap)
     wc.ap.authmode = WIFI_AUTH_WPA2_PSK;
     wc.ap.pmf_cfg.capable = true;
     if (esp_wifi_set_config(WIFI_IF_AP, &wc) != ESP_OK) {
-        esp_wifi_set_mode(WIFI_MODE_STA);
+        set_mode(WIFI_MODE_STA);
         return false;
     }
     esp_wifi_set_ps(WIFI_PS_NONE);   /* the hotspot needs the radio awake */
@@ -548,7 +572,7 @@ bool boopie_setup_web_start(boopie_setup_ap_t *ap)
         ESP_LOGE(TAG, "web server not started: %s (internal free %u, largest %u)", esp_err_to_name(err),
                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-        esp_wifi_set_mode(WIFI_MODE_STA);
+        set_mode(WIFI_MODE_STA);
         return false;
     }
     static const httpd_uri_t URIS[] = {
@@ -588,7 +612,7 @@ void boopie_setup_web_stop(void)
         httpd_stop(s_http);
         s_http = NULL;
     }
-    esp_wifi_set_mode(WIFI_MODE_STA);
+    set_mode(WIFI_MODE_STA);
     ESP_LOGI(TAG, "phone setup off");
 }
 

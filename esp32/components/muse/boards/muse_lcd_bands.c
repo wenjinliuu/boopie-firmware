@@ -48,6 +48,7 @@ static uint8_t *s_chunk[2];
 static size_t s_chunk_bytes;
 static int s_chunks_out;                 /* of the band being sent */
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
+static SemaphoreHandle_t s_parked, s_unpark;   /* muse_lcd_bands_quiet */
 
 /* A piece has gone, or failed to; true if it was the band's last. */
 static bool IRAM_ATTR chunk_done(void)
@@ -128,9 +129,11 @@ lv_display_t *muse_lcd_bands_register(esp_lv_adapter_display_config_t cfg, int l
     s_call_lock = xSemaphoreCreateMutex();
     s_call_done = xSemaphoreCreateBinary();
     s_chunk_free = xSemaphoreCreateCounting(2, 2);
+    s_parked = xSemaphoreCreateBinary();
+    s_unpark = xSemaphoreCreateBinary();
     s_chunk[0] = heap_caps_malloc(chunk_bytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     s_chunk[1] = heap_caps_malloc(chunk_bytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    if (!s_bands || !s_call_lock || !s_call_done || !s_chunk_free || !s_chunk[0] || !s_chunk[1] ||
+    if (!s_bands || !s_call_lock || !s_call_done || !s_chunk_free || !s_parked || !s_unpark || !s_chunk[0] || !s_chunk[1] ||
         xTaskCreatePinnedToCore(send_bands, "lcd_send", 2560, NULL, MUSE_UI_PRIORITY + 1, NULL, MUSE_UI_CORE) != pdPASS) {
         return NULL;
     }
@@ -162,6 +165,42 @@ void muse_lcd_bands_run(void (*fn)(void *arg), void *arg)
     s_call_arg = arg;
     const band_t call = { 0 };
     xQueueSend(s_bands, &call, portMAX_DELAY);
+    xSemaphoreTake(s_call_done, portMAX_DELAY);
+    xSemaphoreGive(s_call_lock);
+}
+
+/* On the send task: both pieces off the wire, then wait to be let go. */
+static void park(void *arg)
+{
+    (void)arg;
+    bool a = xSemaphoreTake(s_chunk_free, pdMS_TO_TICKS(500)) == pdTRUE;
+    bool b = xSemaphoreTake(s_chunk_free, pdMS_TO_TICKS(500)) == pdTRUE;
+    xSemaphoreGive(s_parked);
+    xSemaphoreTake(s_unpark, portMAX_DELAY);
+    if (a) {
+        xSemaphoreGive(s_chunk_free);
+    }
+    if (b) {
+        xSemaphoreGive(s_chunk_free);
+    }
+}
+
+void muse_lcd_bands_quiet(void (*fn)(void *arg), void *arg)
+{
+    if (!s_bands) {
+        fn(arg);
+        return;
+    }
+    xSemaphoreTake(s_call_lock, portMAX_DELAY);
+    s_call = park;
+    s_call_arg = NULL;
+    const band_t call = { 0 };
+    xQueueSend(s_bands, &call, portMAX_DELAY);
+    if (xSemaphoreTake(s_parked, pdMS_TO_TICKS(1500)) != pdTRUE) {
+        ESP_LOGW(TAG, "panel didn't go quiet; going ahead");
+    }
+    fn(arg);
+    xSemaphoreGive(s_unpark);
     xSemaphoreTake(s_call_done, portMAX_DELAY);
     xSemaphoreGive(s_call_lock);
 }

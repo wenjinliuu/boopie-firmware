@@ -56,3 +56,7 @@ lv_display_t *muse_lcd_bands_register(esp_lv_adapter_display_config_t cfg, int l
  * this, whichever core it's called from.
  */
 void muse_lcd_bands_run(void (*fn)(void *arg), void *arg);
+
+/* Runs fn on the caller with the send task parked between bands and nothing
+ * on the wire (muse_board_t.display_quiet). */
+void muse_lcd_bands_quiet(void (*fn)(void *arg), void *arg);
