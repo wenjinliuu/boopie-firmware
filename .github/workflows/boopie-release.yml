@@ -72,7 +72,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
-            echo "::error::v$VERSION already exists"; exit 1
+            # Made by an earlier attempt at this release: build what it marks.
+            echo "::warning::v$VERSION already exists: building the commit it marks, with its notes"
+            exit 0
           fi
           printf '%b\n' "$NOTES" > "$RUNNER_TEMP/notes.txt"
           git tag -a "v$VERSION" -F "$RUNNER_TEMP/notes.txt"
@@ -100,9 +102,16 @@ jobs:
           if [ -n "$PINNED" ]; then
             url="${PINNED%/}"
           else
-            sub=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" | jq -r '.result.subdomain // empty')
-            [ -n "$sub" ] || { echo "::error::no workers.dev subdomain; set the variable BOOPIE_OTA_URL"; exit 1; }
+            id=$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]')
+            [[ "$id" =~ ^[0-9a-f]{32}$ ]] || { echo "::error::CLOUDFLARE_ACCOUNT_ID isn't a 32-digit account ID (${#id} characters)"; exit 1; }
+            reply=$(curl -sS -H "Authorization: Bearer $(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')" \
+              "https://api.cloudflare.com/client/v4/accounts/$id/workers/subdomain")
+            sub=$(jq -r '.result.subdomain // empty' <<< "$reply")
+            if [ -z "$sub" ]; then
+              echo "Cloudflare said: $(jq -c '.errors' <<< "$reply" 2>/dev/null || echo "$reply" | head -c 300)"
+              echo "::error::no workers.dev subdomain; check the token's permissions, or set the variable BOOPIE_OTA_URL"
+              exit 1
+            fi
             url="https://boopie-ota.$sub.workers.dev/v1"
           fi
           echo "server: $url"
