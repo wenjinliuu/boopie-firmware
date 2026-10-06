@@ -144,7 +144,12 @@ static void on_app(lv_event_t *e)
     }
 }
 
-/* Each row by how far it is from the middle: smaller and dimmer toward the edge. */
+/*
+ * Each row by how far it is from the middle: dimmer toward the edge. The dimming
+ * is a black shade over the row (its last child), not the row's own opacity or
+ * scale: those make LVGL draw each row into an ~88 KB layer, which fails when
+ * PSRAM is short and LVGL then retries forever, freezing the screen.
+ */
 static void on_app_scroll(lv_event_t *e)
 {
     (void)e;
@@ -157,10 +162,9 @@ static void on_app_scroll(lv_event_t *e)
         lv_area_t a;
         lv_obj_get_coords(row, &a);
         int d = LV_ABS((a.y1 + a.y2) / 2 - mid);
-        int scale = 256 - d * 70 / 200;
         int opa = 255 - d * 170 / 200;
-        lv_obj_set_style_transform_scale(row, scale < 170 ? 170 : scale, 0);
-        lv_obj_set_style_opa(row, (lv_opa_t)(opa < 60 ? 60 : opa), 0);
+        lv_obj_t *shade = lv_obj_get_child(row, -1);
+        lv_obj_set_style_bg_opa(shade, (lv_opa_t)(255 - (opa < 60 ? 60 : opa)), 0);
     }
 }
 
@@ -186,8 +190,6 @@ static void build_apps(lv_obj_t *page)
         lv_obj_set_style_radius(row, 26, 0);
         lv_obj_set_style_bg_color(row, lv_color_hex(COLOR_CARD_PRESSED), LV_STATE_PRESSED);
         lv_obj_set_style_bg_opa(row, LV_OPA_COVER, LV_STATE_PRESSED);
-        lv_obj_set_style_transform_pivot_x(row, 170, 0);
-        lv_obj_set_style_transform_pivot_y(row, APP_ROW_H / 2, 0);
         lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SNAPPABLE);
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_t *tile;
@@ -206,6 +208,12 @@ static void build_apps(lv_obj_t *page)
         lv_obj_t *d = text(row, &lv_font_montserrat_16, COLOR_DIM, APPS[i].note);
         lv_obj_align(d, LV_ALIGN_LEFT_MID, APP_TILE + 26, 20);
         lv_obj_add_event_cb(row, on_app, LV_EVENT_CLICKED, (void *)&APPS[i]);
+        lv_obj_t *shade = lv_obj_create(row);   /* last child: see on_app_scroll */
+        lv_obj_remove_style_all(shade);
+        lv_obj_set_size(shade, lv_pct(100), lv_pct(100));
+        lv_obj_set_style_radius(shade, 26, 0);
+        lv_obj_set_style_bg_color(shade, lv_color_black(), 0);
+        lv_obj_remove_flag(shade, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
     }
 
     /* The title over the list, on a band the rows pass under. */
