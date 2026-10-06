@@ -206,6 +206,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           (cd out && zip -qr "boopie-$VERSION-flash.zip" flash)
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Boopie $VERSION" \
-            --notes-file out/notes.txt "out/boopie-$VERSION-merged.bin" "out/boopie-$VERSION-unlocked-merged.bin" \
-            "out/boopie-$VERSION-flash.zip"
+          files=("out/boopie-$VERSION-merged.bin" "out/boopie-$VERSION-unlocked-merged.bin" "out/boopie-$VERSION-flash.zip")
+          # A tag made from the Releases page comes with its release: add the files to it.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Boopie $VERSION" \
+              --notes-file out/notes.txt "${files[@]}"
+          fi
